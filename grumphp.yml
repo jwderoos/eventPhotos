@@ -51,8 +51,8 @@ grumphp:
             exclude:
                 - 'Kernel.php'
             fuzzy: false
-            min_lines: 10
-            min_tokens: 50
+            min_lines: 50
+            min_tokens: 100
             triggered_by:
                 - 'php'
 
@@ -71,6 +71,7 @@ grumphp:
                 - 'migrations/'
                 - 'config/'
                 - 'var/'
+                - 'importmap.php'
             sniffs: []
             triggered_by:
                 - 'php'
