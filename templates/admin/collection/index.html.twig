@@ -2,41 +2,60 @@
 
 {% block title %}Admin — Collections{% endblock %}
 
+{% block admin_breadcrumb %}
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li>Admin</li>
+            <li>Collections</li>
+        </ul>
+    </div>
+{% endblock %}
+
 {% block admin_main %}
-    <h1>Collections</h1>
-    <p><a href="{{ path('admin_collection_new') }}">+ new collection</a></p>
+    <header class="mb-6 flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">Collections</h1>
+        <a href="{{ path('admin_collection_new') }}" class="btn btn-primary btn-sm">+ New collection</a>
+    </header>
 
     {% if collections %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Slug</th>
-                    <th>Name</th>
-                    <th>Owner</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for collection in collections %}
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+            <table class="table table-zebra">
+                <thead>
                     <tr>
-                        <td><code>{{ collection.slug }}</code></td>
-                        <td>{{ collection.name }}</td>
-                        <td>{{ collection.owner.email }}</td>
-                        <td>
-                            <a href="{{ path('admin_collection_edit', {id: collection.id}) }}">Edit</a>
-                            <form method="post"
-                                  action="{{ path('admin_collection_delete', {id: collection.id}) }}"
-                                  onsubmit="return confirm('Delete this collection?')"
-                                  style="display:inline">
-                                <input type="hidden" name="_token" value="{{ csrf_token('delete_collection_' ~ collection.id) }}">
-                                <button type="submit">Delete</button>
-                            </form>
-                        </td>
+                        <th>Slug</th>
+                        <th>Name</th>
+                        <th>Owner</th>
+                        <th class="text-right">Actions</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% for collection in collections %}
+                        <tr>
+                            <td><code class="text-xs">{{ collection.slug }}</code></td>
+                            <td class="font-medium">{{ collection.name }}</td>
+                            <td class="text-sm text-base-content/70">{{ collection.owner.email }}</td>
+                            <td class="text-right">
+                                <div class="inline-flex items-center gap-1">
+                                    <a href="{{ path('admin_collection_edit', {id: collection.id}) }}"
+                                       class="btn btn-ghost btn-xs">Edit</a>
+                                    <form method="post"
+                                          action="{{ path('admin_collection_delete', {id: collection.id}) }}"
+                                          onsubmit="return confirm('Delete this collection?')"
+                                          class="inline">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete_collection_' ~ collection.id) }}">
+                                        <button type="submit" class="btn btn-ghost btn-xs text-error">Delete</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     {% else %}
-        <p>No collections.</p>
+        <div class="rounded-box border border-dashed border-base-300 bg-base-100 p-10 text-center">
+            <p class="text-base-content/70">No collections yet.</p>
+            <a href="{{ path('admin_collection_new') }}" class="btn btn-primary btn-sm mt-4">Create your first collection</a>
+        </div>
     {% endif %}
 {% endblock %}

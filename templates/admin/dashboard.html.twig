@@ -2,35 +2,68 @@
 
 {% block title %}Admin — Dashboard{% endblock %}
 
+{% block admin_breadcrumb %}
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li>Admin</li>
+            <li>Dashboard</li>
+        </ul>
+    </div>
+{% endblock %}
+
 {% block admin_main %}
-    <h1>Dashboard</h1>
+    <header class="mb-6 flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">Dashboard</h1>
+    </header>
 
-    <section>
-        <h2>Recent events <a href="{{ path('admin_event_new') }}">+ new</a></h2>
-        {% if events %}
-            <ul>
-                {% for event in events %}
-                    <li>
-                        <a href="{{ path('admin_event_edit', {id: event.id}) }}">{{ event.name }}</a>
-                        — {{ event.date|date('Y-m-d') }} (slug: <code>{{ event.slug }}</code>)
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p>No events yet.</p>
-        {% endif %}
-    </section>
+    <div class="grid gap-6 lg:grid-cols-2">
+        <section class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <h2 class="card-title">Recent events</h2>
+                    <a href="{{ path('admin_event_new') }}" class="btn btn-primary btn-sm">+ New</a>
+                </div>
 
-    <section>
-        <h2>Collections <a href="{{ path('admin_collection_new') }}">+ new</a></h2>
-        {% if collections %}
-            <ul>
-                {% for collection in collections %}
-                    <li><a href="{{ path('admin_collection_edit', {id: collection.id}) }}">{{ collection.name }}</a></li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p>No collections yet.</p>
-        {% endif %}
-    </section>
+                {% if events %}
+                    <ul class="divide-y divide-base-200">
+                        {% for event in events %}
+                            <li class="py-2">
+                                <a href="{{ path('admin_event_edit', {id: event.id}) }}" class="link link-hover font-medium">
+                                    {{ event.name }}
+                                </a>
+                                <span class="text-sm text-base-content/70">
+                                    — {{ event.date|date('Y-m-d') }} (slug: <code class="text-xs">{{ event.slug }}</code>)
+                                </span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-base-content/60">No events yet.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <h2 class="card-title">Collections</h2>
+                    <a href="{{ path('admin_collection_new') }}" class="btn btn-primary btn-sm">+ New</a>
+                </div>
+
+                {% if collections %}
+                    <ul class="divide-y divide-base-200">
+                        {% for collection in collections %}
+                            <li class="py-2">
+                                <a href="{{ path('admin_collection_edit', {id: collection.id}) }}" class="link link-hover font-medium">
+                                    {{ collection.name }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-base-content/60">No collections yet.</p>
+                {% endif %}
+            </div>
+        </section>
+    </div>
 {% endblock %}

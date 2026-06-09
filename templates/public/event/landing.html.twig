@@ -1,40 +1,45 @@
-{% extends 'base.html.twig' %}
+{% extends 'public/_base.html.twig' %}
 
 {% block title %}{{ event.name }}{% endblock %}
 
-{% block body %}
-    <main {{ stimulus_controller('share') }}>
-        <h1>{{ event.name }}</h1>
+{% block public_main %}
+    <article {{ stimulus_controller('share') }} class="card bg-base-100 shadow-sm">
+        <div class="card-body gap-4">
+            <h1 class="card-title text-2xl">{{ event.name }}</h1>
 
-        {% if event.description %}
-            <p>{{ event.description }}</p>
-        {% endif %}
+            {% if event.description %}
+                <p class="text-base-content/80">{{ event.description }}</p>
+            {% endif %}
 
-        <p>
-            Current time:
-            <time datetime="{{ now|date('c') }}">{{ now|date('H:i') }}</time>
-            <br>
-            Window: ±{{ windowMinutes }} minutes
-        </p>
+            <p class="text-sm text-base-content/70">
+                Current time:
+                <time datetime="{{ now|date('c') }}">{{ now|date('H:i') }}</time>
+                <br>
+                Window: ±{{ windowMinutes }} minutes
+            </p>
 
-        <a
-            href="{{ photosUrl }}"
-            class="btn-primary"
-            data-share-url-value="{{ url('public_event_photos', {slug: event.slug, t: now|date('c'), w: windowMinutes}) }}"
-            data-share-title-value="{{ event.name }} — Photos"
-            data-share-text-value="My photos from {{ event.name }}"
-        >
-            Show my photos
-        </a>
+            <div class="card-actions justify-end">
+                <button
+                    type="button"
+                    class="btn btn-ghost"
+                    data-action="click->share#share"
+                    data-share-url-value="{{ url('public_event_photos', {slug: event.slug, t: now|date('c'), w: windowMinutes}) }}"
+                    data-share-title-value="{{ event.name }} — Photos"
+                    data-share-text-value="My photos from {{ event.name }}"
+                >
+                    Share
+                </button>
 
-        <button
-            type="button"
-            data-action="click->share#share"
-            data-share-url-value="{{ url('public_event_photos', {slug: event.slug, t: now|date('c'), w: windowMinutes}) }}"
-            data-share-title-value="{{ event.name }} — Photos"
-            data-share-text-value="My photos from {{ event.name }}"
-        >
-            Share
-        </button>
-    </main>
+                <a
+                    href="{{ photosUrl }}"
+                    class="btn btn-primary"
+                    data-share-url-value="{{ url('public_event_photos', {slug: event.slug, t: now|date('c'), w: windowMinutes}) }}"
+                    data-share-title-value="{{ event.name }} — Photos"
+                    data-share-text-value="My photos from {{ event.name }}"
+                >
+                    Show my photos
+                </a>
+            </div>
+        </div>
+    </article>
 {% endblock %}

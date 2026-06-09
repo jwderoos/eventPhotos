@@ -1,23 +1,29 @@
-{% extends 'base.html.twig' %}
+{% extends 'public/_base.html.twig' %}
 
 {% block title %}{{ event.name }} — Photos{% endblock %}
 
-{% block body %}
-    <main>
-        <h1>{{ event.name }}</h1>
+{% block public_main %}
+    <section class="space-y-6">
+        <header class="space-y-1">
+            <h1 class="text-2xl font-semibold">{{ event.name }}</h1>
+            <p class="text-sm text-base-content/70">
+                Time:
+                <time data-testid="timestamp" datetime="{{ timestamp|date('c') }}">{{ timestamp|date('H:i') }}</time>
+                · Window: ±<span data-testid="window">{{ window }}</span> minutes
+            </p>
+        </header>
+
+        <div class="rounded-box border border-base-300 bg-base-200 p-10 text-center">
+            <p class="text-base-content/70">
+                <em>Photo ingest is not implemented yet.</em><br>
+                Your photos will appear here once added.
+            </p>
+        </div>
 
         <p>
-            Time:
-            <time data-testid="timestamp" datetime="{{ timestamp|date('c') }}">{{ timestamp|date('H:i') }}</time>
+            <a href="{{ path('public_event_landing', {slug: event.slug}) }}" class="btn btn-ghost btn-sm">
+                ← Back to event
+            </a>
         </p>
-        <p>
-            Window: ±<span data-testid="window">{{ window }}</span> minutes
-        </p>
-
-        <p><em>Photo ingest is not implemented yet. Your photos will appear here once added.</em></p>
-
-        <p>
-            <a href="{{ path('public_event_landing', {slug: event.slug}) }}">← Back to event</a>
-        </p>
-    </main>
+    </section>
 {% endblock %}

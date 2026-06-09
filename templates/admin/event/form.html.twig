@@ -2,12 +2,63 @@
 
 {% block title %}Admin — {{ mode == 'new' ? 'New event' : 'Edit ' ~ event.name }}{% endblock %}
 
-{% block admin_main %}
-    <h1>{{ mode == 'new' ? 'New event' : 'Edit ' ~ event.name }}</h1>
+{% block admin_breadcrumb %}
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li>Admin</li>
+            <li><a href="{{ path('admin_event_index') }}" class="link link-hover">Events</a></li>
+            <li>{{ mode == 'new' ? 'New' : 'Edit' }}</li>
+        </ul>
+    </div>
+{% endblock %}
 
-    {{ form_start(form) }}
-    {{ form_widget(form) }}
-    <button type="submit">{{ mode == 'new' ? 'Create' : 'Save' }}</button>
-    <a href="{{ path('admin_event_index') }}">Cancel</a>
-    {{ form_end(form) }}
+{% block admin_main %}
+    <header class="mb-6">
+        <h1 class="text-2xl font-semibold">
+            {{ mode == 'new' ? 'New event' : 'Edit ' ~ event.name }}
+        </h1>
+    </header>
+
+    {{ form_start(form, {attr: {id: 'event-form', class: 'card bg-base-100 shadow-sm'}}) }}
+        <div class="card-body grid gap-4 lg:grid-cols-2">
+            {{ form_widget(form) }}
+        </div>
+    {{ form_end(form, {render_rest: false}) }}
+{% endblock %}
+
+{% block admin_actions %}
+    <a href="{{ path('admin_event_index') }}" class="btn btn-ghost">Cancel</a>
+    <button type="submit" form="event-form" class="btn btn-primary">
+        {{ mode == 'new' ? 'Create' : 'Save' }}
+    </button>
+{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        #event-form > div { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #event-form > div > div { display: flex; flex-direction: column; gap: 0.375rem; }
+        #event-form label { font-size: 0.875rem; font-weight: 500; color: oklch(var(--bc)); }
+        #event-form input[type="text"],
+        #event-form input[type="email"],
+        #event-form input[type="number"],
+        #event-form input[type="date"],
+        #event-form input[type="datetime-local"],
+        #event-form textarea,
+        #event-form select {
+            width: 100%;
+            border: 1px solid oklch(var(--bc) / 0.2);
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background-color: oklch(var(--b1));
+            color: oklch(var(--bc));
+            font-size: 0.875rem;
+        }
+        #event-form textarea { min-height: 6rem; }
+        #event-form .form-help, #event-form small { font-size: 0.75rem; color: oklch(var(--bc) / 0.6); }
+        #event-form ul { color: oklch(var(--er)); font-size: 0.75rem; margin-top: 0.25rem; padding-left: 1rem; }
+        @media (max-width: 1024px) {
+            #event-form > div { grid-template-columns: 1fr; }
+        }
+    </style>
 {% endblock %}
