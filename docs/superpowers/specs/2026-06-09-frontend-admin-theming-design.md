@@ -30,7 +30,7 @@ Bootstrap-only was rejected because its DNA shows through public-facing pages no
 
 - `symfonycasts/tailwind-bundle` for the build. It manages Tailwind's standalone binary (no Node, no npm, no Vite) and integrates with AssetMapper via `php bin/console tailwind:build` and `--watch`.
 - Existing AssetMapper + importmap + Stimulus stack stays unchanged. The bundle writes a built `app.css` that AssetMapper serves.
-- Watcher runs inside `docker-compose` alongside FrankenPHP during development.
+- Watcher runs as a sidecar service in `docker-compose` (alongside the existing `php` and `nginx` services) during development.
 - CI runs `tailwind:build` once before any test that renders HTML/CSS.
 
 ## Theme strategy
@@ -60,7 +60,7 @@ Both themes compile into a single `app.css`. The active theme is selected at run
 - **Flash messages:** daisyUI `alert` component. Symfony flash label mapping: `success` → `alert-success`, `error`/`danger` → `alert-error`, `warning` → `alert-warning`, everything else → `alert-info`. Rendered above `{% block admin_main %}`.
 - **Page container:** `max-w-7xl` centered, with consistent vertical padding (`py-8`). Lists and tables fill the container width.
 - **Form pages:** two-column at `lg`+ (form on the left, optional sidebar tips on the right), single column below. Sticky bottom action bar rendered when `{% block admin_actions %}{% endblock %}` is defined; contains submit and cancel buttons.
-- **List pages:** daisyUI `table` with `table-zebra`. Rows clickable via a small Stimulus controller wrapping `<tr>` (since `<a>` inside `<tr>` is invalid). Empty state is a centered text block with a CTA button to create the first item.
+- **List pages:** daisyUI `table` with `table-zebra`. Each row has explicit Edit (`btn btn-sm btn-ghost`) and Delete (`btn btn-sm btn-ghost text-error`, posts a CSRF-protected form with `confirm()` guard) buttons in an Actions column. Empty state is a centered text block with a CTA button to create the first item.
 
 ## Template migration map
 
@@ -79,14 +79,10 @@ Per file, classified as **rewrite** (markup substantially changes), **light edit
 | File | Change |
 | --- | --- |
 | `templates/admin/dashboard.html.twig` | rewrite — daisyUI `stats` for counters, `card`s for panels |
-| `templates/admin/event/index.html.twig` | rewrite — zebra table, clickable rows, empty state, "New event" CTA |
-| `templates/admin/event/show.html.twig` | rewrite — `card` for details, mini-table for collections |
-| `templates/admin/event/new.html.twig` | rewrite — `form-control` form, sticky action bar |
-| `templates/admin/event/edit.html.twig` | rewrite — same as new |
+| `templates/admin/event/index.html.twig` | rewrite — zebra table with edit/delete actions, empty state, "New event" CTA |
+| `templates/admin/event/form.html.twig` | rewrite — `form-control` form (handles both new and edit via `mode` variable), sticky action bar |
 | `templates/admin/collection/index.html.twig` | rewrite — same shape as event index |
-| `templates/admin/collection/show.html.twig` | rewrite — same shape as event show |
-| `templates/admin/collection/new.html.twig` | rewrite — same shape as event new |
-| `templates/admin/collection/edit.html.twig` | rewrite — same as new |
+| `templates/admin/collection/form.html.twig` | rewrite — same shape as event form |
 
 **Public pages** (extend new public `_base`)
 
@@ -109,16 +105,10 @@ Per file, classified as **rewrite** (markup substantially changes), **light edit
 | `assets/styles/app.css` | rewrite — `@import "tailwindcss"` + `@plugin "daisyui"` with `corporate` and `winter` |
 | `assets/controllers/` | unchanged — existing `share` controller keeps working |
 
-**New Stimulus controller**
-
-| File | Change |
-| --- | --- |
-| `assets/controllers/row_link_controller.js` | new — makes `<tr data-controller="row-link" data-row-link-url-value="...">` navigate on click |
-
 ## Testing
 
 - Existing PHPUnit tests assert on routes and rendered text content; they should pass unchanged.
-- Grep for any assertion that pins specific CSS classes (notably `btn-primary`, whose meaning shifts under daisyUI) and update those call sites.
+- One known test couples to a CSS class: `tests/Functional/Security/LoginTest.php` asserts `assertSelectorTextContains('.error', ...)`. The login template's error block becomes a daisyUI `alert alert-error`; the fix is to add `data-testid="login-error"` to the error element and update the assertion selector, following the pattern already in `EventPhotosStubTest`.
 - No new tests for visual styling — CSS is not unit-testable. Verification is manual: load every admin and public route in a browser, confirm the right theme is active, confirm sticky action bar behaves on long forms, confirm tables render empty states.
 - `tailwind:build` runs in the functional-test setup so compiled CSS exists when tests render pages.
 
