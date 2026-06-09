@@ -1,0 +1,36 @@
+{% extends 'admin/_base.html.twig' %}
+
+{% block title %}Admin — Dashboard{% endblock %}
+
+{% block admin_main %}
+    <h1>Dashboard</h1>
+
+    <section>
+        <h2>Recent events <a href="{{ path('admin_event_new') }}">+ new</a></h2>
+        {% if events %}
+            <ul>
+                {% for event in events %}
+                    <li>
+                        <a href="{{ path('admin_event_edit', {id: event.id}) }}">{{ event.name }}</a>
+                        — {{ event.date|date('Y-m-d') }} (slug: <code>{{ event.slug }}</code>)
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No events yet.</p>
+        {% endif %}
+    </section>
+
+    <section>
+        <h2>Collections <a href="{{ path('admin_collection_new') }}">+ new</a></h2>
+        {% if collections %}
+            <ul>
+                {% for collection in collections %}
+                    <li><a href="{{ path('admin_collection_edit', {id: collection.id}) }}">{{ collection.name }}</a></li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No collections yet.</p>
+        {% endif %}
+    </section>
+{% endblock %}

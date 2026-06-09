@@ -1,0 +1,13 @@
+{% extends 'admin/_base.html.twig' %}
+
+{% block title %}Admin — {{ mode == 'new' ? 'New collection' : 'Edit ' ~ collection.name }}{% endblock %}
+
+{% block admin_main %}
+    <h1>{{ mode == 'new' ? 'New collection' : 'Edit ' ~ collection.name }}</h1>
+
+    {{ form_start(form) }}
+    {{ form_widget(form) }}
+    <button type="submit">{{ mode == 'new' ? 'Create' : 'Save' }}</button>
+    <a href="{{ path('admin_collection_index') }}">Cancel</a>
+    {{ form_end(form) }}
+{% endblock %}

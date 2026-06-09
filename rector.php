@@ -54,6 +54,7 @@ return RectorConfig::configure()
     ])
     ->withSkip([
         __DIR__ . '/migrations',
+        __DIR__ . '/config',
     ])
     // uncomment to reach your current PHP version
     ->withPhpVersion(PhpVersion::PHP_85)

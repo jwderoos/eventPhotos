@@ -1,0 +1,42 @@
+{% extends 'admin/_base.html.twig' %}
+
+{% block title %}Admin — Collections{% endblock %}
+
+{% block admin_main %}
+    <h1>Collections</h1>
+    <p><a href="{{ path('admin_collection_new') }}">+ new collection</a></p>
+
+    {% if collections %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Slug</th>
+                    <th>Name</th>
+                    <th>Owner</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for collection in collections %}
+                    <tr>
+                        <td><code>{{ collection.slug }}</code></td>
+                        <td>{{ collection.name }}</td>
+                        <td>{{ collection.owner.email }}</td>
+                        <td>
+                            <a href="{{ path('admin_collection_edit', {id: collection.id}) }}">Edit</a>
+                            <form method="post"
+                                  action="{{ path('admin_collection_delete', {id: collection.id}) }}"
+                                  onsubmit="return confirm('Delete this collection?')"
+                                  style="display:inline">
+                                <input type="hidden" name="_token" value="{{ csrf_token('delete_collection_' ~ collection.id) }}">
+                                <button type="submit">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No collections.</p>
+    {% endif %}
+{% endblock %}

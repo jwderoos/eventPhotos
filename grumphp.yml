@@ -12,7 +12,9 @@ grumphp:
             strict: true
 
         file_size:
-            max_size: 0.5M
+            max_size: 2M
+            ignore_patterns:
+                - 'composer.lock'
 
         git_branch_name:
             whitelist:
