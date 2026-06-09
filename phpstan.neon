@@ -1,0 +1,14 @@
+includes:
+parameters:
+    parallel:
+        maximumNumberOfProcesses: 5
+        jobSize: 5
+        minimumNumberOfJobsPerProcess: 1
+    reportUnmatchedIgnoredErrors: true
+    treatPhpDocTypesAsCertain: false
+    level: 10
+    paths:
+        - src
+        - tests
+    excludePaths:
+    ignoreErrors: []

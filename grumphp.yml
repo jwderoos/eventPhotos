@@ -1,0 +1,103 @@
+grumphp:
+    ignore_unstaged_changes: true
+    hide_circumvention_tip: true
+    tasks:
+        composer:
+            file: ./composer.json
+            no_check_all: false
+            no_check_lock: false
+            no_check_publish: false
+            no_local_repository: false
+            with_dependencies: false
+            strict: true
+
+        file_size:
+            max_size: 0.5M
+
+        git_branch_name:
+            whitelist:
+                - /^(feature|hotfix|bugfix|release)\/\d+-/
+            blacklist:
+                - develop
+                - main
+                - master
+            allow_detached_head: false
+
+        git_commit_message:
+            allow_empty_message: false
+            enforce_capitalized_subject: false
+            enforce_no_subject_punctuations: false
+            enforce_no_subject_trailing_period: true
+            enforce_single_lined_subject: true
+            type_scope_conventions: []
+            max_body_width: 0
+            max_subject_width: 0
+            matchers:
+                Must contain github issue number: /^(?:\d+)|Merge (?:remote-tracking )?branch '(?:origin\/)?(hotfix|bugfix|release|feature)\/\d+|develop|master|main/
+            case_insensitive: true
+            multiline: true
+            additional_modifiers: ''
+
+#        infection:
+#            show_mutations: true
+#            verbose: true
+#            mutators: []
+#            min_msi: 100
+#            min_covered_msi: 100
+
+        phpcpd:
+            directory:
+                - 'src/'
+            exclude: []
+            fuzzy: false
+            min_lines: 10
+            min_tokens: 50
+            triggered_by:
+                - 'php'
+
+        phpcs:
+            standard:
+                - PSR12
+            severity: ~
+            error_severity: ~
+            tab_width: ~
+            report: full
+            report_width: ~
+            whitelist_patterns: []
+            encoding: ~
+            ignore_patterns: []
+            sniffs: []
+            triggered_by:
+                - 'php'
+            exclude: []
+
+        phpmnd:
+            directory: src
+            whitelist_patterns: []
+            exclude: []
+            exclude_name: []
+            exclude_path: []
+            extensions: []
+            hint: false
+            ignore_funcs: []
+            ignore_numbers: []
+            ignore_strings: []
+            strings: false
+            triggered_by: ['php']
+
+        phpstan:
+            configuration: phpstan.neon
+            triggered_by:
+                - 'php'
+
+        phpunit:
+
+        rector:
+
+#        securitychecker_enlightn:
+        securitychecker_roave:
+
+        yamllint:
+            exception_on_invalid_type: true
+            parse_custom_tags: true
+            parse_constant: true
