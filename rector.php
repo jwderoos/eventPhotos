@@ -34,10 +34,10 @@ return RectorConfig::configure()
         typeDeclarations: true,
         typeDeclarationDocblocks: true,
         privatization: true,
-        naming: true,
+        naming: false,
         instanceOf: true,
         earlyReturn: true,
-        carbon: true,
+        carbon: false,
         rectorPreset: true,
         phpunitCodeQuality: true,
         doctrineCodeQuality: true,
@@ -52,8 +52,12 @@ return RectorConfig::configure()
         __DIR__ . '/src',
         __DIR__ . '/tests',
     ])
+    ->withSkip([
+        __DIR__ . '/migrations',
+        __DIR__ . '/config',
+    ])
     // uncomment to reach your current PHP version
-    ->withPhpVersion(PhpVersion::PHP_83)
+    ->withPhpVersion(PhpVersion::PHP_85)
     ->withAttributesSets()
     ->withPhpSets()
 ;

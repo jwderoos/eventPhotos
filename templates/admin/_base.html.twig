@@ -1,0 +1,23 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+    <nav class="admin-nav">
+        <strong>Event Photos — Admin</strong>
+        <a href="{{ path('admin_dashboard') }}">Dashboard</a>
+        <a href="{{ path('admin_event_index') }}">Events</a>
+        <a href="{{ path('admin_collection_index') }}">Collections</a>
+        <span>·</span>
+        <span>{{ app.user ? app.user.displayName : '' }}</span>
+        <a href="{{ path('app_logout') }}">Sign out</a>
+    </nav>
+
+    {% for label, messages in app.flashes %}
+        {% for message in messages %}
+            <div class="flash flash-{{ label }}">{{ message }}</div>
+        {% endfor %}
+    {% endfor %}
+
+    <main class="admin-main">
+        {% block admin_main %}{% endblock %}
+    </main>
+{% endblock %}

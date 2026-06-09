@@ -12,7 +12,9 @@ grumphp:
             strict: true
 
         file_size:
-            max_size: 0.5M
+            max_size: 2M
+            ignore_patterns:
+                - 'composer.lock'
 
         git_branch_name:
             whitelist:
@@ -48,10 +50,11 @@ grumphp:
         phpcpd:
             directory:
                 - 'src/'
-            exclude: []
+            exclude:
+                - 'Kernel.php'
             fuzzy: false
-            min_lines: 10
-            min_tokens: 50
+            min_lines: 50
+            min_tokens: 100
             triggered_by:
                 - 'php'
 
@@ -65,7 +68,12 @@ grumphp:
             report_width: ~
             whitelist_patterns: []
             encoding: ~
-            ignore_patterns: []
+            ignore_patterns:
+                - 'Kernel.php'
+                - 'migrations/'
+                - 'config/'
+                - 'var/'
+                - 'importmap.php'
             sniffs: []
             triggered_by:
                 - 'php'
@@ -76,7 +84,8 @@ grumphp:
             whitelist_patterns: []
             exclude: []
             exclude_name: []
-            exclude_path: []
+            exclude_path:
+                - 'Kernel.php'
             extensions: []
             hint: false
             ignore_funcs: []

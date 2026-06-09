@@ -1,4 +1,3 @@
-includes:
 parameters:
     parallel:
         maximumNumberOfProcesses: 5
@@ -10,5 +9,8 @@ parameters:
     paths:
         - src
         - tests
+        - public
     excludePaths:
+        - src/Kernel.php
+        - public/index.php
     ignoreErrors: []

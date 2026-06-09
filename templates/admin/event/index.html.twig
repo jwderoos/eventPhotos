@@ -1,0 +1,46 @@
+{% extends 'admin/_base.html.twig' %}
+
+{% block title %}Admin — Events{% endblock %}
+
+{% block admin_main %}
+    <h1>Events</h1>
+    <p><a href="{{ path('admin_event_new') }}">+ new event</a></p>
+
+    {% if events %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Slug</th>
+                    <th>Name</th>
+                    <th>Date</th>
+                    <th>Window</th>
+                    <th>Owner</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in events %}
+                    <tr>
+                        <td><code>{{ event.slug }}</code></td>
+                        <td>{{ event.name }}</td>
+                        <td>{{ event.date|date('Y-m-d') }}</td>
+                        <td>{{ event.resolveWindowMinutes }} min</td>
+                        <td>{{ event.owner.email }}</td>
+                        <td>
+                            <a href="{{ path('admin_event_edit', {id: event.id}) }}">Edit</a>
+                            <form method="post"
+                                  action="{{ path('admin_event_delete', {id: event.id}) }}"
+                                  onsubmit="return confirm('Delete this event?')"
+                                  style="display:inline">
+                                <input type="hidden" name="_token" value="{{ csrf_token('delete_event_' ~ event.id) }}">
+                                <button type="submit">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No events.</p>
+    {% endif %}
+{% endblock %}
