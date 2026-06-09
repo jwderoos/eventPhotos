@@ -1,0 +1,23 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ event.name }} — Photos{% endblock %}
+
+{% block body %}
+    <main>
+        <h1>{{ event.name }}</h1>
+
+        <p>
+            Time:
+            <time data-testid="timestamp" datetime="{{ timestamp|date('c') }}">{{ timestamp|date('H:i') }}</time>
+        </p>
+        <p>
+            Window: ±<span data-testid="window">{{ window }}</span> minutes
+        </p>
+
+        <p><em>Photo ingest is not implemented yet. Your photos will appear here once added.</em></p>
+
+        <p>
+            <a href="{{ path('public_event_landing', {slug: event.slug}) }}">← Back to event</a>
+        </p>
+    </main>
+{% endblock %}
