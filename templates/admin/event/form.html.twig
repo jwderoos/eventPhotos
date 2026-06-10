@@ -20,6 +20,14 @@
     </header>
 
     {{ form_start(form, {attr: {id: 'event-form', class: 'card bg-base-100 shadow-sm'}}) }}
+        {% if event.logoFilename ?? false %}
+            <div class="px-6 pt-6 flex items-center gap-3">
+                <span class="text-sm font-medium">Current logo:</span>
+                <img src="{{ path('admin_event_logo', {id: event.id}) }}"
+                     alt="Event logo"
+                     class="h-16 w-16 object-contain border rounded bg-base-200" />
+            </div>
+        {% endif %}
         <div class="card-body grid gap-4 lg:grid-cols-2">
             {{ form_widget(form) }}
         </div>

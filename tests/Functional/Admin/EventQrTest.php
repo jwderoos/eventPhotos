@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
+use League\Flysystem\FilesystemOperator;
 use App\Entity\Event;
 use App\Entity\User;
 use DateTimeImmutable;
@@ -103,5 +104,107 @@ final class EventQrTest extends WebTestCase
         $client->request(Request::METHOD_GET, sprintf('/admin/events/%d/qr', (int) $aliceEvent->getId()));
 
         $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testNonOwnerCannotFetchEventLogo(): void
+    {
+        $client = self::createClient();
+        $container = self::getContainer();
+
+        /** @var EntityManagerInterface $em */
+        $em = $container->get(EntityManagerInterface::class);
+        /** @var UserPasswordHasherInterface $hasher */
+        $hasher = $container->get(UserPasswordHasherInterface::class);
+
+        $alice = new User('alice@example.com', 'Alice');
+        $alice->addRole('ROLE_ORGANIZER');
+        $alice->setPassword($hasher->hashPassword($alice, 'pw'));
+
+        $bob = new User('bob@example.com', 'Bob');
+        $bob->addRole('ROLE_ORGANIZER');
+        $bob->setPassword($hasher->hashPassword($bob, 'pw'));
+
+        $event = new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $alice);
+
+        $em->persist($alice);
+        $em->persist($bob);
+        $em->persist($event);
+        $em->flush();
+
+        $client->loginUser($bob);
+        $client->request(Request::METHOD_GET, sprintf('/admin/events/%d/logo', (int) $event->getId()));
+
+        $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testEventWithLogoProducesDifferentQrPngThanWithoutLogo(): void
+    {
+        $client = self::createClient();
+        $client->disableReboot();
+
+        $container = self::getContainer();
+
+        /** @var EntityManagerInterface $em */
+        $em = $container->get(EntityManagerInterface::class);
+        /** @var UserPasswordHasherInterface $hasher */
+        $hasher = $container->get(UserPasswordHasherInterface::class);
+
+        $alice = new User('alice@example.com', 'Alice');
+        $alice->addRole('ROLE_ORGANIZER');
+        $alice->setPassword($hasher->hashPassword($alice, 'pw'));
+
+        $event = new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $alice);
+
+        $em->persist($alice);
+        $em->persist($event);
+        $em->flush();
+
+        $client->loginUser($alice);
+
+        $client->request(Request::METHOD_GET, sprintf('/admin/events/%d/qr.png', (int) $event->getId()));
+        $this->assertResponseIsSuccessful();
+        $plain = (string) $client->getResponse()->getContent();
+
+        /** @var FilesystemOperator $storage */
+        $storage = $container->get('event_logos_storage');
+        $storage->write('alice-logo.png', (string) file_get_contents(__DIR__ . '/../../fixtures/logo.png'));
+
+        $event->setLogoFilename('alice-logo.png');
+        $em->flush();
+
+        $client->request(Request::METHOD_GET, sprintf('/admin/events/%d/qr.png', (int) $event->getId()));
+        $this->assertResponseIsSuccessful();
+        $withLogo = (string) $client->getResponse()->getContent();
+
+        $this->assertStringStartsWith("\x89PNG\r\n\x1a\n", $withLogo);
+        $this->assertNotSame($plain, $withLogo);
+    }
+
+    public function testMissingLogoFileInStorageStillRendersPlainQr(): void
+    {
+        $client = self::createClient();
+        $container = self::getContainer();
+
+        /** @var EntityManagerInterface $em */
+        $em = $container->get(EntityManagerInterface::class);
+        /** @var UserPasswordHasherInterface $hasher */
+        $hasher = $container->get(UserPasswordHasherInterface::class);
+
+        $alice = new User('alice@example.com', 'Alice');
+        $alice->addRole('ROLE_ORGANIZER');
+        $alice->setPassword($hasher->hashPassword($alice, 'pw'));
+
+        $event = new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $alice);
+        $event->setLogoFilename('does-not-exist.png');
+
+        $em->persist($alice);
+        $em->persist($event);
+        $em->flush();
+
+        $client->loginUser($alice);
+        $client->request(Request::METHOD_GET, sprintf('/admin/events/%d/qr', (int) $event->getId()));
+
+        $this->assertResponseIsSuccessful();
+        $this->assertStringContainsString('<svg', (string) $client->getResponse()->getContent());
     }
 }

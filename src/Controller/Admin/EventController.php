@@ -12,7 +12,11 @@ use App\Security\Voter\EventVoter;
 use App\Service\QrCodeRenderer;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\FilesystemOperator;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -26,6 +30,9 @@ final class EventController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly QrCodeRenderer $renderer,
         private readonly UrlGeneratorInterface $urlGenerator,
+        #[Autowire(service: 'event_logos_storage')]
+        private readonly FilesystemOperator $eventLogosStorage,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -132,10 +139,14 @@ final class EventController extends AbstractController
 
         $url = $this->eventLandingUrl($event);
 
+        $logoBytes = $this->readLogoBytes($event);
+        // TODO: when user-level default logos exist, fall back to
+        // $event->getOwner()->getDefaultLogo() bytes here when $event has no logo of its own.
+
         return $this->render('admin/event/qr.html.twig', [
             'event' => $event,
             'url'   => $url,
-            'svg'   => $this->renderer->svg($url),
+            'svg'   => $this->renderer->svg($url, $logoBytes),
         ]);
     }
 
@@ -152,14 +163,74 @@ final class EventController extends AbstractController
 
         $url = $this->eventLandingUrl($event);
 
+        $logoBytes = $this->readLogoBytes($event);
+        // TODO: when user-level default logos exist, fall back to
+        // $event->getOwner()->getDefaultLogo() bytes here when $event has no logo of its own.
+
         return new Response(
-            $this->renderer->png($url),
+            $this->renderer->png($url, $logoBytes),
             Response::HTTP_OK,
             [
                 'Content-Type'        => 'image/png',
                 'Content-Disposition' => sprintf('attachment; filename="event-%s.png"', $event->getSlug()),
             ],
         );
+    }
+
+    #[Route(
+        '/admin/events/{id}/logo',
+        name: 'admin_event_logo',
+        requirements: ['id' => '\d+'],
+        methods: ['GET'],
+    )]
+    public function logo(Event $event): Response
+    {
+        $this->denyAccessUnlessGranted(EventVoter::VIEW, $event);
+
+        $filename = $event->getLogoFilename();
+        if ($filename === null) {
+            throw $this->createNotFoundException();
+        }
+
+        try {
+            $contents = $this->eventLogosStorage->read($filename);
+        } catch (FilesystemException) {
+            throw $this->createNotFoundException();
+        }
+
+        $response = new Response($contents);
+        $response->headers->set('Content-Type', $this->mimeFromExtension($filename));
+        $response->headers->set('Cache-Control', 'private, max-age=300');
+
+        return $response;
+    }
+
+    private function readLogoBytes(Event $event): ?string
+    {
+        $filename = $event->getLogoFilename();
+        if ($filename === null) {
+            return null;
+        }
+
+        try {
+            return $this->eventLogosStorage->read($filename);
+        } catch (FilesystemException $filesystemException) {
+            $this->logger->warning('Failed to read event logo; rendering QR without it', [
+                'event_id' => $event->getId(),
+                'filename' => $filename,
+                'exception' => $filesystemException,
+            ]);
+            return null;
+        }
+    }
+
+    private function mimeFromExtension(string $filename): string
+    {
+        return match (strtolower(pathinfo($filename, PATHINFO_EXTENSION))) {
+            'png'           => 'image/png',
+            'jpg', 'jpeg'   => 'image/jpeg',
+            default         => 'application/octet-stream',
+        };
     }
 
     private function eventLandingUrl(Event $event): string

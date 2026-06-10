@@ -19,6 +19,7 @@ use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Vich\UploaderBundle\Form\Type\VichFileType;
 
 /**
  * @extends AbstractType<Event>
@@ -50,6 +51,13 @@ final class EventType extends AbstractType
                 'required' => false,
                 'help'     => sprintf('Minutes around "now". Empty → default %d.', Event::DEFAULT_WINDOW_MINUTES),
             ]);
+
+        $builder->add('logoFile', VichFileType::class, [
+            'required'     => false,
+            'label'        => 'Logo (PNG or JPEG, max 2 MB)',
+            'allow_delete' => true,
+            'download_uri' => false,
+        ]);
 
         $user = $this->security->getUser();
         $isAdmin = $this->security->isGranted('ROLE_ADMIN');

@@ -1,0 +1,6 @@
+flysystem:
+    storages:
+        event_logos_storage:
+            adapter: 'local'
+            options:
+                directory: '%kernel.project_dir%/var/uploads/event-logos'

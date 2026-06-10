@@ -1,0 +1,4 @@
+flysystem:
+    storages:
+        event_logos_storage:
+            adapter: 'memory'

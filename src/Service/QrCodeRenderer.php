@@ -5,46 +5,92 @@ declare(strict_types=1);
 namespace App\Service;
 
 use Endroid\QrCode\Builder\Builder;
+use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\Writer\PngWriter;
 use Endroid\QrCode\Writer\SvgWriter;
+use Endroid\QrCode\Writer\WriterInterface;
+use RuntimeException;
 
 final class QrCodeRenderer
 {
-    /**
-     * SVG is vector and scales without loss at any rendered size,
-     * so 320 is sufficient for the inline preview.
-     */
     private const int DEFAULT_SVG_SIZE = 320;
 
-    /**
-     * PNG is raster and needs to be larger so it doesn't blur when
-     * embedded in print materials or scaled up.
-     */
     private const int DEFAULT_PNG_SIZE = 512;
 
     private const int MARGIN = 10;
 
-    public function svg(string $url, ?int $size = null): string
-    {
-        $builder = new Builder(
-            writer: new SvgWriter(),
-            data: $url,
-            size: $size ?? self::DEFAULT_SVG_SIZE,
-            margin: self::MARGIN,
-        );
+    private const float LOGO_WIDTH_RATIO = 0.20;
 
-        return $builder->build()->getString();
+    public function svg(string $url, ?string $logoContents = null, ?int $size = null): string
+    {
+        return $this->build(
+            new SvgWriter(),
+            $url,
+            $logoContents,
+            $size ?? self::DEFAULT_SVG_SIZE,
+            supportsPunchout: false
+        );
     }
 
-    public function png(string $url, ?int $size = null): string
+    public function png(string $url, ?string $logoContents = null, ?int $size = null): string
     {
-        $builder = new Builder(
-            writer: new PngWriter(),
-            data: $url,
-            size: $size ?? self::DEFAULT_PNG_SIZE,
-            margin: self::MARGIN,
+        return $this->build(
+            new PngWriter(),
+            $url,
+            $logoContents,
+            $size ?? self::DEFAULT_PNG_SIZE,
+            supportsPunchout: true
         );
+    }
 
-        return $builder->build()->getString();
+    private function build(
+        WriterInterface $writer,
+        string $url,
+        ?string $logoContents,
+        int $size,
+        bool $supportsPunchout
+    ): string {
+        return $this->withTempLogo(
+            $logoContents,
+            function (?string $logoPath) use ($writer, $url, $logoContents, $size, $supportsPunchout): string {
+                $builder = new Builder(
+                    writer: $writer,
+                    data: $url,
+                    errorCorrectionLevel: $logoContents !== null
+                        ? ErrorCorrectionLevel::High
+                        : ErrorCorrectionLevel::Medium,
+                    size: $size,
+                    margin: self::MARGIN,
+                    logoPath: $logoPath ?? '',
+                    logoResizeToWidth: $logoPath !== null ? (int)($size * self::LOGO_WIDTH_RATIO) : null,
+                    logoPunchoutBackground: $logoPath !== null && $supportsPunchout,
+                );
+
+                return $builder->build()->getString();
+            },
+        );
+    }
+
+    /**
+     * @param callable(?string): string $fn
+     */
+    private function withTempLogo(?string $logoContents, callable $fn): string
+    {
+        if ($logoContents === null) {
+            return $fn(null);
+        }
+
+        $path = tempnam(sys_get_temp_dir(), 'qrlogo_');
+        if ($path === false) {
+            throw new RuntimeException('Failed to create temp file for QR logo.');
+        }
+
+        try {
+            file_put_contents($path, $logoContents);
+
+            return $fn($path);
+        } finally {
+            @unlink($path);
+        }
     }
 }
