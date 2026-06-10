@@ -45,7 +45,9 @@ The `_test` suffix is appended automatically by `config/packages/doctrine.yaml`'
 4. **Install deps** — `composer install --no-interaction --no-progress --prefer-dist`.
 5. **Create test DB + migrate** — `bin/console doctrine:database:create --env=test --if-not-exists` then `bin/console doctrine:migrations:migrate --env=test --no-interaction --allow-no-migration`.
 6. **Schema/migration drift check** — `bin/console doctrine:schema:validate --env=test`. Fails if entity mapping is invalid OR if the migrated DB schema doesn't match the entity metadata (i.e., someone added a field and forgot the migration).
-7. **GrumPHP** — `vendor/bin/grumphp run --tasks=composer,file_size,phpcpd,phpcs,phpmnd,phpstan,phpunit,rector,securitychecker_roave,yamllint`.
+7. **Install importmap vendor assets** — `bin/console importmap:install`. AssetMapper populates `assets/vendor/` from `importmap.php`. Required for any test that renders a template using `importmap()`. Should ideally run as a composer `post-install-cmd` (tracked in issue #26); until then, explicit here.
+8. **Build Tailwind CSS** — `bin/console tailwind:build`. Generates the `tailwindcss` asset that `templates/base.html.twig` references via the `styles/app.css` import. Any functional test that renders the layout will 500 without this.
+9. **GrumPHP** — `vendor/bin/grumphp run --tasks=composer,file_size,phpcpd,phpcs,phpmnd,phpstan,phpunit,rector,securitychecker_roave,yamllint`.
 
 ### Why the explicit `--tasks` allowlist
 
@@ -72,16 +74,14 @@ Add one task — runs on every local commit, gives early feedback that entity at
 ```yaml
 shell:
     scripts:
-        - ['bin/console', 'doctrine:schema:validate', '--skip-sync', '--no-interaction']
+        - ['-c', 'bin/console doctrine:schema:validate --skip-sync --no-interaction']
 ```
 
 `--skip-sync` validates entity mapping only, not the DB schema. CI runs the full `doctrine:schema:validate` (step 6) which covers both mapping and sync.
 
-**Verification note:** `--skip-sync` should boot without a working DB connection, but if Doctrine's command bootstrap still attempts to connect, the local hook will need a reachable DB. Three fallback paths if that surfaces during implementation:
+**Note on the script syntax:** GrumPHP's `Shell` task `exec()`s `/bin/sh` and passes the array entries as positional args to `sh`. The literal argv form (`['bin/console', 'doctrine:schema:validate', ...]`) does not work — `sh` treats the first arg as a script filename. The canonical form is `['-c', '<full command string>']`.
 
-1. Accept the requirement — devs usually have a running DB anyway.
-2. Wrap the script to swallow connection failures.
-3. Drop the local check and rely on CI-only.
+**Note on DB connection:** In practice `--skip-sync` does need a reachable DB to bootstrap Doctrine's command. This is acceptable for the local hook because devs run Postgres locally for development anyway. CI runs the full mapping+sync check (step 6) on a freshly-migrated DB.
 
 ## Failure handling + caching
 
@@ -97,8 +97,9 @@ These are deliberate exclusions, called out so future-us knows they were conside
 - **Coverage reporting / badges** (Codecov etc.).
 - **Deploy step.**
 - **PHP version matrix.** `composer.json` pins `^8.5`; only one version is supported.
-- **Tailwind build.** Tests don't need built CSS.
 - **`.phpunit.cache` cross-run caching.** Negligible payoff for a 26-test suite.
+
+(An earlier draft of this spec listed "Tailwind build" as out of scope on the assumption that tests don't need built CSS. That was wrong — `base.html.twig` references the `tailwindcss` asset and Symfony's `asset()` throws when it's missing, so every functional test that renders the layout fails without the build. The build step is now included; see step 8.)
 
 ## Files touched
 
@@ -108,3 +109,12 @@ These are deliberate exclusions, called out so future-us knows they were conside
 ## Open questions
 
 None blocking. The `--skip-sync` DB-connection question above is the only thing that may surface during implementation; the design covers all three fallback options.
+
+## Implementation outcomes
+
+What actually shipped on PR #25, captured here so the next reader sees the final shape:
+
+- **`grumphp.yml` shell-task syntax landed as `['-c', '<command>']`**, not the argv form the original draft showed. See the `grumphp.yml change` section.
+- **Two extra CI steps** (`importmap:install`, `tailwind:build`) were added during iteration when the test suite failed against the layout template. Documented in the step list above.
+- **First CI run caught a real schema drift** — the messenger-table migration shipped in #13 used a Doctrine-version-mismatched index name. Fixed in-place on the same PR. This was the entire reason for the `doctrine:schema:validate` step existing, and it paid for itself on the very first green build.
+- **Composer auto-scripts gap** — `composer.json` defines `auto-scripts` but doesn't wire them to `post-install-cmd`/`post-update-cmd`, which is why the explicit `importmap:install` step exists in CI. Tracked in issue #26; once fixed, the explicit step can be removed.
