@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service;
 
+use Throwable;
 use App\Service\QrCodeRenderer;
 use PHPUnit\Framework\TestCase;
 
@@ -36,5 +37,39 @@ final class QrCodeRendererTest extends TestCase
         $b = $renderer->svg('https://example.com/e/b');
 
         $this->assertNotSame($a, $b);
+    }
+
+    public function testSvgWithLogoDiffersFromSvgWithoutLogo(): void
+    {
+        $renderer = new QrCodeRenderer();
+        $url = 'https://example.com/e/summer-fest';
+        $logo = (string) file_get_contents(__DIR__ . '/../../fixtures/logo.png');
+
+        $plain = $renderer->svg($url);
+        $withLogo = $renderer->svg($url, $logo);
+
+        $this->assertStringContainsString('<svg', $withLogo);
+        $this->assertNotSame($plain, $withLogo);
+    }
+
+    public function testPngWithLogoStartsWithPngMagicAndDiffersFromPlainPng(): void
+    {
+        $renderer = new QrCodeRenderer();
+        $url = 'https://example.com/e/summer-fest';
+        $logo = (string) file_get_contents(__DIR__ . '/../../fixtures/logo.png');
+
+        $plain = $renderer->png($url);
+        $withLogo = $renderer->png($url, $logo);
+
+        $this->assertStringStartsWith("\x89PNG\r\n\x1a\n", $withLogo);
+        $this->assertNotSame($plain, $withLogo);
+    }
+
+    public function testRendererRejectsInvalidLogoBytes(): void
+    {
+        $renderer = new QrCodeRenderer();
+
+        $this->expectException(Throwable::class);
+        $renderer->svg('https://example.com/e/x', 'not-an-image');
     }
 }

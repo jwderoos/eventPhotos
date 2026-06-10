@@ -32,7 +32,9 @@
         "doctrine/dbal": "^4",
         "symfony/monolog-bundle": "^4.0",
         "symfonycasts/tailwind-bundle": "^0.13.0",
-        "endroid/qr-code": "^6"
+        "endroid/qr-code": "^6",
+        "vich/uploader-bundle": "^2.9",
+        "league/flysystem-bundle": "^3.7"
     },
     "require-dev": {
         "phpunit/phpunit": "^13.2",
@@ -54,7 +56,8 @@
         "symfony/css-selector": "^8.1",
         "phpstan/phpstan-symfony": "^2",
         "phpstan/phpstan-doctrine": "^2",
-        "dama/doctrine-test-bundle": "^8.6"
+        "dama/doctrine-test-bundle": "^8.6",
+        "league/flysystem-memory": "^3.31"
     },
     "config": {
         "allow-plugins": {

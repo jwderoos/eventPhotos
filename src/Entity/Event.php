@@ -9,10 +9,14 @@ use App\Repository\EventRepository;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\HttpFoundation\File\File;
+use Symfony\Component\Validator\Constraints as Assert;
+use Vich\UploaderBundle\Mapping\Annotation as Vich;
 
 #[ORM\Entity(repositoryClass: EventRepository::class)]
 #[ORM\Table(name: 'events')]
 #[ORM\UniqueConstraint(name: 'uniq_events_slug', columns: ['slug'])]
+#[Vich\Uploadable]
 class Event implements Stringable
 {
     public const int DEFAULT_WINDOW_MINUTES = 30;
@@ -37,6 +41,20 @@ class Event implements Stringable
     #[ORM\ManyToOne(targetEntity: EventCollection::class, inversedBy: 'events')]
     #[ORM\JoinColumn(nullable: true)]
     private ?EventCollection $collection = null;
+
+    #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
+    private ?string $logoFilename = null;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?DateTimeImmutable $logoUpdatedAt = null;
+
+    #[Vich\UploadableField(mapping: 'event_logo', fileNameProperty: 'logoFilename')]
+    #[Assert\File(
+        maxSize: '2M',
+        mimeTypes: ['image/png', 'image/jpeg'],
+        mimeTypesMessage: 'Please upload a PNG or JPEG image.',
+    )]
+    private ?File $logoFile = null;
 
     public function __construct(
         #[ORM\Column(type: Types::STRING, length: 120)]
@@ -149,6 +167,35 @@ class Event implements Stringable
     public function resolveWindowMinutes(): int
     {
         return $this->defaultWindowMinutes ?? self::DEFAULT_WINDOW_MINUTES;
+    }
+
+    public function getLogoFilename(): ?string
+    {
+        return $this->logoFilename;
+    }
+
+    public function setLogoFilename(?string $logoFilename): void
+    {
+        $this->logoFilename = $logoFilename;
+    }
+
+    public function getLogoUpdatedAt(): ?DateTimeImmutable
+    {
+        return $this->logoUpdatedAt;
+    }
+
+    public function getLogoFile(): ?File
+    {
+        return $this->logoFile;
+    }
+
+    public function setLogoFile(?File $logoFile): void
+    {
+        $this->logoFile = $logoFile;
+
+        if ($logoFile instanceof File) {
+            $this->logoUpdatedAt = new DateTimeImmutable();
+        }
     }
 
     public function __toString(): string
