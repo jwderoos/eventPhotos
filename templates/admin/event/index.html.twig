@@ -40,6 +40,10 @@
                             <td class="text-sm text-base-content/70">{{ event.owner.email }}</td>
                             <td class="text-right">
                                 <div class="inline-flex items-center gap-1">
+                                    <a href="{{ path('admin_event_qr', {id: event.id}) }}"
+                                       target="_blank"
+                                       rel="noopener"
+                                       class="btn btn-ghost btn-xs">QR</a>
                                     <a href="{{ path('admin_event_edit', {id: event.id}) }}"
                                        class="btn btn-ghost btn-xs">Edit</a>
                                     <form method="post"

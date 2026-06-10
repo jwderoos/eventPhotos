@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ event.name }} — QR</title>
+    {{ importmap('app') }}
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center bg-base-200 p-8">
+    <main class="w-full max-w-md bg-base-100 rounded-box shadow p-8 text-center">
+        <div class="mx-auto mb-6" style="width:320px;max-width:100%">
+            {{ svg|raw }}
+        </div>
+
+        <h1 class="text-3xl font-semibold mb-1">{{ event.name }}</h1>
+        <p class="text-base-content/70 mb-2">{{ event.date|date('Y-m-d') }}</p>
+        <p class="text-lg mb-4">Scan to see your photos</p>
+
+        <p class="text-xs text-base-content/50 break-all mb-6">{{ url }}</p>
+
+        <div class="no-print flex gap-2 justify-center">
+            <button type="button" onclick="window.print()" class="btn btn-primary btn-sm">Print</button>
+            <a href="{{ path('admin_event_qr_png', {id: event.id}) }}"
+               download="event-{{ event.slug }}.png"
+               class="btn btn-sm">Download PNG</a>
+            <a href="{{ path('admin_event_index') }}" class="btn btn-ghost btn-sm">Back</a>
+        </div>
+    </main>
+</body>
+</html>
