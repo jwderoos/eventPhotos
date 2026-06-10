@@ -3,5 +3,5 @@
 @source not "./daisyui{,*}.mjs";
 
 @plugin "./daisyui.mjs" {
-    themes: corporate --default, winter;
+    themes: silk --default, dracula;
 }
