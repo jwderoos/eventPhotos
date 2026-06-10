@@ -18,8 +18,13 @@
                     Enter the email associated with your account. If it matches an account, we'll send a reset link.
                 </p>
 
-                {{ form_start(requestForm) }}
-                    {{ form_row(requestForm.email, {label: 'Email'}) }}
+                {{ form_start(requestForm, {attr: {class: 'space-y-3'}}) }}
+                    {{ form_row(requestForm.email, {
+                        label: 'Email',
+                        label_attr: {class: 'label-text'},
+                        row_attr: {class: 'form-control w-full'},
+                        attr: {class: 'input input-bordered w-full'},
+                    }) }}
                     <button type="submit" class="btn btn-primary w-full">Send reset link</button>
                 {{ form_end(requestForm) }}
 
