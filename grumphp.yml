@@ -110,3 +110,7 @@ grumphp:
             exception_on_invalid_type: true
             parse_custom_tags: true
             parse_constant: true
+
+        shell:
+            scripts:
+                - ['-c', 'bin/console doctrine:schema:validate --skip-sync --no-interaction']
