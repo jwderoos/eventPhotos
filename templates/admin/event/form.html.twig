@@ -32,6 +32,10 @@
             {{ form_widget(form) }}
         </div>
     {{ form_end(form, {render_rest: false}) }}
+
+    {% if mode == 'edit' %}
+        {{ include('admin/event/photos_panel.html.twig', {event: event}) }}
+    {% endif %}
 {% endblock %}
 
 {% block admin_actions %}
@@ -46,7 +50,7 @@
     <style>
         #event-form > div { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
         #event-form > div > div { display: flex; flex-direction: column; gap: 0.375rem; }
-        #event-form label { font-size: 0.875rem; font-weight: 500; color: oklch(var(--bc)); }
+        #event-form label { font-size: 0.875rem; font-weight: 500; color: var(--color-base-content); }
         #event-form input[type="text"],
         #event-form input[type="email"],
         #event-form input[type="number"],
@@ -55,16 +59,16 @@
         #event-form textarea,
         #event-form select {
             width: 100%;
-            border: 1px solid oklch(var(--bc) / 0.2);
+            border: 1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent);
             border-radius: 0.5rem;
             padding: 0.5rem 0.75rem;
-            background-color: oklch(var(--b1));
-            color: oklch(var(--bc));
+            background-color: var(--color-base-100);
+            color: var(--color-base-content);
             font-size: 0.875rem;
         }
         #event-form textarea { min-height: 6rem; }
-        #event-form .form-help, #event-form small { font-size: 0.75rem; color: oklch(var(--bc) / 0.6); }
-        #event-form ul { color: oklch(var(--er)); font-size: 0.75rem; margin-top: 0.25rem; padding-left: 1rem; }
+        #event-form .form-help, #event-form small { font-size: 0.75rem; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+        #event-form ul { color: var(--color-error); font-size: 0.75rem; margin-top: 0.25rem; padding-left: 1rem; }
         @media (max-width: 1024px) {
             #event-form > div { grid-template-columns: 1fr; }
         }

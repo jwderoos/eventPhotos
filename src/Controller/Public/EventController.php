@@ -6,6 +6,7 @@ namespace App\Controller\Public;
 
 use App\Entity\Event;
 use App\Repository\EventRepository;
+use App\Repository\PhotoRepository;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,9 +21,12 @@ final class EventController extends AbstractController
 {
     private const int MAX_WINDOW_MINUTES = 1440;
 
+    private const int HARD_CAP = 200;
+
     public function __construct(
         private readonly EventRepository $events,
         private readonly ClockInterface $clock,
+        private readonly PhotoRepository $photos,
     ) {
     }
 
@@ -52,10 +56,16 @@ final class EventController extends AbstractController
         $timestamp = $this->parseTimestamp($request->query->get('t'));
         $window    = $this->parseWindow($request->query->get('w'), $event);
 
+        $start  = $timestamp->modify(sprintf('-%d minutes', $window));
+        $end    = $timestamp->modify(sprintf('+%d minutes', $window));
+        $photos = $this->photos->findReadyInWindow($event, $start, $end);
+
         return $this->render('public/event/photos.html.twig', [
             'event'     => $event,
             'timestamp' => $timestamp,
             'window'    => $window,
+            'photos'    => $photos,
+            'capHit'    => count($photos) === self::HARD_CAP,
         ]);
     }
 

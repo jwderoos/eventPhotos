@@ -11,7 +11,7 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\HttpFoundation\File\File;
 use Symfony\Component\Validator\Constraints as Assert;
-use Vich\UploaderBundle\Mapping\Annotation as Vich;
+use Vich\UploaderBundle\Mapping\Attribute as Vich;
 
 #[ORM\Entity(repositoryClass: EventRepository::class)]
 #[ORM\Table(name: 'events')]
@@ -37,6 +37,10 @@ class Event implements Stringable
 
     #[ORM\Column(type: Types::INTEGER, nullable: true)]
     private ?int $defaultWindowMinutes = null;
+
+    #[ORM\Column(type: Types::STRING, length: 64)]
+    #[Assert\Timezone]
+    private string $timezone = 'Europe/Amsterdam';
 
     #[ORM\ManyToOne(targetEntity: EventCollection::class, inversedBy: 'events')]
     #[ORM\JoinColumn(nullable: true)]
@@ -142,6 +146,16 @@ class Event implements Stringable
     public function setDefaultWindowMinutes(?int $minutes): void
     {
         $this->defaultWindowMinutes = $minutes;
+    }
+
+    public function getTimezone(): string
+    {
+        return $this->timezone;
+    }
+
+    public function setTimezone(string $timezone): void
+    {
+        $this->timezone = $timezone;
     }
 
     public function getOwner(): User

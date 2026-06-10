@@ -1,0 +1,45 @@
+<li class="card bg-base-200 shadow-sm" data-status="{{ photo.status.value }}">
+    <figure class="aspect-square bg-base-300">
+        {% if photo.status.value == 'ready' %}
+            <img src="{{ path('photo_serve_thumb', {id: photo.id}) }}"
+                 alt="{{ photo.originalFilename }}"
+                 loading="lazy"
+                 class="object-cover w-full h-full">
+        {% else %}
+            <div class="flex items-center justify-center w-full h-full text-sm">
+                {{ photo.status.value }}
+            </div>
+        {% endif %}
+    </figure>
+    <div class="card-body p-3 text-xs">
+        <div class="flex items-center justify-between gap-2">
+            <span class="badge badge-{{ {
+                ready: 'success',
+                pending: 'info',
+                failed: 'error',
+            }[photo.status.value] ?? 'ghost' }}">{{ photo.status.value }}</span>
+            {% if photo.takenAt %}
+                <time datetime="{{ photo.takenAt|date('c') }}">
+                    {{ photo.takenAt|date('H:i', event.timezone) }}
+                </time>
+            {% endif %}
+        </div>
+        <p class="truncate" title="{{ photo.originalFilename }}">{{ photo.originalFilename }}</p>
+        {% if photo.processingError %}
+            <p class="text-error">{{ photo.processingError }}</p>
+        {% endif %}
+        <div class="flex gap-2 mt-2">
+            {% if photo.status.value == 'failed' %}
+                <form method="post" action="{{ path('admin_photo_retry', {eventId: event.id, photoId: photo.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('retry_photo_' ~ photo.id) }}">
+                    <button class="btn btn-xs btn-warning">Retry</button>
+                </form>
+            {% endif %}
+            <form method="post" action="{{ path('admin_photo_delete', {eventId: event.id, photoId: photo.id}) }}"
+                  onsubmit="return confirm('Delete this photo?');">
+                <input type="hidden" name="_token" value="{{ csrf_token('delete_photo_' ~ photo.id) }}">
+                <button class="btn btn-xs btn-ghost">Delete</button>
+            </form>
+        </div>
+    </div>
+</li>
