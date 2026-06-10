@@ -45,4 +45,20 @@ final class EventTest extends TestCase
     {
         $this->assertGreaterThan(0, Event::DEFAULT_WINDOW_MINUTES);
     }
+
+    public function testTimezoneDefaultsToEuropeAmsterdam(): void
+    {
+        $event = new Event('e', 'Event', new DateTimeImmutable('2026-06-10'), new User('o@x', 'Owner'));
+
+        $this->assertSame('Europe/Amsterdam', $event->getTimezone());
+    }
+
+    public function testTimezoneCanBeChanged(): void
+    {
+        $event = new Event('e', 'Event', new DateTimeImmutable('2026-06-10'), new User('o@x', 'Owner'));
+        $event->setTimezone('Europe/Amsterdam');
+        $event->setTimezone('America/New_York');
+
+        $this->assertSame('America/New_York', $event->getTimezone());
+    }
 }

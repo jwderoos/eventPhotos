@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Form;
 
+use DateTimeZone;
 use Doctrine\ORM\QueryBuilder;
 use App\Entity\Event;
 use App\Entity\EventCollection;
@@ -12,6 +13,7 @@ use Doctrine\ORM\EntityRepository;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateTimeType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
@@ -32,6 +34,8 @@ final class EventType extends AbstractType
 
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
+        $timezones = DateTimeZone::listIdentifiers();
+
         $builder
             ->add('slug', TextType::class, [
                 'help' => 'Used in the public QR URL: /e/{slug}',
@@ -50,6 +54,10 @@ final class EventType extends AbstractType
             ->add('defaultWindowMinutes', IntegerType::class, [
                 'required' => false,
                 'help'     => sprintf('Minutes around "now". Empty → default %d.', Event::DEFAULT_WINDOW_MINUTES),
+            ])
+            ->add('timezone', ChoiceType::class, [
+                'choices' => array_combine($timezones, $timezones),
+                'help'    => 'IANA zone for EXIF timestamps without an explicit offset.',
             ]);
 
         $builder->add('logoFile', VichFileType::class, [

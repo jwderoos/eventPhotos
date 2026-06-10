@@ -10,15 +10,35 @@
                 Time:
                 <time data-testid="timestamp" datetime="{{ timestamp|date('c') }}">{{ timestamp|date('H:i') }}</time>
                 · Window: ±<span data-testid="window">{{ window }}</span> minutes
+                · {{ photos|length }} photo{{ photos|length == 1 ? '' : 's' }}
             </p>
         </header>
 
-        <div class="rounded-box border border-base-300 bg-base-200 p-10 text-center">
-            <p class="text-base-content/70">
-                <em>Photo ingest is not implemented yet.</em><br>
-                Your photos will appear here once added.
-            </p>
-        </div>
+        {% if photos|length == 0 %}
+            <div class="rounded-box border border-base-300 bg-base-200 p-10 text-center">
+                <p class="text-base-content/70">No photos in this window yet.</p>
+            </div>
+        {% else %}
+            <ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {% for photo in photos %}
+                    <li>
+                        <a href="{{ path('photo_serve_preview', {id: photo.id}) }}"
+                           target="_blank"
+                           rel="noopener">
+                            <img src="{{ path('photo_serve_thumb', {id: photo.id}) }}"
+                                 alt="{{ event.name }}"
+                                 loading="lazy"
+                                 class="w-full aspect-square object-cover rounded-box">
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+            {% if capHit %}
+                <p class="text-sm text-warning">
+                    Showing the first 200 photos in this window. Narrow your time range to see others.
+                </p>
+            {% endif %}
+        {% endif %}
 
         <p>
             <a href="{{ path('public_event_landing', {slug: event.slug}) }}" class="btn btn-ghost btn-sm">

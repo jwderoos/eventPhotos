@@ -1,0 +1,47 @@
+import { Controller } from '@hotwired/stimulus';
+
+export default class extends Controller {
+    static values = {
+        src: String,
+    };
+
+    connect() {
+        this.boundOnFrameLoad = this.onFrameLoad.bind(this);
+        this.element.addEventListener('turbo:frame-load', this.boundOnFrameLoad);
+        this.scheduleIfNeeded();
+    }
+
+    disconnect() {
+        this.element.removeEventListener('turbo:frame-load', this.boundOnFrameLoad);
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+    }
+
+    onFrameLoad() {
+        this.scheduleIfNeeded();
+    }
+
+    scheduleIfNeeded() {
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+        const pending = this.element.querySelector('[data-status="pending"]');
+        if (!pending) {
+            return;
+        }
+        this.timer = setTimeout(() => this.poll(), 5000);
+    }
+
+    poll() {
+        const base = this.srcValue || this.element.getAttribute('src') || '';
+        if (!base) {
+            return;
+        }
+        const cleaned = base.split('?')[0];
+        const next = cleaned + '?_=' + Date.now();
+        this.element.setAttribute('src', next);
+    }
+}

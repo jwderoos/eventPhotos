@@ -1,0 +1,14 @@
+<section class="card bg-base-100 shadow-sm mt-6">
+    <div class="card-body">
+        <h2 class="card-title">Photos</h2>
+
+        <div data-controller="uppy"
+             data-uppy-endpoint-value="{{ path('admin_photo_upload', {id: event.id}) }}"
+             data-uppy-grid-frame-value="{{ path('admin_photo_grid', {id: event.id}) }}">
+        </div>
+
+        <turbo-frame id="photos-grid" src="{{ path('admin_photo_grid', {id: event.id}) }}" loading="lazy">
+            <p class="text-base-content/70">Loading photos…</p>
+        </turbo-frame>
+    </div>
+</section>

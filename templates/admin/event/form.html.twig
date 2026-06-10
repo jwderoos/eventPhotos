@@ -32,6 +32,10 @@
             {{ form_widget(form) }}
         </div>
     {{ form_end(form, {render_rest: false}) }}
+
+    {% if mode == 'edit' %}
+        {{ include('admin/event/photos_panel.html.twig', {event: event}) }}
+    {% endif %}
 {% endblock %}
 
 {% block admin_actions %}

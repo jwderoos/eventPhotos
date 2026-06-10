@@ -4,3 +4,15 @@ flysystem:
             adapter: 'local'
             options:
                 directory: '%kernel.project_dir%/var/uploads/event-logos'
+        photo_originals_storage:
+            adapter: 'local'
+            options:
+                directory: '%kernel.project_dir%/var/uploads/photos/originals'
+        photo_thumbs_storage:
+            adapter: 'local'
+            options:
+                directory: '%kernel.project_dir%/var/uploads/photos/thumbs'
+        photo_previews_storage:
+            adapter: 'local'
+            options:
+                directory: '%kernel.project_dir%/var/uploads/photos/previews'
