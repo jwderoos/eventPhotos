@@ -47,6 +47,12 @@ vendor/bin/phpcs                                  # PSR-12
 - `phpstan` level 10, `phpcs` PSR-12, `phpmnd` (no magic numbers in `src/`), `phpcpd` (50-line / 100-token duplication), `rector`, `securitychecker_roave`, and `doctrine:schema:validate` all gate commits.
 - CI workflow (`.github/workflows/ci.yml`) spins up Postgres 16, runs migrations against the test DB, then `grumphp run` with the same task list.
 
+## Migrations
+
+- **Never hand-write a migration.** Generate via `bin/console doctrine:migrations:diff`, then edit only the `getDescription()` text if needed. Don't author `CREATE TABLE`, `CREATE INDEX`, etc. by hand.
+- Reason: hand-written index/constraint names drift from Doctrine ORM's auto-generated hash names (algorithm differs by Doctrine version). Issue #13 shipped a hand-written messenger-table migration whose index name was wrong; the bug was invisible until CI started running `doctrine:schema:validate` on a freshly-migrated DB.
+- The drift gate is two-tier: GrumPHP's `shell` task runs `doctrine:schema:validate --skip-sync` locally on every commit (mapping-only, no DB needed), and CI runs the full `doctrine:schema:validate --env=test` after migrating against a fresh Postgres.
+
 ## Architecture
 
 ### Photo ingest pipeline (the core flow)
