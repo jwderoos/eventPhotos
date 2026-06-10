@@ -1,0 +1,77 @@
+name: CI
+
+on:
+    pull_request:
+    push:
+        branches: [main]
+
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+    quality:
+        name: Quality
+        runs-on: ubuntu-latest
+
+        services:
+            postgres:
+                image: postgres:16
+                env:
+                    POSTGRES_USER: postgres
+                    POSTGRES_PASSWORD: postgres
+                    POSTGRES_DB: app
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -U postgres"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 10
+
+        env:
+            DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5432/app?serverVersion=16&charset=utf8"
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup PHP 8.5
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.5'
+                  extensions: ctype, dom, exif, fileinfo, gd, iconv, intl, mbstring, pdo, pdo_pgsql, simplexml, tokenizer, zip, opcache
+                  coverage: none
+                  tools: composer:v2
+
+            - name: Get composer cache directory
+              id: composer-cache
+              run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+            - name: Composer cache
+              uses: actions/cache@v4
+              with:
+                  path: ${{ steps.composer-cache.outputs.dir }}
+                  key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+                  restore-keys: ${{ runner.os }}-composer-
+
+            - name: Install dependencies
+              run: composer install --no-interaction --no-progress --prefer-dist
+
+            - name: Create test database
+              run: bin/console doctrine:database:create --env=test --if-not-exists
+
+            - name: Run migrations
+              run: bin/console doctrine:migrations:migrate --env=test --no-interaction --allow-no-migration
+
+            - name: Validate schema (mapping + sync)
+              run: bin/console doctrine:schema:validate --env=test
+
+            - name: Install importmap vendor assets
+              run: bin/console importmap:install
+
+            - name: Build Tailwind CSS
+              run: bin/console tailwind:build
+
+            - name: GrumPHP
+              run: vendor/bin/grumphp run --tasks=composer,file_size,phpcpd,phpcs,phpmnd,phpstan,phpunit,rector,securitychecker_roave,yamllint

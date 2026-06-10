@@ -36,10 +36,12 @@ Edit `grumphp.yml`. Add this block at the end of `grumphp.tasks:`, after the exi
 ```yaml
         shell:
             scripts:
-                - ['bin/console', 'doctrine:schema:validate', '--skip-sync', '--no-interaction']
+                - ['-c', 'bin/console doctrine:schema:validate --skip-sync --no-interaction']
 ```
 
 Indentation: 8 spaces for the task key (`shell:`), 12 spaces for `scripts:`, 16 spaces for the script entry — matches the surrounding tasks.
+
+**Note on the script syntax:** GrumPHP's `Shell` task `exec()`s `/bin/sh` and passes the array entries as positional args to `sh`. The literal argv form (`['bin/console', 'doctrine:schema:validate', ...]`) does not work — `sh` interprets the first arg as a script filename. Use `['-c', '<full command string>']`.
 
 - [ ] **Step 3: Verify the `shell` task runs cleanly**
 
@@ -166,9 +168,17 @@ jobs:
             - name: Validate schema (mapping + sync)
               run: bin/console doctrine:schema:validate --env=test
 
+            - name: Install importmap vendor assets
+              run: bin/console importmap:install
+
+            - name: Build Tailwind CSS
+              run: bin/console tailwind:build
+
             - name: GrumPHP
               run: vendor/bin/grumphp run --tasks=composer,file_size,phpcpd,phpcs,phpmnd,phpstan,phpunit,rector,securitychecker_roave,yamllint
 ```
+
+**Why `importmap:install` and `tailwind:build`:** every functional test that renders `templates/base.html.twig` resolves the `styles/app.css` asset and the importmap'd `app` entrypoint. Without these two steps the test suite hard-fails on `Twig\Error\RuntimeError` ("vendor asset is missing" / "tailwindcss asset not found"). The importmap step is a CI-only workaround until composer's `auto-scripts` are wired to `post-install-cmd` (tracked in issue #26).
 
 Indentation: 4 spaces throughout (matches project convention — `grumphp.yml` uses 4-space).
 
@@ -277,3 +287,29 @@ Expected: `Quality` check appears and is green.
 ## Out-of-scope follow-ups
 
 After the workflow is merged, the user can (manually, outside this plan) configure GitHub branch protection on `main` to require the `Quality` check before merging. Not in this plan because branch protection lives in GitHub repo settings, not in the workflow yaml.
+
+---
+
+## What actually happened (PR #25)
+
+Recorded after execution so the next agent sees the full shape, not just the planned shape.
+
+**Plan adjustments:**
+
+- **Task 1 `shell` task syntax:** the literal argv form (`['bin/console', ...]`) does not work with GrumPHP's `Shell` task — `sh` interprets the first array entry as a script filename. Shipped form: `['-c', '<full command string>']`. Plan has been updated; spec footnote added.
+- **Task 2 `ci.yml` content:** two additional steps (`importmap:install`, `tailwind:build`) were added between `Validate schema` and `GrumPHP`. The spec missed these because it assumed tests didn't need built assets. Step list above now reflects what shipped.
+
+**Iteration log (Task 3):**
+
+1. **CI run #1 — failed at `Validate schema`.** Schema validate caught a real drift: `migrations/Version20260610151632.php` (messenger table, shipped in #13) created the index with a Doctrine-version-mismatched name (`IDX_…BA31DB` instead of `IDX_…BA31DBBF396750`). The drift gate paid for itself on the very first run. Fix: edit the original migration in-place (project is pre-production, single dev, fixing-the-source preferred over band-aid migration). Drop+recreate local test DB.
+2. **CI run #2 — failed at `GrumPHP / phpunit`** with `Twig\Error\RuntimeError: Unable to find asset "tailwindcss"`. Tests rendering the layout failed because Tailwind hadn't been built. Fix: add `bin/console tailwind:build` step.
+3. **CI run #3 — failed at `GrumPHP / phpunit`** with `Twig\Error\RuntimeError: The "@hotwired/stimulus" vendor asset is missing`. AssetMapper's `importmap()` couldn't resolve vendor assets because `assets/vendor/` was empty. Root cause: `composer.json` defines `auto-scripts` but doesn't wire them to `post-install-cmd` / `post-update-cmd`. Workaround: add `bin/console importmap:install` step. Real fix tracked in issue #26.
+4. **CI run #4 — green.** PR #25 merged.
+
+**Out-of-band changes that landed on the same branch:**
+
+- `CLAUDE.md` was created on the branch (initial file by the user, plus a "Migrations" section added by the agent codifying the rule "never hand-write migrations — always use `doctrine:migrations:diff`" — the rule that, had it existed, would have prevented the messenger-table index name bug).
+
+**Issues created during execution:**
+
+- **#26** — Wire composer `auto-scripts` to `post-install-cmd` / `post-update-cmd`. Removes the need for the explicit `importmap:install` step in CI.
