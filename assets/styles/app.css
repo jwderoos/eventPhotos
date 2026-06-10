@@ -1,3 +1,7 @@
-body {
-    background-color: skyblue;
+@import "tailwindcss";
+
+@source not "./daisyui{,*}.mjs";
+
+@plugin "./daisyui.mjs" {
+    themes: corporate --default, winter;
 }

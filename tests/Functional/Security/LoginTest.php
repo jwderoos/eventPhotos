@@ -48,6 +48,6 @@ final class LoginTest extends WebTestCase
         ]);
 
         $kernelBrowser->followRedirect();
-        self::assertSelectorTextContains('.error', 'Invalid credentials');
+        self::assertSelectorTextContains('[data-testid="login-error"]', 'Invalid credentials');
     }
 }

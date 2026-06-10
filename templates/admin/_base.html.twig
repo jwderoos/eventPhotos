@@ -1,23 +1,97 @@
 {% extends 'base.html.twig' %}
 
+{% block html_attributes %}data-theme="corporate"{% endblock %}
+
 {% block body %}
-    <nav class="admin-nav">
-        <strong>Event Photos — Admin</strong>
-        <a href="{{ path('admin_dashboard') }}">Dashboard</a>
-        <a href="{{ path('admin_event_index') }}">Events</a>
-        <a href="{{ path('admin_collection_index') }}">Collections</a>
-        <span>·</span>
-        <span>{{ app.user ? app.user.displayName : '' }}</span>
-        <a href="{{ path('app_logout') }}">Sign out</a>
-    </nav>
+    {% block admin_shell %}
+        <div class="drawer lg:drawer-open">
+            <input id="admin-drawer" type="checkbox" class="drawer-toggle">
 
-    {% for label, messages in app.flashes %}
-        {% for message in messages %}
-            <div class="flash flash-{{ label }}">{{ message }}</div>
-        {% endfor %}
-    {% endfor %}
+            <div class="drawer-content flex min-h-screen flex-col bg-base-200">
+                <div class="navbar border-b border-base-300 bg-base-100">
+                    <div class="flex-none lg:hidden">
+                        <label for="admin-drawer" aria-label="Open sidebar" class="btn btn-square btn-ghost">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                            </svg>
+                        </label>
+                    </div>
 
-    <main class="admin-main">
-        {% block admin_main %}{% endblock %}
-    </main>
+                    <div class="flex-1">
+                        {% block admin_breadcrumb %}
+                            <span class="text-sm text-base-content/70">Admin</span>
+                        {% endblock %}
+                    </div>
+
+                    {% if app.user %}
+                        <div class="flex-none">
+                            <div class="dropdown dropdown-end">
+                                <label tabindex="0" class="btn btn-ghost">
+                                    {{ app.user.displayName }}
+                                </label>
+                                <ul tabindex="0" class="dropdown-content menu rounded-box z-[1] w-48 bg-base-100 p-2 shadow">
+                                    <li><a href="{{ path('app_logout') }}">Sign out</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+
+                {% set flashMap = {success: 'alert-success', error: 'alert-error', danger: 'alert-error', warning: 'alert-warning'} %}
+                {% for label, messages in app.flashes %}
+                    {% for message in messages %}
+                        <div class="mx-auto mt-4 w-full max-w-7xl px-4" data-testid="flash-{{ label }}">
+                            <div class="alert {{ flashMap[label]|default('alert-info') }}" role="status">
+                                <span>{{ message }}</span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endfor %}
+
+                <main class="mx-auto w-full max-w-7xl flex-1 px-4 py-8">
+                    {% block admin_main %}{% endblock %}
+                </main>
+
+                {% if block('admin_actions') is defined %}
+                    <div class="sticky bottom-0 border-t border-base-300 bg-base-100/95 backdrop-blur">
+                        <div class="mx-auto flex max-w-7xl items-center justify-end gap-2 px-4 py-3">
+                            {{ block('admin_actions') }}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="drawer-side">
+                <label for="admin-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
+                <aside class="flex min-h-full w-64 flex-col bg-base-100 border-r border-base-300">
+                    <div class="px-4 py-5">
+                        <p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Event Photos</p>
+                        <p class="text-lg font-semibold">Admin</p>
+                    </div>
+
+                    {% set route = app.request.attributes.get('_route') %}
+                    <ul class="menu menu-md px-2">
+                        <li>
+                            <a href="{{ path('admin_dashboard') }}"
+                               class="{{ route == 'admin_dashboard' ? 'active' : '' }}">
+                                Dashboard
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ path('admin_event_index') }}"
+                               class="{{ route starts with 'admin_event_' ? 'active' : '' }}">
+                                Events
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ path('admin_collection_index') }}"
+                               class="{{ route starts with 'admin_collection_' ? 'active' : '' }}">
+                                Collections
+                            </a>
+                        </li>
+                    </ul>
+                </aside>
+            </div>
+        </div>
+    {% endblock %}
 {% endblock %}

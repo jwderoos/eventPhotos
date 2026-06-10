@@ -16,6 +16,17 @@ services:
       mailer:
         condition: service_started
 
+  tailwind:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    command: php bin/console tailwind:build --watch
+    volumes:
+      - ./:/app:delegated
+    working_dir: /app
+    depends_on:
+      - php
+
   nginx:
     image: nginx:1.27-alpine
     volumes:

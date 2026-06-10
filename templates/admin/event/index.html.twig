@@ -2,45 +2,64 @@
 
 {% block title %}Admin — Events{% endblock %}
 
+{% block admin_breadcrumb %}
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li>Admin</li>
+            <li>Events</li>
+        </ul>
+    </div>
+{% endblock %}
+
 {% block admin_main %}
-    <h1>Events</h1>
-    <p><a href="{{ path('admin_event_new') }}">+ new event</a></p>
+    <header class="mb-6 flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">Events</h1>
+        <a href="{{ path('admin_event_new') }}" class="btn btn-primary btn-sm">+ New event</a>
+    </header>
 
     {% if events %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Slug</th>
-                    <th>Name</th>
-                    <th>Date</th>
-                    <th>Window</th>
-                    <th>Owner</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for event in events %}
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+            <table class="table table-zebra">
+                <thead>
                     <tr>
-                        <td><code>{{ event.slug }}</code></td>
-                        <td>{{ event.name }}</td>
-                        <td>{{ event.date|date('Y-m-d') }}</td>
-                        <td>{{ event.resolveWindowMinutes }} min</td>
-                        <td>{{ event.owner.email }}</td>
-                        <td>
-                            <a href="{{ path('admin_event_edit', {id: event.id}) }}">Edit</a>
-                            <form method="post"
-                                  action="{{ path('admin_event_delete', {id: event.id}) }}"
-                                  onsubmit="return confirm('Delete this event?')"
-                                  style="display:inline">
-                                <input type="hidden" name="_token" value="{{ csrf_token('delete_event_' ~ event.id) }}">
-                                <button type="submit">Delete</button>
-                            </form>
-                        </td>
+                        <th>Slug</th>
+                        <th>Name</th>
+                        <th>Date</th>
+                        <th>Window</th>
+                        <th>Owner</th>
+                        <th class="text-right">Actions</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% for event in events %}
+                        <tr>
+                            <td><code class="text-xs">{{ event.slug }}</code></td>
+                            <td class="font-medium">{{ event.name }}</td>
+                            <td>{{ event.date|date('Y-m-d') }}</td>
+                            <td>{{ event.resolveWindowMinutes }} min</td>
+                            <td class="text-sm text-base-content/70">{{ event.owner.email }}</td>
+                            <td class="text-right">
+                                <div class="inline-flex items-center gap-1">
+                                    <a href="{{ path('admin_event_edit', {id: event.id}) }}"
+                                       class="btn btn-ghost btn-xs">Edit</a>
+                                    <form method="post"
+                                          action="{{ path('admin_event_delete', {id: event.id}) }}"
+                                          onsubmit="return confirm('Delete this event?')"
+                                          class="inline">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete_event_' ~ event.id) }}">
+                                        <button type="submit" class="btn btn-ghost btn-xs text-error">Delete</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     {% else %}
-        <p>No events.</p>
+        <div class="rounded-box border border-dashed border-base-300 bg-base-100 p-10 text-center">
+            <p class="text-base-content/70">No events yet.</p>
+            <a href="{{ path('admin_event_new') }}" class="btn btn-primary btn-sm mt-4">Create your first event</a>
+        </div>
     {% endif %}
 {% endblock %}

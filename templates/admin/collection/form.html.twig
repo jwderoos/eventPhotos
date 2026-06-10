@@ -2,12 +2,60 @@
 
 {% block title %}Admin — {{ mode == 'new' ? 'New collection' : 'Edit ' ~ collection.name }}{% endblock %}
 
-{% block admin_main %}
-    <h1>{{ mode == 'new' ? 'New collection' : 'Edit ' ~ collection.name }}</h1>
+{% block admin_breadcrumb %}
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li>Admin</li>
+            <li><a href="{{ path('admin_collection_index') }}" class="link link-hover">Collections</a></li>
+            <li>{{ mode == 'new' ? 'New' : 'Edit' }}</li>
+        </ul>
+    </div>
+{% endblock %}
 
-    {{ form_start(form) }}
-    {{ form_widget(form) }}
-    <button type="submit">{{ mode == 'new' ? 'Create' : 'Save' }}</button>
-    <a href="{{ path('admin_collection_index') }}">Cancel</a>
-    {{ form_end(form) }}
+{% block admin_main %}
+    <header class="mb-6">
+        <h1 class="text-2xl font-semibold">
+            {{ mode == 'new' ? 'New collection' : 'Edit ' ~ collection.name }}
+        </h1>
+    </header>
+
+    {{ form_start(form, {attr: {id: 'collection-form', class: 'card bg-base-100 shadow-sm'}}) }}
+        <div class="card-body grid gap-4 lg:grid-cols-2">
+            {{ form_widget(form) }}
+        </div>
+    {{ form_end(form, {render_rest: false}) }}
+{% endblock %}
+
+{% block admin_actions %}
+    <a href="{{ path('admin_collection_index') }}" class="btn btn-ghost">Cancel</a>
+    <button type="submit" form="collection-form" class="btn btn-primary">
+        {{ mode == 'new' ? 'Create' : 'Save' }}
+    </button>
+{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        #collection-form > div { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #collection-form > div > div { display: flex; flex-direction: column; gap: 0.375rem; }
+        #collection-form label { font-size: 0.875rem; font-weight: 500; color: oklch(var(--bc)); }
+        #collection-form input[type="text"],
+        #collection-form input[type="email"],
+        #collection-form textarea,
+        #collection-form select {
+            width: 100%;
+            border: 1px solid oklch(var(--bc) / 0.2);
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background-color: oklch(var(--b1));
+            color: oklch(var(--bc));
+            font-size: 0.875rem;
+        }
+        #collection-form textarea { min-height: 6rem; }
+        #collection-form .form-help, #collection-form small { font-size: 0.75rem; color: oklch(var(--bc) / 0.6); }
+        #collection-form ul { color: oklch(var(--er)); font-size: 0.75rem; margin-top: 0.25rem; padding-left: 1rem; }
+        @media (max-width: 1024px) {
+            #collection-form > div { grid-template-columns: 1fr; }
+        }
+    </style>
 {% endblock %}

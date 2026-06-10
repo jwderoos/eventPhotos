@@ -1,29 +1,37 @@
-{% extends 'base.html.twig' %}
+{% extends 'admin/_base.html.twig' %}
 
 {% block title %}Sign in{% endblock %}
 
-{% block body %}
-    <main class="login">
-        <h1>Sign in</h1>
+{% block admin_shell %}
+    <div class="flex min-h-screen items-center justify-center bg-base-200 px-4">
+        <div class="card w-full max-w-sm bg-base-100 shadow-md">
+            <div class="card-body gap-4">
+                <h1 class="card-title justify-center text-xl">Sign in</h1>
 
-        {% if error %}
-            <div class="error">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
-        {% endif %}
+                {% if error %}
+                    <div data-testid="login-error" class="alert alert-error" role="alert">
+                        <span>{{ error.messageKey|trans(error.messageData, 'security') }}</span>
+                    </div>
+                {% endif %}
 
-        <form method="post" action="{{ path('app_login') }}">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+                <form method="post" action="{{ path('app_login') }}" class="space-y-3">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
 
-            <label>
-                Email
-                <input type="email" name="_username" value="{{ last_username }}" required autofocus>
-            </label>
+                    <label class="form-control w-full">
+                        <span class="label-text">Email</span>
+                        <input type="email" name="_username" value="{{ last_username }}" required autofocus
+                               class="input input-bordered w-full">
+                    </label>
 
-            <label>
-                Password
-                <input type="password" name="_password" required>
-            </label>
+                    <label class="form-control w-full">
+                        <span class="label-text">Password</span>
+                        <input type="password" name="_password" required
+                               class="input input-bordered w-full">
+                    </label>
 
-            <button type="submit">Sign in</button>
-        </form>
-    </main>
+                    <button type="submit" class="btn btn-primary w-full">Sign in</button>
+                </form>
+            </div>
+        </div>
+    </div>
 {% endblock %}
