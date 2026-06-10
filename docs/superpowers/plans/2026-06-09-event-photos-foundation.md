@@ -205,11 +205,14 @@ GrumPHP:   composer, file_size, git checks, phpcpd, phpcs (PSR-12),
 
 Each deserves its own brainstorming + plan when picked up:
 
-- **Photo entity, migration, ingest pipeline, time-window query.** The whole reason the rest exists. Likely needs a storage strategy decision (S3/MinIO vs local disk), file-validation pipeline, EXIF-based timestamp extraction, and the time-window query on `/e/{slug}/photos`.
+- **Photo entity, migration, ingest pipeline, time-window query.** DONE! The whole reason the rest exists. Likely needs a storage strategy decision (S3/MinIO vs local disk), file-validation pipeline, EXIF-based timestamp extraction, and the time-window query on `/e/{slug}/photos`.
 - **SSO / OIDC integration.** Auth model is ready for it (provider abstraction in security.yaml).
 - **Password reset flow.** Mailer + Mailpit already wired; just need the controller, form, and tokens.
 - **Organizer self-signup.** Currently CLI-only via `app:create-user`.
 - **Admin User CRUD** (with proper password reset, not direct password editing).
+- **User levels** admins should be allowed to view/change everything. Event creators only their own events.
+- **General UI improvements** photo management is now part of the event edit page, should be stand alone, and the flow could be better.
+- **Download/view tracking** it could be valuable for event owners to know what photos are most popular.
 - **CI pipeline** (GitHub Actions running `vendor/bin/grumphp run` + `vendor/bin/phpunit` against Postgres).
 - **Rate limiting** on `/e/{slug}` and `/e/{slug}/photos`.
 - **Cache headers and CDN strategy** for the public pages.
