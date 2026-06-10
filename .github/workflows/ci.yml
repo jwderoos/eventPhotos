@@ -67,6 +67,9 @@ jobs:
             - name: Validate schema (mapping + sync)
               run: bin/console doctrine:schema:validate --env=test
 
+            - name: Install importmap vendor assets
+              run: bin/console importmap:install
+
             - name: Build Tailwind CSS
               run: bin/console tailwind:build
 
