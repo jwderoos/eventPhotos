@@ -1,0 +1,22 @@
+{% extends 'admin/_base.html.twig' %}
+
+{% block title %}Check your email{% endblock %}
+
+{% block admin_shell %}
+    <div class="flex min-h-screen items-center justify-center bg-base-200 px-4">
+        <div class="card w-full max-w-sm bg-base-100 shadow-md">
+            <div class="card-body gap-4">
+                <h1 class="card-title justify-center text-xl">Check your email</h1>
+
+                <p data-testid="reset-check-email" class="text-sm text-base-content/80">
+                    If an account exists for the email you entered, we've sent a password reset link.
+                    The link is valid for {{ (tokenLifetime / 60)|round }} minutes.
+                </p>
+
+                <p class="text-sm text-center">
+                    <a href="{{ path('app_login') }}" class="link">Back to sign in</a>
+                </p>
+            </div>
+        </div>
+    </div>
+{% endblock %}

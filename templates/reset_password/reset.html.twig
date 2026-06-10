@@ -1,0 +1,27 @@
+{% extends 'admin/_base.html.twig' %}
+
+{% block title %}Set a new password{% endblock %}
+
+{% block admin_shell %}
+    <div class="flex min-h-screen items-center justify-center bg-base-200 px-4">
+        <div class="card w-full max-w-sm bg-base-100 shadow-md">
+            <div class="card-body gap-4">
+                <h1 class="card-title justify-center text-xl">Set a new password</h1>
+
+                {{ form_start(resetForm, {attr: {class: 'space-y-3'}}) }}
+                    {{ form_row(resetForm.plainPassword.first, {
+                        label_attr: {class: 'label-text'},
+                        row_attr: {class: 'form-control w-full'},
+                        attr: {class: 'input input-bordered w-full'},
+                    }) }}
+                    {{ form_row(resetForm.plainPassword.second, {
+                        label_attr: {class: 'label-text'},
+                        row_attr: {class: 'form-control w-full'},
+                        attr: {class: 'input input-bordered w-full'},
+                    }) }}
+                    <button type="submit" class="btn btn-primary w-full">Update password</button>
+                {{ form_end(resetForm) }}
+            </div>
+        </div>
+    </div>
+{% endblock %}
