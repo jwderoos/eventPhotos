@@ -27,6 +27,25 @@ services:
     depends_on:
       - php
 
+  worker:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    command: php bin/console messenger:consume async failed -vv --time-limit=3600 --memory-limit=128M
+    volumes:
+      - ./:/app:delegated
+    working_dir: /app
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=16&charset=utf8"
+      MAILER_DSN: "smtp://mailer:1025"
+      APP_ENV: dev
+    restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+    depends_on:
+      database:
+        condition: service_healthy
+
   nginx:
     image: nginx:1.27-alpine
     volumes:
