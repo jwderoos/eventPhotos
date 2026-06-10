@@ -4,24 +4,28 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
-use Symfony\Component\HttpFoundation\RedirectResponse;
 use App\Entity\Event;
 use App\Entity\User;
 use App\Form\EventType;
 use App\Repository\EventRepository;
 use App\Security\Voter\EventVoter;
+use App\Service\QrCodeRenderer;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 final class EventController extends AbstractController
 {
     public function __construct(
         private readonly EventRepository $events,
         private readonly EntityManagerInterface $em,
+        private readonly QrCodeRenderer $renderer,
+        private readonly UrlGeneratorInterface $urlGenerator,
     ) {
     }
 
@@ -113,5 +117,57 @@ final class EventController extends AbstractController
         $this->addFlash('success', 'Event deleted.');
 
         return $this->redirectToRoute('admin_event_index');
+    }
+
+    #[Route(
+        '/admin/events/{id}/qr',
+        name: 'admin_event_qr',
+        requirements: ['id' => '\d+'],
+        methods: ['GET'],
+    )]
+    public function qr(
+        Event $event,
+    ): Response {
+        $this->denyAccessUnlessGranted(EventVoter::VIEW, $event);
+
+        $url = $this->eventLandingUrl($event);
+
+        return $this->render('admin/event/qr.html.twig', [
+            'event' => $event,
+            'url'   => $url,
+            'svg'   => $this->renderer->svg($url),
+        ]);
+    }
+
+    #[Route(
+        '/admin/events/{id}/qr.png',
+        name: 'admin_event_qr_png',
+        requirements: ['id' => '\d+'],
+        methods: ['GET'],
+    )]
+    public function qrPng(
+        Event $event,
+    ): Response {
+        $this->denyAccessUnlessGranted(EventVoter::VIEW, $event);
+
+        $url = $this->eventLandingUrl($event);
+
+        return new Response(
+            $this->renderer->png($url),
+            Response::HTTP_OK,
+            [
+                'Content-Type'        => 'image/png',
+                'Content-Disposition' => sprintf('attachment; filename="event-%s.png"', $event->getSlug()),
+            ],
+        );
+    }
+
+    private function eventLandingUrl(Event $event): string
+    {
+        return $this->urlGenerator->generate(
+            'public_event_landing',
+            ['slug' => $event->getSlug()],
+            UrlGeneratorInterface::ABSOLUTE_URL,
+        );
     }
 }
