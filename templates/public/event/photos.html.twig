@@ -4,11 +4,25 @@
 
 {% block public_main %}
     <section class="space-y-6">
-        <header class="space-y-1">
+        <header class="space-y-2">
             <h1 class="text-2xl font-semibold">{{ event.name }}</h1>
+
+            <form method="get"
+                  action="{{ path('public_event_photos', {slug: event.slug}) }}"
+                  data-testid="time-filter"
+                  class="flex flex-wrap items-center gap-2 text-sm">
+                <label for="photos-time" class="sr-only">Time</label>
+                <input type="time"
+                       id="photos-time"
+                       name="t"
+                       value="{{ timestamp|date('H:i', event.timezone) }}"
+                       class="input input-sm input-bordered w-28">
+                <button type="submit" class="btn btn-sm">Update</button>
+            </form>
+
             <p class="text-sm text-base-content/70">
-                Time:
-                <time data-testid="timestamp" datetime="{{ timestamp|date('c') }}">{{ timestamp|date('H:i') }}</time>
+                Showing
+                <time data-testid="timestamp" datetime="{{ timestamp|date('c') }}">{{ timestamp|date('H:i', event.timezone) }}</time>
                 · Window: ±<span data-testid="window">{{ window }}</span> minutes
                 · {{ photos|length }} photo{{ photos|length == 1 ? '' : 's' }}
             </p>

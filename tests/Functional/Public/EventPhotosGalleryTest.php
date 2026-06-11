@@ -43,7 +43,7 @@ final class EventPhotosGalleryTest extends WebTestCase
 
         $em->flush();
 
-        $client->request(Request::METHOD_GET, '/e/gallery/photos?t=2026-06-10T12:00:00%2B00:00&w=30');
+        $client->request(Request::METHOD_GET, '/e/gallery/photos?t=12:00');
 
         $this->assertResponseIsSuccessful();
         $content = (string) $client->getResponse()->getContent();
@@ -64,6 +64,7 @@ final class EventPhotosGalleryTest extends WebTestCase
 
         $event = new Event('g2', 'G2', new DateTimeImmutable('2026-06-10'), $owner);
         $event->setTimezone('UTC');
+        $event->setDefaultWindowMinutes(720);
 
         $em->persist($event);
 
@@ -71,7 +72,7 @@ final class EventPhotosGalleryTest extends WebTestCase
         $em->persist($pending);
         $em->flush();
 
-        $client->request(Request::METHOD_GET, '/e/g2/photos?t=2026-06-10T12:00:00%2B00:00&w=720');
+        $client->request(Request::METHOD_GET, '/e/g2/photos?t=12:00');
 
         $this->assertResponseIsSuccessful();
         $this->assertStringNotContainsString(

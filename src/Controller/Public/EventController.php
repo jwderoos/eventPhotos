@@ -8,7 +8,7 @@ use App\Entity\Event;
 use App\Repository\EventRepository;
 use App\Repository\PhotoRepository;
 use DateTimeImmutable;
-use DateTimeInterface;
+use DateTimeZone;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,9 +19,11 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class EventController extends AbstractController
 {
-    private const int MAX_WINDOW_MINUTES = 1440;
-
     private const int HARD_CAP = 200;
+
+    private const string TIME_FORMAT = 'H:i';
+
+    private const string TIME_PATTERN = '/^(?:[01]\d|2[0-3]):[0-5]\d$/';
 
     public function __construct(
         private readonly EventRepository $events,
@@ -34,17 +36,13 @@ final class EventController extends AbstractController
     public function landing(string $slug): Response
     {
         $event = $this->resolve($slug);
-        $now   = $this->clock->now();
+        $now   = $this->nowInEventTimezone($event);
 
         return $this->render('public/event/landing.html.twig', [
             'event'         => $event,
             'now'           => $now,
             'windowMinutes' => $event->resolveWindowMinutes(),
-            'photosUrl'     => $this->generateUrl('public_event_photos', [
-                'slug' => $event->getSlug(),
-                't'    => $now->format(DateTimeInterface::ATOM),
-                'w'    => $event->resolveWindowMinutes(),
-            ]),
+            'photosUrl'     => $this->buildPhotosUrl($event, $now),
         ]);
     }
 
@@ -53,8 +51,12 @@ final class EventController extends AbstractController
     {
         $event = $this->resolve($slug);
 
-        $timestamp = $this->parseTimestamp($request->query->get('t'));
-        $window    = $this->parseWindow($request->query->get('w'), $event);
+        if ($request->query->has('w')) {
+            throw new BadRequestHttpException('Window is no longer configurable per request.');
+        }
+
+        $timestamp = $this->resolveTimestamp($request->query->get('t'), $event);
+        $window    = $event->resolveWindowMinutes();
 
         $start  = $timestamp->modify(sprintf('-%d minutes', $window));
         $end    = $timestamp->modify(sprintf('+%d minutes', $window));
@@ -80,37 +82,40 @@ final class EventController extends AbstractController
         return $event;
     }
 
-    private function parseTimestamp(mixed $raw): DateTimeImmutable
+    private function buildPhotosUrl(Event $event, DateTimeImmutable $when): string
     {
-        if (!is_string($raw) || $raw === '') {
-            return $this->clock->now();
-        }
-
-        $parsed = DateTimeImmutable::createFromFormat(DateTimeInterface::ATOM, $raw);
-
-        if (!$parsed instanceof DateTimeImmutable) {
-            throw new BadRequestHttpException('Invalid timestamp.');
-        }
-
-        return $parsed;
+        return $this->generateUrl('public_event_photos', [
+            'slug' => $event->getSlug(),
+            't'    => $when->format(self::TIME_FORMAT),
+        ]);
     }
 
-    private function parseWindow(mixed $raw, Event $event): int
+    private function nowInEventTimezone(Event $event): DateTimeImmutable
     {
-        if ($raw === null || $raw === '') {
-            return $event->resolveWindowMinutes();
+        return $this->clock->now()->setTimezone(new DateTimeZone($event->getTimezone()));
+    }
+
+    private function resolveTimestamp(mixed $raw, Event $event): DateTimeImmutable
+    {
+        if (!is_string($raw) || $raw === '') {
+            return $this->nowInEventTimezone($event);
         }
 
-        if (!is_numeric($raw)) {
-            throw new BadRequestHttpException('Invalid window.');
+        if (preg_match(self::TIME_PATTERN, $raw) !== 1) {
+            throw new BadRequestHttpException('Invalid time. Expected HH:mm.');
         }
 
-        $window = (int) $raw;
+        $eventDate = $event->getDate()->format('Y-m-d');
+        $resolved  = DateTimeImmutable::createFromFormat(
+            'Y-m-d H:i',
+            sprintf('%s %s', $eventDate, $raw),
+            new DateTimeZone($event->getTimezone()),
+        );
 
-        if ($window < 1 || $window > self::MAX_WINDOW_MINUTES) {
-            throw new BadRequestHttpException('Invalid window.');
+        if (!$resolved instanceof DateTimeImmutable) {
+            throw new BadRequestHttpException('Invalid time. Expected HH:mm.');
         }
 
-        return $window;
+        return $resolved;
     }
 }
