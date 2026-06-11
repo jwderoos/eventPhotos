@@ -1,0 +1,33 @@
+{% extends 'admin/_base.html.twig' %}
+
+{% block title %}Admin — New invite{% endblock %}
+
+{% block admin_breadcrumb %}
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li>Admin</li>
+            <li><a href="{{ path('admin_invite_index') }}">Invites</a></li>
+            <li>New</li>
+        </ul>
+    </div>
+{% endblock %}
+
+{% block admin_main %}
+    <header class="mb-6">
+        <h1 class="text-2xl font-semibold">Create invite link</h1>
+        <p class="text-sm text-base-content/70">The URL is shown ONCE after creation. Share it via your own channel.</p>
+    </header>
+
+    <div class="card max-w-xl bg-base-100 shadow">
+        <div class="card-body">
+            {{ form_start(form) }}
+                {{ form_row(form.role) }}
+                {{ form_row(form.expiresInDays) }}
+                <div class="card-actions justify-end">
+                    <a href="{{ path('admin_invite_index') }}" class="btn btn-ghost">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Create invite</button>
+                </div>
+            {{ form_end(form) }}
+        </div>
+    </div>
+{% endblock %}
