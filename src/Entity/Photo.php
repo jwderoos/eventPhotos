@@ -137,11 +137,12 @@ class Photo
 
         //hack for test data @todo : remove
         $takenAt = new DateTimeImmutable(
-            $this->getEvent()->getDate()->format('Y-m-d')  . ' ' .
-            $takenAt->format('H:i:s'), $takenAt->getTimezone()
+            $this->getEvent()->getDate()->format('Y-m-d')  . ' ' . $takenAt->format('H:i:s'),
+            $takenAt->getTimezone()
         );
 
         $this->takenAt = $takenAt;
+
         $this->width = $width;
         $this->height = $height;
         $this->processingError = null;
