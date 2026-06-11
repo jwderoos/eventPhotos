@@ -45,7 +45,7 @@ final class PhotoServeTest extends WebTestCase
         $thumbs->write($path, 'thumb-bytes');
 
         try {
-            $client->request(Request::METHOD_GET, sprintf('/p/%d/thumb.jpg', $photo->getId()));
+            $client->request(Request::METHOD_GET, sprintf('/e/%s/p/%d/thumb.jpg', $event->getSlug(), $photo->getId()));
 
             self::assertResponseIsSuccessful();
             self::assertResponseHeaderSame('Content-Type', 'image/jpeg');
@@ -76,7 +76,7 @@ final class PhotoServeTest extends WebTestCase
         $em->persist($photo);
         $em->flush();
 
-        $client->request(Request::METHOD_GET, sprintf('/p/%d/thumb.jpg', $photo->getId()));
+        $client->request(Request::METHOD_GET, sprintf('/e/%s/p/%d/thumb.jpg', $event->getSlug(), $photo->getId()));
 
         self::assertResponseStatusCodeSame(404);
     }
@@ -110,7 +110,7 @@ final class PhotoServeTest extends WebTestCase
         $thumbs->write($path, 'thumb-bytes');
 
         try {
-            $url = sprintf('/p/%d/thumb.jpg', $photo->getId());
+            $url = sprintf('/e/%s/p/%d/thumb.jpg', $event->getSlug(), $photo->getId());
 
             $client->request(Request::METHOD_GET, $url);
             self::assertResponseIsSuccessful();
@@ -119,6 +119,89 @@ final class PhotoServeTest extends WebTestCase
 
             $client->request(Request::METHOD_GET, $url, [], [], ['HTTP_IF_NONE_MATCH' => $etag]);
             self::assertResponseStatusCodeSame(304);
+        } finally {
+            $thumbs->delete($path);
+        }
+    }
+
+    public function testReturns404WhenSlugDoesNotMatchPhotoEvent(): void
+    {
+        $client = self::createClient();
+        $c      = self::getContainer();
+        /** @var EntityManagerInterface $em */
+        $em = $c->get(EntityManagerInterface::class);
+        /** @var FilesystemOperator $thumbs */
+        $thumbs = $c->get('photo_thumbs_storage');
+
+        $owner = new User('o4@example.test', 'O');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+
+        $eventA = new Event('e4a', 'E4A', new DateTimeImmutable('2026-06-10'), $owner);
+        $eventA->setTimezone('UTC');
+
+        $em->persist($eventA);
+
+        $eventB = new Event('e4b', 'E4B', new DateTimeImmutable('2026-06-10'), $owner);
+        $eventB->setTimezone('UTC');
+
+        $em->persist($eventB);
+
+        $photo = new Photo($eventA, str_repeat('d', 64), 'x.jpg', 100);
+        $photo->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100);
+
+        $em->persist($photo);
+        $em->flush();
+
+        $path = sprintf('event-%d/%d.jpg', (int) $eventA->getId(), (int) $photo->getId());
+        $thumbs->write($path, 'thumb-bytes');
+
+        try {
+            $client->request(Request::METHOD_GET, sprintf('/e/%s/p/%d/thumb.jpg', $eventA->getSlug(), $photo->getId()));
+            self::assertResponseIsSuccessful();
+
+            $client->request(Request::METHOD_GET, sprintf('/e/%s/p/%d/thumb.jpg', $eventB->getSlug(), $photo->getId()));
+            self::assertResponseStatusCodeSame(404);
+        } finally {
+            $thumbs->delete($path);
+        }
+    }
+
+    public function testOldUnscopedRouteIsGone(): void
+    {
+        $client = self::createClient();
+        $c      = self::getContainer();
+        /** @var EntityManagerInterface $em */
+        $em = $c->get(EntityManagerInterface::class);
+        /** @var FilesystemOperator $thumbs */
+        $thumbs = $c->get('photo_thumbs_storage');
+
+        $owner = new User('o5@example.test', 'O');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+
+        $event = new Event('e5', 'E5', new DateTimeImmutable('2026-06-10'), $owner);
+        $event->setTimezone('UTC');
+
+        $em->persist($event);
+
+        $photo = new Photo($event, str_repeat('e', 64), 'x.jpg', 100);
+        $photo->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100);
+
+        $em->persist($photo);
+        $em->flush();
+
+        $path = sprintf('event-%d/%d.jpg', (int) $event->getId(), (int) $photo->getId());
+        $thumbs->write($path, 'thumb-bytes');
+
+        try {
+            $client->request(Request::METHOD_GET, sprintf('/p/%d/thumb.jpg', $photo->getId()));
+            self::assertResponseStatusCodeSame(404);
+
+            $client->request(Request::METHOD_GET, sprintf('/p/%d/preview.jpg', $photo->getId()));
+            self::assertResponseStatusCodeSame(404);
         } finally {
             $thumbs->delete($path);
         }

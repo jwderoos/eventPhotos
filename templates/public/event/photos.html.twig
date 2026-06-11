@@ -36,10 +36,10 @@
             <ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {% for photo in photos %}
                     <li>
-                        <a href="{{ path('photo_serve_preview', {id: photo.id}) }}"
+                        <a href="{{ path('photo_serve_preview', {slug: event.slug, id: photo.id}) }}"
                            target="_blank"
                            rel="noopener">
-                            <img src="{{ path('photo_serve_thumb', {id: photo.id}) }}"
+                            <img src="{{ path('photo_serve_thumb', {slug: event.slug, id: photo.id}) }}"
                                  alt="{{ event.name }}"
                                  loading="lazy"
                                  class="w-full aspect-square object-cover rounded-box">

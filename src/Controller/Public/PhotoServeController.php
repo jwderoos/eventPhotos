@@ -32,31 +32,35 @@ final class PhotoServeController extends AbstractController
     }
 
     #[Route(
-        '/p/{id}/thumb.jpg',
+        '/e/{slug}/p/{id}/thumb.jpg',
         name: 'photo_serve_thumb',
-        requirements: ['id' => '\d+'],
+        requirements: ['slug' => '[a-z0-9-]+', 'id' => '\d+'],
         methods: ['GET'],
     )]
-    public function thumb(int $id, Request $request): StreamedResponse
+    public function thumb(string $slug, int $id, Request $request): StreamedResponse
     {
-        return $this->serve($id, $this->thumbs, $request);
+        return $this->serve($slug, $id, $this->thumbs, $request);
     }
 
     #[Route(
-        '/p/{id}/preview.jpg',
+        '/e/{slug}/p/{id}/preview.jpg',
         name: 'photo_serve_preview',
-        requirements: ['id' => '\d+'],
+        requirements: ['slug' => '[a-z0-9-]+', 'id' => '\d+'],
         methods: ['GET'],
     )]
-    public function preview(int $id, Request $request): StreamedResponse
+    public function preview(string $slug, int $id, Request $request): StreamedResponse
     {
-        return $this->serve($id, $this->previews, $request);
+        return $this->serve($slug, $id, $this->previews, $request);
     }
 
-    private function serve(int $id, FilesystemOperator $storage, Request $request): StreamedResponse
+    private function serve(string $slug, int $id, FilesystemOperator $storage, Request $request): StreamedResponse
     {
         $photo = $this->photos->find($id);
         if (!$photo instanceof Photo || $photo->getStatus() !== PhotoStatus::Ready) {
+            throw $this->createNotFoundException();
+        }
+
+        if ($photo->getEvent()->getSlug() !== $slug) {
             throw $this->createNotFoundException();
         }
 

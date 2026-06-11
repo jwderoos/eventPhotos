@@ -1,9 +1,9 @@
 <tr data-photo-id="{{ photo.id }}" data-status="{{ photo.status.value }}">
     <td class="w-14">
         {% if photo.status.value == 'ready' %}
-            <a href="{{ path('photo_serve_preview', {id: photo.id}) }}"
+            <a href="{{ path('photo_serve_preview', {slug: photo.event.slug, id: photo.id}) }}"
                target="_blank" rel="noopener">
-                <img src="{{ path('photo_serve_thumb', {id: photo.id}) }}"
+                <img src="{{ path('photo_serve_thumb', {slug: photo.event.slug, id: photo.id}) }}"
                      alt="{{ photo.originalFilename }}"
                      loading="lazy"
                      class="h-12 w-12 object-cover rounded">
@@ -46,7 +46,7 @@
     <td class="text-right">
         <div class="inline-flex items-center gap-1">
             {% if photo.status.value == 'ready' %}
-                <a href="{{ path('photo_serve_preview', {id: photo.id}) }}"
+                <a href="{{ path('photo_serve_preview', {slug: photo.event.slug, id: photo.id}) }}"
                    target="_blank" rel="noopener"
                    class="btn btn-ghost btn-xs">View</a>
             {% endif %}
