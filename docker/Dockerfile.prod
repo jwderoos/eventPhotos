@@ -1,0 +1,86 @@
+# syntax=docker/dockerfile:1.7
+#
+# Multi-stage / multi-target production build.
+#
+#   builder — composer install (no-dev), asset compile, prod cache warmup
+#   php     — php-fpm runtime image
+#   nginx   — nginx serving baked-in /app/public, proxying to php-fpm
+#
+# Build both runtime targets via compose.prod.yaml.
+
+# ----------------------------------------------------------------------------
+# builder
+# ----------------------------------------------------------------------------
+FROM php:8.5-fpm-bookworm AS builder
+
+COPY --from=mlocati/php-extension-installer:latest /usr/bin/install-php-extensions /usr/local/bin/
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git unzip ca-certificates \
+    && install-php-extensions pdo_pgsql intl zip opcache apcu gd exif \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV APP_ENV=prod \
+    APP_DEBUG=0 \
+    COMPOSER_ALLOW_SUPERUSER=1
+
+WORKDIR /app
+
+# Step 1: dependency layer (cached when composer.{json,lock} unchanged).
+COPY composer.json composer.lock symfony.lock ./
+RUN composer install \
+        --no-dev \
+        --no-scripts \
+        --no-autoloader \
+        --no-interaction \
+        --prefer-dist
+
+# Step 2: source.
+COPY . .
+
+# Step 3: optimized autoload + asset pipeline + cache warmup.
+# Order matters: importmap → tailwind → asset-map:compile → cache:warmup.
+RUN composer dump-autoload --classmap-authoritative --no-dev \
+    && php bin/console assets:install public --no-interaction \
+    && php bin/console importmap:install --no-interaction \
+    && php bin/console tailwind:build --minify \
+    && php bin/console asset-map:compile --no-interaction \
+    && php bin/console cache:clear --env=prod --no-debug \
+    && php bin/console cache:warmup --env=prod --no-debug
+
+# ----------------------------------------------------------------------------
+# php-fpm runtime
+# ----------------------------------------------------------------------------
+FROM php:8.5-fpm-bookworm AS php
+
+COPY --from=mlocati/php-extension-installer:latest /usr/bin/install-php-extensions /usr/local/bin/
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && install-php-extensions pdo_pgsql intl zip opcache apcu gd exif \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY docker/php/php-prod.ini /usr/local/etc/php/conf.d/zz-app.ini
+
+WORKDIR /app
+
+COPY --from=builder --chown=www-data:www-data /app /app
+
+USER www-data
+
+# var/uploads and var/share are volume-mounted; others must exist for cache+log.
+# Created as www-data so no recursive chown is needed.
+RUN mkdir -p var/cache var/log var/uploads var/share
+
+# ----------------------------------------------------------------------------
+# nginx runtime
+# ----------------------------------------------------------------------------
+FROM nginx:1.27-alpine AS nginx
+
+COPY --from=builder /app/public /app/public
+COPY docker/nginx/default.prod.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
