@@ -1,0 +1,10 @@
+{% extends 'public/_base.html.twig' %}
+
+{% block title %}Invite invalid or expired{% endblock %}
+
+{% block public_main %}
+<div class="mx-auto max-w-md p-8 text-center" data-testid="invite-invalid">
+    <h1 class="mb-4 text-2xl font-semibold">This invite link is invalid or has expired</h1>
+    <p class="text-sm text-base-content/70">If you believe this is a mistake, ask the person who sent it to issue a new link.</p>
+</div>
+{% endblock %}

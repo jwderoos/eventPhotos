@@ -1,0 +1,18 @@
+{% extends 'public/_base.html.twig' %}
+
+{% block title %}Accept invitation{% endblock %}
+
+{% block public_main %}
+<div class="mx-auto max-w-md p-8">
+    <h1 class="mb-4 text-2xl font-semibold">You've been invited</h1>
+    <p class="mb-6 text-sm text-base-content/70">Set up your account to continue.</p>
+
+    {{ form_start(form) }}
+        {{ form_row(form.email) }}
+        {{ form_row(form.displayName) }}
+        {{ form_row(form.password.first) }}
+        {{ form_row(form.password.second) }}
+        <button type="submit" class="btn btn-primary w-full">Create account</button>
+    {{ form_end(form) }}
+</div>
+{% endblock %}

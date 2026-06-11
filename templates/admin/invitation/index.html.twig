@@ -1,0 +1,96 @@
+{% extends 'admin/_base.html.twig' %}
+
+{% block title %}Admin — Invites{% endblock %}
+
+{% block admin_breadcrumb %}
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li>Admin</li>
+            <li>Invites</li>
+        </ul>
+    </div>
+{% endblock %}
+
+{% block admin_main %}
+    <header class="mb-6 flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">Invites</h1>
+        <a href="{{ path('admin_invite_new') }}" class="btn btn-primary btn-sm">+ New invite</a>
+    </header>
+
+    {% if newUrl is not null %}
+        <div class="alert alert-success mb-6" data-testid="invite-new-url">
+            <div class="flex w-full flex-col gap-2">
+                <span class="font-semibold">Invite link generated — copy it now.</span>
+                <span class="text-sm">This URL is shown only once. After you leave this page it cannot be recovered.</span>
+                <div class="flex items-center gap-2">
+                    <input type="text" readonly value="{{ newUrl }}"
+                           class="input input-bordered input-sm flex-1 font-mono text-xs"
+                           onclick="this.select()">
+                    <button type="button" class="btn btn-sm"
+                            data-copy-url="{{ newUrl }}"
+                            onclick="navigator.clipboard.writeText(this.dataset.copyUrl)">Copy</button>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    {% set statusBadgeMap = {
+        'pending':  'badge-info',
+        'used':     'badge-success',
+        'expired':  'badge-ghost',
+        'revoked':  'badge-error',
+    } %}
+
+    <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+        <table class="table table-zebra">
+            <thead>
+                <tr>
+                    <th>Selector</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Created by</th>
+                    <th>Created</th>
+                    <th>Expires</th>
+                    <th>Redeemed by</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for invite in invitations %}
+                    {% set status = invite.status.value %}
+                    <tr>
+                        <td><code class="text-xs">{{ invite.selector|slice(0, 8) }}…</code></td>
+                        <td><span class="badge badge-outline">{{ invite.role|replace({'ROLE_': ''})|capitalize }}</span></td>
+                        <td>
+                            <span class="badge {{ statusBadgeMap[status] }}" data-testid="invite-status-{{ invite.id }}">
+                                {{ status|capitalize }}
+                            </span>
+                        </td>
+                        <td>{{ invite.createdBy.email }}</td>
+                        <td><span title="{{ invite.createdAt|date('c') }}">{{ invite.createdAt|date('Y-m-d H:i') }}</span></td>
+                        <td><span title="{{ invite.expiresAt|date('c') }}">{{ invite.expiresAt|date('Y-m-d H:i') }}</span></td>
+                        <td>{{ invite.usedBy ? invite.usedBy.email : invite.email|default('—') }}</td>
+                        <td class="text-right">
+                            {% if invite.pending %}
+                                <form method="post"
+                                      action="{{ path('admin_invite_revoke', {id: invite.id}) }}"
+                                      onsubmit="return confirm('Revoke this invite?')"
+                                      class="inline">
+                                    <input type="hidden" name="_token"
+                                           value="{{ csrf_token('invite_revoke_' ~ invite.id) }}">
+                                    <button type="submit" class="btn btn-ghost btn-xs text-error">Revoke</button>
+                                </form>
+                            {% else %}
+                                <span class="text-xs text-base-content/50">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="8" class="py-8 text-center text-base-content/60">No invites yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

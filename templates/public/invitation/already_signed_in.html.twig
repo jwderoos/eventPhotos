@@ -1,0 +1,14 @@
+{% extends 'public/_base.html.twig' %}
+
+{% block title %}Already signed in{% endblock %}
+
+{% block public_main %}
+<div class="mx-auto max-w-md p-8 text-center" data-testid="invite-already-signed-in">
+    <h1 class="mb-4 text-2xl font-semibold">You're already signed in</h1>
+    <p class="mb-4 text-sm text-base-content/70">
+        You're signed in as <strong>{{ app.user.email }}</strong>.
+        Sign out first if you want to redeem this invite for a new account.
+    </p>
+    <a href="{{ path('app_logout') }}" class="btn btn-outline">Sign out</a>
+</div>
+{% endblock %}
