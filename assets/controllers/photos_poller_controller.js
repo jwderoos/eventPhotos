@@ -8,11 +8,13 @@ export default class extends Controller {
     connect() {
         this.boundOnFrameLoad = this.onFrameLoad.bind(this);
         this.element.addEventListener('turbo:frame-load', this.boundOnFrameLoad);
+        this.element.addEventListener('photos:row-added', this.boundOnFrameLoad);
         this.scheduleIfNeeded();
     }
 
     disconnect() {
         this.element.removeEventListener('turbo:frame-load', this.boundOnFrameLoad);
+        this.element.removeEventListener('photos:row-added', this.boundOnFrameLoad);
         if (this.timer) {
             clearTimeout(this.timer);
             this.timer = null;
@@ -40,8 +42,9 @@ export default class extends Controller {
         if (!base) {
             return;
         }
-        const cleaned = base.split('?')[0];
-        const next = cleaned + '?_=' + Date.now();
-        this.element.setAttribute('src', next);
+        const [path, query = ''] = base.split('?');
+        const params = new URLSearchParams(query);
+        params.set('_', String(Date.now()));
+        this.element.setAttribute('src', `${path}?${params.toString()}`);
     }
 }

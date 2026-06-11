@@ -9,7 +9,7 @@
         }
     },
     "require": {
-        "php": "^8.5",
+        "php": "^8.4",
         "ext-ctype": "*",
         "ext-dom": "*",
         "ext-exif": "*",

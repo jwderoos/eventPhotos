@@ -1,0 +1,72 @@
+<tr data-photo-id="{{ photo.id }}" data-status="{{ photo.status.value }}">
+    <td class="w-14">
+        {% if photo.status.value == 'ready' %}
+            <a href="{{ path('photo_serve_preview', {id: photo.id}) }}"
+               target="_blank" rel="noopener">
+                <img src="{{ path('photo_serve_thumb', {id: photo.id}) }}"
+                     alt="{{ photo.originalFilename }}"
+                     loading="lazy"
+                     class="h-12 w-12 object-cover rounded">
+            </a>
+        {% else %}
+            <div class="h-12 w-12 bg-base-300 rounded"></div>
+        {% endif %}
+    </td>
+    <td class="font-medium">
+        <span class="block max-w-xs truncate" title="{{ photo.originalFilename }}">
+            {{ photo.originalFilename }}
+        </span>
+    </td>
+    <td class="whitespace-nowrap text-sm">
+        {% if photo.takenAt %}
+            {{ photo.takenAt|date('Y-m-d H:i', event.timezone) }}
+        {% endif %}
+    </td>
+    <td class="whitespace-nowrap text-sm">
+        {{ photo.createdAt|date('Y-m-d H:i', event.timezone) }}
+    </td>
+    <td class="whitespace-nowrap text-sm">
+        {% if photo.width and photo.height %}
+            {{ photo.width }} × {{ photo.height }}
+        {% endif %}
+    </td>
+    <td class="whitespace-nowrap text-sm">
+        {{ photo.byteSize|format_bytes }}
+    </td>
+    <td>
+        <span class="badge badge-{{ {
+            ready: 'success',
+            pending: 'info',
+            failed: 'error',
+        }[photo.status.value] ?? 'ghost' }}"
+              {% if photo.processingError %}title="{{ photo.processingError }}"{% endif %}>
+            {{ photo.status.value }}
+        </span>
+    </td>
+    <td class="text-right">
+        <div class="inline-flex items-center gap-1">
+            {% if photo.status.value == 'ready' %}
+                <a href="{{ path('photo_serve_preview', {id: photo.id}) }}"
+                   target="_blank" rel="noopener"
+                   class="btn btn-ghost btn-xs">View</a>
+            {% endif %}
+            {% if photo.status.value == 'failed' %}
+                <form method="post"
+                      action="{{ path('admin_photo_retry', {eventId: event.id, photoId: photo.id}) }}"
+                      class="inline">
+                    <input type="hidden" name="_token" value="{{ csrf_token('retry_photo_' ~ photo.id) }}">
+                    <input type="hidden" name="page" value="{{ page|default(1) }}">
+                    <button class="btn btn-ghost btn-xs text-warning">Retry</button>
+                </form>
+            {% endif %}
+            <form method="post"
+                  action="{{ path('admin_photo_delete', {eventId: event.id, photoId: photo.id}) }}"
+                  onsubmit="return confirm('Delete this photo?');"
+                  class="inline">
+                <input type="hidden" name="_token" value="{{ csrf_token('delete_photo_' ~ photo.id) }}">
+                <input type="hidden" name="page" value="{{ page|default(1) }}">
+                <button class="btn btn-ghost btn-xs text-error">Delete</button>
+            </form>
+        </div>
+    </td>
+</tr>

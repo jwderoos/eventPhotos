@@ -1,6 +1,4 @@
-<turbo-frame id="photos-grid"
-             data-controller="photos-poller"
-             data-photos-poller-src-value="{{ path('admin_photo_grid', {id: event.id}) }}">
+<turbo-frame id="photos-grid">
     {% if hasStalePending %}
         <div class="alert alert-warning my-4">
             Some photos look stuck. Is the worker running?
@@ -8,13 +6,95 @@
         </div>
     {% endif %}
 
-    {% if photos|length == 0 %}
+    {% if total == 0 %}
         <p class="text-base-content/70">No photos yet. Drop some files above.</p>
+    {% elseif photos|length == 0 %}
+        <p class="text-base-content/70">No photos on this page.</p>
     {% else %}
-        <ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {% for photo in photos %}
-                {{ include('admin/event/_photo_tile.html.twig', {event: event, photo: photo}) }}
-            {% endfor %}
-        </ul>
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+            <table class="table table-zebra">
+                <thead>
+                    <tr>
+                        <th>Thumb</th>
+                        <th>Filename</th>
+                        <th>Taken at</th>
+                        <th>Uploaded at</th>
+                        <th>Dimensions</th>
+                        <th>Size</th>
+                        <th>Status</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for photo in photos %}
+                        {{ include('admin/event/_photo_row.html.twig', {event: event, photo: photo, page: page}) }}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    {% set lastPage = (total > 0) ? ((total - 1) // perPage) + 1 : 1 %}
+    {% if lastPage > 1 %}
+        <nav class="mt-4 flex items-center justify-between text-sm">
+            <div class="text-base-content/70">
+                {% set from = (page - 1) * perPage + 1 %}
+                {% set to   = min(page * perPage, total) %}
+                Showing {{ from }}–{{ to }} of {{ total }}
+            </div>
+            <div class="inline-flex items-center gap-2">
+                {% if page > 1 %}
+                    <a href="{{ path('admin_photo_grid', {id: event.id, page: page - 1}) }}"
+                       class="btn btn-ghost btn-sm">‹ Prev</a>
+                {% endif %}
+                <span class="px-2">Page {{ page }} of {{ lastPage }}</span>
+                {% if page < lastPage %}
+                    <a href="{{ path('admin_photo_grid', {id: event.id, page: page + 1}) }}"
+                       class="btn btn-ghost btn-sm">Next ›</a>
+                {% endif %}
+            </div>
+        </nav>
+    {% endif %}
+
+    {% if total > 0 %}
+        <div data-controller="delete-all-photos"
+             data-delete-all-photos-expected-value="{{ event.name }}"
+             class="mt-6 flex justify-end border-t border-base-300 pt-4">
+            <button type="button"
+                    class="btn btn-error btn-sm"
+                    data-action="click->delete-all-photos#open">
+                Delete all photos
+            </button>
+            <dialog class="modal" data-delete-all-photos-target="dialog">
+                <div class="modal-box">
+                    <h3 class="text-lg font-bold">Delete all photos for "{{ event.name }}"?</h3>
+                    <p class="py-2">
+                        This will permanently delete {{ total }} photo{% if total != 1 %}s{% endif %}
+                        and their files. This action cannot be undone.
+                    </p>
+                    <p class="text-sm">To confirm, type the event name <strong>{{ event.name }}</strong> below:</p>
+                    <input type="text"
+                           class="input input-bordered w-full mt-2"
+                           autocomplete="off"
+                           data-delete-all-photos-target="input"
+                           data-action="input->delete-all-photos#check">
+                    <div class="modal-action">
+                        <form method="dialog"><button class="btn">Cancel</button></form>
+                        <form method="post"
+                              action="{{ path('admin_photo_delete_all', {id: event.id}) }}">
+                            <input type="hidden" name="_token"
+                                   value="{{ csrf_token('delete_all_photos_' ~ event.id) }}">
+                            <button type="submit"
+                                    class="btn btn-error"
+                                    data-delete-all-photos-target="submit"
+                                    disabled>
+                                Delete all
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <form method="dialog" class="modal-backdrop"><button>close</button></form>
+            </dialog>
+        </div>
     {% endif %}
 </turbo-frame>

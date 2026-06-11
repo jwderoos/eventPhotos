@@ -69,6 +69,13 @@ final class PhotoUploadTest extends WebTestCase
         $body = (array) json_decode((string) $this->client->getResponse()->getContent(), true);
         $this->assertSame('pending', $body['status'] ?? null);
         $this->assertIsInt($body['photoId'] ?? null);
+        $this->assertArrayHasKey('rowHtml', $body);
+        $this->assertIsString($body['rowHtml']);
+        $this->assertStringContainsString(
+            sprintf('data-photo-id="%d"', $body['photoId']),
+            $body['rowHtml'],
+        );
+        $this->assertStringContainsString('data-status="pending"', $body['rowHtml']);
 
         $photo = $this->em->find(Photo::class, $body['photoId']);
         $this->assertInstanceOf(Photo::class, $photo);
@@ -96,6 +103,20 @@ final class PhotoUploadTest extends WebTestCase
         $body = (array) json_decode((string) $this->client->getResponse()->getContent(), true);
         $this->assertSame('duplicate', $body['status']);
         $this->assertSame($firstId, $body['photoId']);
+    }
+
+    public function testDuplicateResponseHasNoRowHtml(): void
+    {
+        $url     = sprintf('/admin/events/%d/photos', (int) $this->event->getId());
+        $fixture = 'with-datetime-original.jpg';
+
+        $this->client->request(Request::METHOD_POST, $url, [], ['file' => $this->fixture($fixture)]);
+        $this->client->request(Request::METHOD_POST, $url, [], ['file' => $this->fixture($fixture)]);
+
+        self::assertResponseStatusCodeSame(200);
+        $body = (array) json_decode((string) $this->client->getResponse()->getContent(), true);
+        $this->assertSame('duplicate', $body['status']);
+        $this->assertArrayNotHasKey('rowHtml', $body);
     }
 
     public function testRejectsNonJpeg(): void
