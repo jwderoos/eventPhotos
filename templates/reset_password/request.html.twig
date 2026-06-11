@@ -19,12 +19,7 @@
                 </p>
 
                 {{ form_start(requestForm, {attr: {class: 'space-y-3'}}) }}
-                    {{ form_row(requestForm.email, {
-                        label: 'Email',
-                        label_attr: {class: 'label-text'},
-                        row_attr: {class: 'form-control w-full'},
-                        attr: {class: 'input input-bordered w-full'},
-                    }) }}
+                    {{ form_row(requestForm.email, {label: 'Email'}) }}
                     <button type="submit" class="btn btn-primary w-full">Send reset link</button>
                 {{ form_end(requestForm) }}
 
