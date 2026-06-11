@@ -1,7 +1,7 @@
 <li class="card bg-base-200 shadow-sm" data-status="{{ photo.status.value }}">
     <figure class="aspect-square bg-base-300">
         {% if photo.status.value == 'ready' %}
-            <img src="{{ path('photo_serve_thumb', {id: photo.id}) }}"
+            <img src="{{ path('photo_serve_thumb', {slug: photo.event.slug, id: photo.id}) }}"
                  alt="{{ photo.originalFilename }}"
                  loading="lazy"
                  class="object-cover w-full h-full">
