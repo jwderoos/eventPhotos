@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\Event;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -21,5 +22,15 @@ final class EventRepository extends ServiceEntityRepository
     public function findOneBySlug(string $slug): ?Event
     {
         return $this->findOneBy(['slug' => $slug]);
+    }
+
+    public function countByOwner(User $owner): int
+    {
+        return (int) $this->createQueryBuilder('e')
+            ->select('COUNT(e.id)')
+            ->where('e.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 }

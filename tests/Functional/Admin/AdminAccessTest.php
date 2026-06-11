@@ -14,7 +14,21 @@ final class AdminAccessTest extends WebTestCase
 {
     public function testAnonymousGetsRedirectedToLogin(): void
     {
-        $client = self::createClient();
+        $client    = self::createClient();
+        $container = self::getContainer();
+
+        /** @var EntityManagerInterface $em */
+        $em = $container->get(EntityManagerInterface::class);
+        /** @var UserPasswordHasherInterface $hasher */
+        $hasher = $container->get(UserPasswordHasherInterface::class);
+
+        $user = new User('anon-test@example.com', 'AnonTest');
+        $user->addRole('ROLE_ORGANIZER');
+        $user->setPassword($hasher->hashPassword($user, 'pw'));
+
+        $em->persist($user);
+        $em->flush();
+
         $client->request(Request::METHOD_GET, '/admin');
 
         $this->assertResponseRedirects();

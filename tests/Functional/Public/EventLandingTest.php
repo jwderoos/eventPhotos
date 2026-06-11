@@ -37,6 +37,15 @@ final class EventLandingTest extends WebTestCase
     public function testLandingReturns404ForUnknownSlug(): void
     {
         $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+
+        $owner = new User('slug-404-test@example.com', 'SlugTest');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+        $em->flush();
+
         $client->request(Request::METHOD_GET, '/e/does-not-exist');
 
         $this->assertResponseStatusCodeSame(404);
