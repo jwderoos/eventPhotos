@@ -69,11 +69,11 @@ WORKDIR /app
 
 COPY --from=builder --chown=www-data:www-data /app /app
 
-# var/uploads and var/share are volume-mounted; others must exist for cache+log.
-RUN mkdir -p var/cache var/log var/uploads var/share \
-    && chown -R www-data:www-data var
-
 USER www-data
+
+# var/uploads and var/share are volume-mounted; others must exist for cache+log.
+# Created as www-data so no recursive chown is needed.
+RUN mkdir -p var/cache var/log var/uploads var/share
 
 # ----------------------------------------------------------------------------
 # nginx runtime
