@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Form\LoginFormType;
 use LogicException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
@@ -19,9 +20,14 @@ final class SecurityController extends AbstractController
     #[Route('/login', name: 'app_login')]
     public function login(): Response
     {
-        return $this->render('security/login.html.twig', [
+        $form = $this->createForm(LoginFormType::class, null, [
             'last_username' => $this->authenticationUtils->getLastUsername(),
-            'error'         => $this->authenticationUtils->getLastAuthenticationError(),
+            'action'        => $this->generateUrl('app_login'),
+        ]);
+
+        return $this->render('security/login.html.twig', [
+            'form'  => $form,
+            'error' => $this->authenticationUtils->getLastAuthenticationError(),
         ]);
     }
 

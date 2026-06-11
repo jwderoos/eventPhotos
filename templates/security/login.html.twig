@@ -14,23 +14,11 @@
                     </div>
                 {% endif %}
 
-                <form method="post" action="{{ path('app_login') }}" class="space-y-3">
-                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
-
-                    <label class="form-control w-full">
-                        <span class="label-text">Email</span>
-                        <input type="email" name="_username" value="{{ last_username }}" required autofocus
-                               class="input input-bordered w-full">
-                    </label>
-
-                    <label class="form-control w-full">
-                        <span class="label-text">Password</span>
-                        <input type="password" name="_password" required
-                               class="input input-bordered w-full">
-                    </label>
-
+                {{ form_start(form, {attr: {class: 'space-y-3'}}) }}
+                    {{ form_row(form._username) }}
+                    {{ form_row(form._password) }}
                     <button type="submit" class="btn btn-primary w-full">Sign in</button>
-                </form>
+                {{ form_end(form) }}
 
                 <p class="text-sm text-center">
                     <a href="{{ path('app_forgot_password_request') }}" class="link">Forgot your password?</a>
