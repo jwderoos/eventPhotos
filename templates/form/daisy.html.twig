@@ -1,0 +1,60 @@
+{%- extends 'form_div_layout.html.twig' -%}
+
+{#-
+    Project-wide DaisyUI form theme. Registered globally via twig.form_themes
+    in config/packages/twig.yaml so every `form_row` call picks it up.
+
+    Class-merge pattern: caller-supplied attr.class wins (we append, never
+    replace), so {{ form_row(field, {attr: {class: 'input input-lg'}}) }}
+    still works as an escape hatch.
+-#}
+
+{%- block form_row -%}
+    <div class="form-control w-full">
+        {{- form_label(form) -}}
+        {{- form_widget(form) -}}
+        {{- form_help(form) -}}
+        {{- form_errors(form) -}}
+    </div>
+{%- endblock form_row -%}
+
+{%- block form_label -%}
+    {%- if label is not same as(false) -%}
+        {%- set label_attr = label_attr|merge({class: (label_attr.class|default('') ~ ' label-text')|trim}) -%}
+        {{- parent() -}}
+    {%- endif -%}
+{%- endblock form_label -%}
+
+{%- block form_widget_simple -%}
+    {%- set type = type|default('text') -%}
+    {%- if type != 'hidden' -%}
+        {%- set attr = attr|merge({class: (attr.class|default('') ~ ' input input-bordered w-full')|trim}) -%}
+    {%- endif -%}
+    {{- parent() -}}
+{%- endblock form_widget_simple -%}
+
+{%- block textarea_widget -%}
+    {%- set attr = attr|merge({class: (attr.class|default('') ~ ' textarea textarea-bordered w-full')|trim}) -%}
+    {{- parent() -}}
+{%- endblock textarea_widget -%}
+
+{%- block choice_widget_collapsed -%}
+    {%- set attr = attr|merge({class: (attr.class|default('') ~ ' select select-bordered w-full')|trim}) -%}
+    {{- parent() -}}
+{%- endblock choice_widget_collapsed -%}
+
+{%- block form_help -%}
+    {%- if help is not empty -%}
+        <small class="text-xs text-base-content/60">{{ help|trans(help_translation_parameters|default([]), translation_domain|default('messages')) }}</small>
+    {%- endif -%}
+{%- endblock form_help -%}
+
+{%- block form_errors -%}
+    {%- if errors|length > 0 -%}
+        <ul class="text-error text-xs mt-1">
+            {%- for error in errors -%}
+                <li>{{ error.message }}</li>
+            {%- endfor -%}
+        </ul>
+    {%- endif -%}
+{%- endblock form_errors -%}
