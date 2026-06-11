@@ -41,6 +41,21 @@ final class LoginTest extends WebTestCase
     public function testInvalidCredentialsShowError(): void
     {
         $kernelBrowser = self::createClient();
+        $container     = self::getContainer();
+
+        /** @var EntityManagerInterface $em */
+        $em = $container->get(EntityManagerInterface::class);
+        /** @var UserPasswordHasherInterface $hasher */
+        $hasher = $container->get(UserPasswordHasherInterface::class);
+
+        // A user must exist so the first-run subscriber does not redirect to /setup.
+        $user = new User('invalid-creds-test@example.com', 'InvalidCredsTest');
+        $user->addRole('ROLE_ORGANIZER');
+        $user->setPassword($hasher->hashPassword($user, 'does-not-matter'));
+
+        $em->persist($user);
+        $em->flush();
+
         $kernelBrowser->request(Request::METHOD_GET, '/login');
         $kernelBrowser->submitForm('Sign in', [
             '_username' => 'nobody@example.com',

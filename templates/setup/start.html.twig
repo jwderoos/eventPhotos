@@ -1,0 +1,30 @@
+{% extends 'base.html.twig' %}
+
+{% block html_attributes %}data-theme="dracula"{% endblock %}
+
+{% block title %}Set up eventFotos{% endblock %}
+
+{% block body %}
+    <main class="flex min-h-screen items-center justify-center bg-base-200 p-4">
+        <div class="card w-full max-w-md bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h1 class="card-title">Create the first admin</h1>
+                <p class="text-sm text-base-content/70">
+                    No users exist yet. Create your admin account to finish setting up eventFotos.
+                </p>
+
+                {{ form_start(form) }}
+                    <div class="grid gap-4">
+                        {{ form_row(form.email) }}
+                        {{ form_row(form.displayName) }}
+                        {{ form_row(form.plainPassword.first) }}
+                        {{ form_row(form.plainPassword.second) }}
+                    </div>
+                    <div class="card-actions mt-6 justify-end">
+                        <button type="submit" class="btn btn-primary">Create admin account</button>
+                    </div>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </main>
+{% endblock %}

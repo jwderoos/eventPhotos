@@ -89,6 +89,14 @@
                                 Collections
                             </a>
                         </li>
+                        {% if is_granted('ROLE_ADMIN') %}
+                            <li>
+                                <a href="{{ path('admin_user_index') }}"
+                                   class="{{ route starts with 'admin_user_' ? 'active' : '' }}">
+                                    Users
+                                </a>
+                            </li>
+                        {% endif %}
                     </ul>
                 </aside>
             </div>

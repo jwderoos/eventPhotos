@@ -47,7 +47,21 @@ final class PasswordResetTest extends WebTestCase
 
     public function testRequestForUnknownUserShowsSamePageWithoutSendingEmail(): void
     {
-        $client = self::createClient();
+        $client    = self::createClient();
+        $container = self::getContainer();
+
+        /** @var EntityManagerInterface $em */
+        $em = $container->get(EntityManagerInterface::class);
+        /** @var UserPasswordHasherInterface $hasher */
+        $hasher = $container->get(UserPasswordHasherInterface::class);
+
+        // A user must exist so the first-run subscriber does not redirect to /setup.
+        $user = new User('unknown-user-test@example.com', 'UnknownUserTest');
+        $user->addRole('ROLE_ORGANIZER');
+        $user->setPassword($hasher->hashPassword($user, 'does-not-matter'));
+
+        $em->persist($user);
+        $em->flush();
 
         $client->request(Request::METHOD_GET, '/reset-password');
         $client->submitForm('Send reset link', [
@@ -152,7 +166,22 @@ final class PasswordResetTest extends WebTestCase
 
     public function testInvalidTokenIsRejected(): void
     {
-        $client = self::createClient();
+        $client    = self::createClient();
+        $container = self::getContainer();
+
+        /** @var EntityManagerInterface $em */
+        $em = $container->get(EntityManagerInterface::class);
+        /** @var UserPasswordHasherInterface $hasher */
+        $hasher = $container->get(UserPasswordHasherInterface::class);
+
+        // A user must exist so the first-run subscriber does not redirect to /setup.
+        $user = new User('invalid-token-test@example.com', 'InvalidTokenTest');
+        $user->addRole('ROLE_ORGANIZER');
+        $user->setPassword($hasher->hashPassword($user, 'does-not-matter'));
+
+        $em->persist($user);
+        $em->flush();
+
         $client->request(Request::METHOD_GET, '/reset-password/reset/this-is-not-a-valid-token-format-at-all');
         self::assertResponseRedirects();
         $client->followRedirect();
