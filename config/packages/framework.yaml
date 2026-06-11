@@ -8,6 +8,14 @@ framework:
     #esi: true
     #fragments: true
 
+when@prod:
+    framework:
+        # Trust X-Forwarded-* headers from the reverse proxy in front of nginx.
+        # TRUSTED_PROXIES=REMOTE_ADDR trusts the immediate upstream, which is
+        # only safe because nothing else can reach the nginx container directly.
+        trusted_proxies: '%env(default::TRUSTED_PROXIES)%'
+        trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port', 'x-forwarded-prefix']
+
 when@test:
     framework:
         test: true
