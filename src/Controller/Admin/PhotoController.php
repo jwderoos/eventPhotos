@@ -30,7 +30,7 @@ final class PhotoController extends AbstractController
 {
     private const int MAX_BYTES = 25 * 1024 * 1024;
 
-    private const int GRID_LIMIT = 200;
+    private const int PER_PAGE = 100;
 
     private const string STALE_PENDING_THRESHOLD = '-5 minutes';
 
@@ -45,6 +45,21 @@ final class PhotoController extends AbstractController
         #[Autowire(service: 'photo_previews_storage')]
         private readonly FilesystemOperator $previews,
     ) {
+    }
+
+    #[Route(
+        '/admin/events/{id}/photos',
+        name: 'admin_event_photo_manage',
+        requirements: ['id' => '\d+'],
+        methods: ['GET'],
+    )]
+    public function manage(Event $event): Response
+    {
+        $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
+
+        return $this->render('admin/event/photos_manage.html.twig', [
+            'event' => $event,
+        ]);
     }
 
     #[Route(
@@ -121,8 +136,17 @@ final class PhotoController extends AbstractController
 
         $this->bus->dispatch(new ProcessPhoto((int) $photo->getId()));
 
+        $rowHtml = $this->renderView('admin/event/_photo_row.html.twig', [
+            'event' => $event,
+            'photo' => $photo,
+        ]);
+
         return new JsonResponse(
-            ['status' => 'pending', 'photoId' => $photo->getId()],
+            [
+                'status'  => 'pending',
+                'photoId' => $photo->getId(),
+                'rowHtml' => $rowHtml,
+            ],
             Response::HTTP_ACCEPTED,
         );
     }
@@ -133,11 +157,17 @@ final class PhotoController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['GET'],
     )]
-    public function gridFrame(Event $event): Response
+    public function gridFrame(Event $event, Request $request): Response
     {
         $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
 
-        $photos = $this->photos->findBy(['event' => $event], ['createdAt' => 'DESC'], self::GRID_LIMIT);
+        $page = max(1, $request->query->getInt('page', 1));
+
+        $result = $this->photos->paginateForEvent($event, $page, self::PER_PAGE);
+        /** @var list<Photo> $photos */
+        $photos = $result['photos'];
+        /** @var int $total */
+        $total = $result['total'];
 
         $hasStalePending = false;
         $cutoff          = new DateTimeImmutable(self::STALE_PENDING_THRESHOLD);
@@ -151,6 +181,9 @@ final class PhotoController extends AbstractController
         return $this->render('admin/event/photos_grid.html.twig', [
             'event'           => $event,
             'photos'          => $photos,
+            'total'           => $total,
+            'page'            => $page,
+            'perPage'         => self::PER_PAGE,
             'hasStalePending' => $hasStalePending,
         ]);
     }
@@ -177,7 +210,36 @@ final class PhotoController extends AbstractController
 
         $this->addFlash('success', 'Photo re-queued.');
 
-        return $this->redirectToRoute('admin_event_edit', ['id' => $eventId]);
+        return $this->redirectToRoute('admin_photo_grid', [
+            'id'   => $eventId,
+            'page' => max(1, $request->request->getInt('page', 1)),
+        ]);
+    }
+
+    #[Route(
+        '/admin/events/{id}/photos/delete-all',
+        name: 'admin_photo_delete_all',
+        requirements: ['id' => '\d+'],
+        methods: ['POST'],
+    )]
+    public function deleteAll(Event $event, Request $request): RedirectResponse
+    {
+        $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
+        $this->assertCsrf($request, 'delete_all_photos_' . $event->getId());
+
+        $eventId = (int) $event->getId();
+        $this->photos->deleteAllForEvent($event);
+
+        $dir = sprintf('event-%d', $eventId);
+        foreach ([$this->originals, $this->thumbs, $this->previews] as $fs) {
+            try {
+                $fs->deleteDirectory($dir);
+            } catch (FilesystemException) {
+                // Best-effort — pipeline may not have produced files yet.
+            }
+        }
+
+        return $this->redirectToRoute('admin_photo_grid', ['id' => $eventId]);
     }
 
     #[Route(
@@ -204,9 +266,10 @@ final class PhotoController extends AbstractController
         $this->em->remove($photo);
         $this->em->flush();
 
-        $this->addFlash('success', 'Photo deleted.');
-
-        return $this->redirectToRoute('admin_event_edit', ['id' => $eventId]);
+        return $this->redirectToRoute('admin_photo_grid', [
+            'id'   => $eventId,
+            'page' => max(1, $request->request->getInt('page', 1)),
+        ]);
     }
 
     private function loadOrThrow(int $eventId, int $photoId): Photo

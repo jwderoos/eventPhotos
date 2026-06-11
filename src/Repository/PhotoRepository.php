@@ -46,4 +46,46 @@ final class PhotoRepository extends ServiceEntityRepository
 
         return $result;
     }
+
+    public function deleteAllForEvent(Event $event): int
+    {
+        $deleted = $this->createQueryBuilder('p')
+            ->delete()
+            ->andWhere('p.event = :event')
+            ->setParameter('event', $event)
+            ->getQuery()
+            ->execute();
+
+        return is_int($deleted) ? $deleted : 0;
+    }
+
+    /**
+     * @return array{photos: list<Photo>, total: int}
+     */
+    public function paginateForEvent(Event $event, int $page, int $perPage): array
+    {
+        $page    = max(1, $page);
+        $perPage = max(1, $perPage);
+        $offset  = ($page - 1) * $perPage;
+
+        $qb = $this->createQueryBuilder('p')
+            ->andWhere('p.event = :event')
+            ->setParameter('event', $event);
+
+        /** @var list<Photo> $photos */
+        $photos = (clone $qb)
+            ->orderBy('p.createdAt', 'DESC')
+            ->addOrderBy('p.id', 'DESC')
+            ->setFirstResult($offset)
+            ->setMaxResults($perPage)
+            ->getQuery()
+            ->getResult();
+
+        $total = (int) (clone $qb)
+            ->select('COUNT(p.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return ['photos' => $photos, 'total' => $total];
+    }
 }
