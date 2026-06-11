@@ -61,4 +61,18 @@ final class EventTest extends TestCase
 
         $this->assertSame('America/New_York', $event->getTimezone());
     }
+
+    public function testSetNameDoesNotChangeSlug(): void
+    {
+        $event = new Event(
+            'summer-fest-abc123',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15'),
+            new User('o@x', 'Owner'),
+        );
+
+        $event->setName('Winter Fest');
+
+        $this->assertSame('summer-fest-abc123', $event->getSlug());
+    }
 }

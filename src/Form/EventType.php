@@ -37,9 +37,6 @@ final class EventType extends AbstractType
         $timezones = DateTimeZone::listIdentifiers();
 
         $builder
-            ->add('slug', TextType::class, [
-                'help' => 'Used in the public QR URL: /e/{slug}',
-            ])
             ->add('name', TextType::class)
             ->add('description', TextareaType::class, ['required' => false])
             ->add('date', DateType::class, ['widget' => 'single_text'])
