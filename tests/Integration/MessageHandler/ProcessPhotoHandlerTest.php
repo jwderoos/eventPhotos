@@ -86,6 +86,10 @@ final class ProcessPhotoHandlerTest extends KernelTestCase
         $path = sprintf('event-%d/%d.jpg', $this->event->getId(), $photo->getId());
         $this->assertTrue($this->thumbs->fileExists($path));
         $this->assertTrue($this->previews->fileExists($path));
+        $this->assertFalse(
+            $this->originals->fileExists($path),
+            'Original should be deleted after successful ingest.',
+        );
     }
 
     public function testRejectsWhenExifMissing(): void
@@ -98,6 +102,11 @@ final class ProcessPhotoHandlerTest extends KernelTestCase
         $this->assertSame(PhotoStatus::Failed, $photo->getStatus());
         $this->assertNotNull($photo->getProcessingError());
         $this->assertStringContainsString('DateTimeOriginal', $photo->getProcessingError());
+        $path = sprintf('event-%d/%d.jpg', $this->event->getId(), $photo->getId());
+        $this->assertFalse(
+            $this->originals->fileExists($path),
+            'Original should be deleted after PhotoRejected (non-recoverable failure).',
+        );
     }
 
     public function testIdempotentWhenAlreadyReady(): void

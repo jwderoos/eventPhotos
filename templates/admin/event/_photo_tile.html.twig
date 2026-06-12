@@ -29,12 +29,6 @@
             <p class="text-error">{{ photo.processingError }}</p>
         {% endif %}
         <div class="flex gap-2 mt-2">
-            {% if photo.status.value == 'failed' %}
-                <form method="post" action="{{ path('admin_photo_retry', {eventId: event.id, photoId: photo.id}) }}">
-                    <input type="hidden" name="_token" value="{{ csrf_token('retry_photo_' ~ photo.id) }}">
-                    <button class="btn btn-xs btn-warning">Retry</button>
-                </form>
-            {% endif %}
             <form method="post" action="{{ path('admin_photo_delete', {eventId: event.id, photoId: photo.id}) }}"
                   onsubmit="return confirm('Delete this photo?');">
                 <input type="hidden" name="_token" value="{{ csrf_token('delete_photo_' ~ photo.id) }}">
