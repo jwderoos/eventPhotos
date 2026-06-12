@@ -47,6 +47,37 @@ final class PhotoRepository extends ServiceEntityRepository
         return $result;
     }
 
+    /**
+     * Returns total stored bytes per event id (derivative bytes if recorded,
+     * else original upload size). Events with no photos are absent from the
+     * returned map.
+     *
+     * @param  list<int> $eventIds
+     * @return array<int, int>
+     */
+    public function sumBytesByEventIds(array $eventIds): array
+    {
+        if ($eventIds === []) {
+            return [];
+        }
+
+        /** @var list<array{event_id: int|string, total_bytes: int|string|null}> $rows */
+        $rows = $this->createQueryBuilder('p')
+            ->select('IDENTITY(p.event) AS event_id, SUM(COALESCE(p.derivativeBytes, p.byteSize)) AS total_bytes')
+            ->andWhere('p.event IN (:eventIds)')
+            ->setParameter('eventIds', $eventIds)
+            ->groupBy('p.event')
+            ->getQuery()
+            ->getArrayResult();
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(int) $row['event_id']] = (int) ($row['total_bytes'] ?? 0);
+        }
+
+        return $out;
+    }
+
     public function deleteAllForEvent(Event $event): int
     {
         $deleted = $this->createQueryBuilder('p')

@@ -8,6 +8,7 @@ use App\Entity\Event;
 use App\Entity\User;
 use App\Form\EventType;
 use App\Repository\EventRepository;
+use App\Repository\PhotoRepository;
 use App\Security\Voter\EventVoter;
 use App\Service\QrCodeRenderer;
 use DateTimeImmutable;
@@ -27,6 +28,7 @@ final class EventController extends AbstractController
 {
     public function __construct(
         private readonly EventRepository $events,
+        private readonly PhotoRepository $photos,
         private readonly EntityManagerInterface $em,
         private readonly QrCodeRenderer $renderer,
         private readonly UrlGeneratorInterface $urlGenerator,
@@ -45,8 +47,16 @@ final class EventController extends AbstractController
         }
 
         $criteria = $this->isGranted('ROLE_ADMIN') ? [] : ['owner' => $user];
+        $events   = $this->events->findBy($criteria, ['startsAt' => 'DESC']);
+
+        $eventIds = array_values(array_filter(array_map(
+            static fn (Event $e): ?int => $e->getId(),
+            $events,
+        )));
+
         return $this->render('admin/event/index.html.twig', [
-            'events' => $this->events->findBy($criteria, ['startsAt' => 'DESC']),
+            'events'        => $events,
+            'storageByEvent' => $this->photos->sumBytesByEventIds($eventIds),
         ]);
     }
 
