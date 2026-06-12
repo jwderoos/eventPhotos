@@ -8,9 +8,13 @@
     <p class="mb-6 text-sm text-base-content/70">Set up your account to continue.</p>
 
     {% if google_oauth_enabled() %}
-        <a href="{{ path('oauth_google_invite_start', {token: token}) }}" data-testid="google-invite" class="btn btn-outline w-full mb-4">
-            Sign up with Google
-        </a>
+        <div class="mb-4">
+            {% include '_partials/_google_oauth_button.html.twig' with {
+                href: path('oauth_google_invite_start', {token: token}),
+                testid: 'google-invite',
+                variant: 'light',
+            } only %}
+        </div>
         <div class="divider text-xs">or</div>
     {% endif %}
 

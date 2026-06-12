@@ -19,9 +19,11 @@
                 {% endfor %}
 
                 {% if google_oauth_enabled() %}
-                    <a href="{{ path('oauth_google_login_start') }}" data-testid="google-login" class="btn btn-outline w-full">
-                        Sign in with Google
-                    </a>
+                    {% include '_partials/_google_oauth_button.html.twig' with {
+                        href: path('oauth_google_login_start'),
+                        testid: 'google-login',
+                        variant: 'dark',
+                    } only %}
                     <div class="divider text-xs">or</div>
                 {% endif %}
 

@@ -2,8 +2,17 @@
 
 {% block title %}My account{% endblock %}
 
-{% block admin_shell %}
-<div class="mx-auto max-w-2xl p-8 space-y-8">
+{% block admin_breadcrumb %}
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li>Admin</li>
+            <li>My account</li>
+        </ul>
+    </div>
+{% endblock %}
+
+{% block admin_main %}
+<div class="mx-auto max-w-2xl space-y-8">
     <h1 class="text-2xl font-semibold">My account</h1>
 
     {% for message in app.flashes('success') %}
@@ -21,11 +30,14 @@
         {% else %}
             <table class="table">
                 <thead>
-                    <tr><th>Provider</th><th>Email</th><th>Linked</th><th></th></tr>
+                    <tr><th></th><th>Provider</th><th>Email</th><th>Linked</th><th></th></tr>
                 </thead>
                 <tbody>
                 {% for identity in identities %}
                     <tr>
+                        <td class="w-8">
+                            {% include '_partials/_provider_logo.html.twig' with {provider: identity.provider.value, class: 'h-6 w-6'} only %}
+                        </td>
                         <td>{{ identity.provider.value|capitalize }}</td>
                         <td>{{ identity.email }}</td>
                         <td>{{ identity.linkedAt|date('Y-m-d H:i') }}</td>
@@ -42,7 +54,12 @@
         {% endif %}
 
         {% if google_oauth_enabled() and not user.hasIdentityFor(constant('App\\Enum\\AuthProvider::Google')) %}
-            <a href="{{ path('oauth_google_link_start') }}" class="btn btn-primary">Link Google</a>
+            <div class="max-w-xs">
+                {% include '_partials/_google_oauth_button.html.twig' with {
+                    href: path('oauth_google_link_start'),
+                    variant: 'dark',
+                } only %}
+            </div>
         {% endif %}
     </section>
 
