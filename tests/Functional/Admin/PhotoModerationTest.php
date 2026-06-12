@@ -94,7 +94,7 @@ final class PhotoModerationTest extends WebTestCase
     public function testDeleteRemovesRowAndStorageFiles(): void
     {
         $photo = new Photo($this->event, str_repeat('b', 64), 'x.jpg', 100);
-        $photo->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100);
+        $photo->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100, 1024);
 
         $this->em->persist($photo);
         $this->em->flush();
@@ -125,7 +125,7 @@ final class PhotoModerationTest extends WebTestCase
         $eventId = (int) $this->event->getId();
 
         $ready = new Photo($this->event, str_repeat('d', 64), 'a.jpg', 100);
-        $ready->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100);
+        $ready->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100, 1024);
 
         $pending = new Photo($this->event, str_repeat('e', 64), 'b.jpg', 100);
 

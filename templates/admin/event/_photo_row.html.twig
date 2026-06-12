@@ -31,7 +31,7 @@
         {% endif %}
     </td>
     <td class="whitespace-nowrap text-sm">
-        {{ photo.byteSize|format_bytes }}
+        {{ (photo.derivativeBytes ?? photo.byteSize)|format_bytes }}
     </td>
     <td>
         <span class="badge badge-{{ {

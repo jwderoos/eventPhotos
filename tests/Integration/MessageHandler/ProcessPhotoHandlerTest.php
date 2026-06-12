@@ -90,6 +90,11 @@ final class ProcessPhotoHandlerTest extends KernelTestCase
             $this->originals->fileExists($path),
             'Original should be deleted after successful ingest.',
         );
+        $this->assertSame(
+            $this->thumbs->fileSize($path) + $this->previews->fileSize($path),
+            $photo->getDerivativeBytes(),
+            'Stored derivativeBytes should equal thumb + preview on-disk size.',
+        );
     }
 
     public function testRejectsWhenExifMissing(): void

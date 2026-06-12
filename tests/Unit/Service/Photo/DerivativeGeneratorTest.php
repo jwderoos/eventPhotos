@@ -23,12 +23,17 @@ final class DerivativeGeneratorTest extends TestCase
         $originalsFs->write('event-1/42.jpg', $originalBytes);
 
         $generator = new DerivativeGenerator($originalsFs, $thumbsFs, $previewsFs);
-        [$width, $height] = $generator->generate('event-1/42.jpg');
+        [$width, $height, $derivativeBytes] = $generator->generate('event-1/42.jpg');
 
         $this->assertSame(3000, $width);
         $this->assertSame(2000, $height);
         $this->assertTrue($thumbsFs->fileExists('event-1/42.jpg'));
         $this->assertTrue($previewsFs->fileExists('event-1/42.jpg'));
+        $this->assertSame(
+            $thumbsFs->fileSize('event-1/42.jpg') + $previewsFs->fileSize('event-1/42.jpg'),
+            $derivativeBytes,
+            'Returned derivativeBytes should equal the actual on-disk sum of thumb + preview.',
+        );
 
         $thumbDims = getimagesizefromstring($thumbsFs->read('event-1/42.jpg'));
         $this->assertNotFalse($thumbDims);

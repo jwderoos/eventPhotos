@@ -38,12 +38,12 @@ final class EventPhotosGalleryTest extends WebTestCase
         $em->persist($event);
 
         $inside = new Photo($event, str_repeat('a', 64), 'a.jpg', 100);
-        $inside->markReady(new DateTimeImmutable('2026-06-10 12:00:00', new DateTimeZone('UTC')), 100, 100);
+        $inside->markReady(new DateTimeImmutable('2026-06-10 12:00:00', new DateTimeZone('UTC')), 100, 100, 1024);
 
         $em->persist($inside);
 
         $outside = new Photo($event, str_repeat('b', 64), 'b.jpg', 100);
-        $outside->markReady(new DateTimeImmutable('2026-06-10 18:00:00', new DateTimeZone('UTC')), 100, 100);
+        $outside->markReady(new DateTimeImmutable('2026-06-10 18:00:00', new DateTimeZone('UTC')), 100, 100, 1024);
 
         $em->persist($outside);
 

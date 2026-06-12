@@ -108,7 +108,7 @@ final class PhotoRepositoryTest extends KernelTestCase
             originalFilename: 'x.jpg',
             byteSize: 100,
         );
-        $photo->markReady(new DateTimeImmutable($takenAt, new DateTimeZone('UTC')), 100, 100);
+        $photo->markReady(new DateTimeImmutable($takenAt, new DateTimeZone('UTC')), 100, 100, 1024);
 
         $this->em->persist($photo);
         return $photo;

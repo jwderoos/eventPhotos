@@ -58,8 +58,8 @@ final readonly class ProcessPhotoHandler
                 @unlink($tmpFile);
             }
 
-            [$width, $height] = $this->derivatives->generate($path);
-            $photo->markReady($takenAt, $width, $height);
+            [$width, $height, $derivativeBytes] = $this->derivatives->generate($path);
+            $photo->markReady($takenAt, $width, $height, $derivativeBytes);
             $this->em->flush();
             $this->deleteOriginalQuietly($path, (int) $photo->getId());
         } catch (PhotoRejected $photoRejected) {

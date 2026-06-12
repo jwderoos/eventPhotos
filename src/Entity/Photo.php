@@ -28,6 +28,15 @@ class Photo
     #[ORM\Column(type: Types::INTEGER, nullable: true)]
     private ?int $height = null;
 
+    /**
+     * Total bytes of stored derivatives (thumb + preview).
+     *
+     * Null for photos ingested before #55 — those still have byteSize (the
+     * original upload size) as their best available size figure.
+     */
+    #[ORM\Column(type: Types::INTEGER, nullable: true)]
+    private ?int $derivativeBytes = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?DateTimeImmutable $takenAt = null;
 
@@ -100,6 +109,11 @@ class Photo
         return $this->height;
     }
 
+    public function getDerivativeBytes(): ?int
+    {
+        return $this->derivativeBytes;
+    }
+
     public function getTakenAt(): ?DateTimeImmutable
     {
         return $this->takenAt;
@@ -125,7 +139,7 @@ class Photo
         return $this->updatedAt;
     }
 
-    public function markReady(DateTimeImmutable $takenAt, int $width, int $height): void
+    public function markReady(DateTimeImmutable $takenAt, int $width, int $height, int $derivativeBytes): void
     {
         if ($this->status !== PhotoStatus::Pending) {
             throw new DomainException(sprintf(
@@ -139,6 +153,7 @@ class Photo
 
         $this->width = $width;
         $this->height = $height;
+        $this->derivativeBytes = $derivativeBytes;
         $this->processingError = null;
         $this->status = PhotoStatus::Ready;
     }

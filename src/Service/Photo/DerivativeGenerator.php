@@ -30,7 +30,8 @@ final readonly class DerivativeGenerator
     }
 
     /**
-     * @return array{0:int,1:int} [width, height] of the original image
+     * @return array{0:int,1:int,2:int} [width, height, derivativeBytes]
+     *                                   — derivativeBytes is the sum of thumb + preview JPEG payload sizes.
      */
     public function generate(string $path): array
     {
@@ -44,16 +45,16 @@ final readonly class DerivativeGenerator
         $width  = imagesx($image);
         $height = imagesy($image);
 
-        $this->thumbs->write(
-            $path,
-            $this->encode($this->scaleTo($image, $width, $height, self::THUMB_LONG_EDGE), self::THUMB_QUALITY),
-        );
-        $this->previews->write(
-            $path,
-            $this->encode($this->scaleTo($image, $width, $height, self::PREVIEW_LONG_EDGE), self::PREVIEW_QUALITY),
-        );
+        $thumb = $this->scaleTo($image, $width, $height, self::THUMB_LONG_EDGE);
+        $thumbBytes = $this->encode($thumb, self::THUMB_QUALITY);
 
-        return [$width, $height];
+        $preview = $this->scaleTo($image, $width, $height, self::PREVIEW_LONG_EDGE);
+        $previewBytes = $this->encode($preview, self::PREVIEW_QUALITY);
+
+        $this->thumbs->write($path, $thumbBytes);
+        $this->previews->write($path, $previewBytes);
+
+        return [$width, $height, strlen($thumbBytes) + strlen($previewBytes)];
     }
 
     /**

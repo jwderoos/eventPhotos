@@ -42,7 +42,7 @@ final class PhotoServeTest extends WebTestCase
         $em->persist($event);
 
         $photo = new Photo($event, str_repeat('a', 64), 'x.jpg', 100);
-        $photo->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100);
+        $photo->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100, 1024);
 
         $em->persist($photo);
         $em->flush();
@@ -119,7 +119,7 @@ final class PhotoServeTest extends WebTestCase
         $em->persist($event);
 
         $photo = new Photo($event, str_repeat('c', 64), 'x.jpg', 100);
-        $photo->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100);
+        $photo->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100, 1024);
 
         $em->persist($photo);
         $em->flush();
@@ -179,7 +179,7 @@ final class PhotoServeTest extends WebTestCase
         $em->persist($eventB);
 
         $photo = new Photo($eventA, str_repeat('d', 64), 'x.jpg', 100);
-        $photo->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100);
+        $photo->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100, 1024);
 
         $em->persist($photo);
         $em->flush();
@@ -224,7 +224,7 @@ final class PhotoServeTest extends WebTestCase
         $em->persist($event);
 
         $photo = new Photo($event, str_repeat('e', 64), 'x.jpg', 100);
-        $photo->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100);
+        $photo->markReady(new DateTimeImmutable('now', new DateTimeZone('UTC')), 100, 100, 1024);
 
         $em->persist($photo);
         $em->flush();
