@@ -82,6 +82,52 @@ final class EventWindowFormTest extends WebTestCase
         $this->assertSame('14:00', $form['event[endTime]']->getValue());
     }
 
+    public function testEditFormPreservesTimesAcrossCreatePersistReload(): void
+    {
+        $client    = self::createClient();
+        $container = self::getContainer();
+        $alice     = $this->seedOrganizer();
+
+        $client->loginUser($alice);
+        $crawler = $client->request(Request::METHOD_GET, '/admin/events/new');
+        $form    = $crawler->selectButton('Create')->form([
+            'event[name]'      => 'Round Trip Fest',
+            'event[eventDate]' => '2026-07-15',
+            'event[startTime]' => '10:00',
+            'event[endTime]'   => '14:00',
+            'event[timezone]'  => 'Europe/Amsterdam',
+        ]);
+        $client->submit($form);
+        self::assertResponseRedirects('/admin/events');
+
+        /** @var EventRepository $events */
+        $events  = $container->get(EventRepository::class);
+        $created = $events->findOneBy(['name' => 'Round Trip Fest']);
+        $this->assertInstanceOf(Event::class, $created);
+
+        // Second HTTP request → fresh EntityManager → hydrates from DB. This is the
+        // round-trip path that surfaced the wall-clock-vs-UTC mismatch (#TZ shift bug).
+        $crawler = $client->request(Request::METHOD_GET, sprintf('/admin/events/%d/edit', (int) $created->getId()));
+        self::assertResponseIsSuccessful();
+        $editForm = $crawler->selectButton('Save')->form();
+
+        /** @phpstan-ignore-next-line method.nonObject */
+        $this->assertSame('10:00', $editForm['event[startTime]']->getValue());
+        /** @phpstan-ignore-next-line method.nonObject */
+        $this->assertSame('14:00', $editForm['event[endTime]']->getValue());
+
+        // Re-save the form unchanged and re-read it: times must remain stable.
+        $client->submit($editForm);
+        self::assertResponseRedirects('/admin/events');
+
+        $crawler  = $client->request(Request::METHOD_GET, sprintf('/admin/events/%d/edit', (int) $created->getId()));
+        $editForm = $crawler->selectButton('Save')->form();
+        /** @phpstan-ignore-next-line method.nonObject */
+        $this->assertSame('10:00', $editForm['event[startTime]']->getValue());
+        /** @phpstan-ignore-next-line method.nonObject */
+        $this->assertSame('14:00', $editForm['event[endTime]']->getValue());
+    }
+
     public function testCreateEventRejectsInvalidStartTimeFormat(): void
     {
         $client = self::createClient();
