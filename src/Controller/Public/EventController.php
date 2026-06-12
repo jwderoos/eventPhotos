@@ -7,10 +7,16 @@ namespace App\Controller\Public;
 use App\Entity\Event;
 use App\Repository\EventRepository;
 use App\Repository\PhotoRepository;
+use App\Service\Event\PhotosUrlBuilder;
+use App\Service\QrCodeRenderer;
 use DateTimeImmutable;
 use DateTimeZone;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\FilesystemOperator;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Clock\ClockInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -21,7 +27,7 @@ final class EventController extends AbstractController
 {
     private const int HARD_CAP = 200;
 
-    private const string TIME_FORMAT = 'H:i';
+    private const int DISPLAY_QR_SIZE = 720;
 
     private const string TIME_PATTERN = '/^(?:[01]\d|2[0-3]):[0-5]\d$/';
 
@@ -29,6 +35,11 @@ final class EventController extends AbstractController
         private readonly EventRepository $events,
         private readonly ClockInterface $clock,
         private readonly PhotoRepository $photos,
+        private readonly PhotosUrlBuilder $photosUrl,
+        private readonly QrCodeRenderer $qr,
+        #[Autowire(service: 'event_logos_storage')]
+        private readonly FilesystemOperator $eventLogosStorage,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -39,10 +50,11 @@ final class EventController extends AbstractController
         $now   = $this->nowInEventTimezone($event);
 
         return $this->render('public/event/landing.html.twig', [
-            'event'         => $event,
-            'now'           => $now,
-            'windowMinutes' => $event->resolveWindowMinutes(),
-            'photosUrl'     => $this->buildPhotosUrl($event, $now),
+            'event'             => $event,
+            'now'               => $now,
+            'windowMinutes'     => $event->resolveWindowMinutes(),
+            'photosUrl'         => $this->photosUrl->build($event, $now),
+            'photosUrlAbsolute' => $this->photosUrl->build($event, $now, absolute: true),
         ]);
     }
 
@@ -71,6 +83,56 @@ final class EventController extends AbstractController
         ]);
     }
 
+    #[Route(
+        '/e/{slug}/display',
+        name: 'public_event_display',
+        requirements: ['slug' => '[a-z0-9-]+'],
+        methods: ['GET'],
+    )]
+    public function display(string $slug): Response
+    {
+        $event     = $this->resolve($slug);
+        $now       = $this->nowInEventTimezone($event);
+        $photosUrl = $this->photosUrl->build($event, $now, absolute: true);
+
+        return $this->render('public/event/display.html.twig', [
+            'event' => $event,
+            'now'   => $now,
+            'qrSvg' => $this->qr->svg(
+                $photosUrl,
+                $this->readLogoBytes($event),
+                size: self::DISPLAY_QR_SIZE,
+            ),
+        ]);
+    }
+
+    #[Route(
+        '/e/{slug}/display/qr.svg',
+        name: 'public_event_display_qr',
+        requirements: ['slug' => '[a-z0-9-]+'],
+        methods: ['GET'],
+    )]
+    public function displayQr(string $slug): Response
+    {
+        $event = $this->resolve($slug);
+        $now   = $this->nowInEventTimezone($event);
+
+        $svg = $this->qr->svg(
+            $this->photosUrl->build($event, $now, absolute: true),
+            $this->readLogoBytes($event),
+            size: self::DISPLAY_QR_SIZE,
+        );
+
+        $response = new Response($svg);
+        $response->headers->set('Content-Type', 'image/svg+xml');
+        $response->headers->set('Cache-Control', 'no-store');
+        // Note: Symfony's ResponseHeaderBag auto-appends `private` when no public/s-maxage
+        // directive is set, so the wire value will be `no-store, private`. That's correct
+        // (and harmless) for this anonymous public route.
+
+        return $response;
+    }
+
     private function resolve(string $slug): Event
     {
         $event = $this->events->findOneBySlug($slug);
@@ -80,14 +142,6 @@ final class EventController extends AbstractController
         }
 
         return $event;
-    }
-
-    private function buildPhotosUrl(Event $event, DateTimeImmutable $when): string
-    {
-        return $this->generateUrl('public_event_photos', [
-            'slug' => $event->getSlug(),
-            't'    => $when->format(self::TIME_FORMAT),
-        ]);
     }
 
     private function nowInEventTimezone(Event $event): DateTimeImmutable
@@ -117,5 +171,24 @@ final class EventController extends AbstractController
         }
 
         return $resolved;
+    }
+
+    private function readLogoBytes(Event $event): ?string
+    {
+        $filename = $event->getLogoFilename();
+        if ($filename === null) {
+            return null;
+        }
+
+        try {
+            return $this->eventLogosStorage->read($filename);
+        } catch (FilesystemException $filesystemException) {
+            $this->logger->warning('Failed to read event logo; rendering QR without it', [
+                'event_id'  => $event->getId(),
+                'filename'  => $filename,
+                'exception' => $filesystemException,
+            ]);
+            return null;
+        }
     }
 }

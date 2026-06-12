@@ -23,7 +23,7 @@
                     type="button"
                     class="btn btn-ghost"
                     data-action="click->share#share"
-                    data-share-url-value="{{ url('public_event_photos', {slug: event.slug, t: now|date('H:i', event.timezone)}) }}"
+                    data-share-url-value="{{ photosUrlAbsolute }}"
                     data-share-title-value="{{ event.name }} — Photos"
                     data-share-text-value="My photos from {{ event.name }}"
                 >
@@ -33,7 +33,7 @@
                 <a
                     href="{{ photosUrl }}"
                     class="btn btn-primary"
-                    data-share-url-value="{{ url('public_event_photos', {slug: event.slug, t: now|date('H:i', event.timezone)}) }}"
+                    data-share-url-value="{{ photosUrlAbsolute }}"
                     data-share-title-value="{{ event.name }} — Photos"
                     data-share-text-value="My photos from {{ event.name }}"
                 >

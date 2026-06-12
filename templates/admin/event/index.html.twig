@@ -44,6 +44,10 @@
                                        target="_blank"
                                        rel="noopener"
                                        class="btn btn-ghost btn-xs">QR</a>
+                                    <a href="{{ path('public_event_display', {slug: event.slug}) }}"
+                                       target="_blank"
+                                       rel="noopener"
+                                       class="btn btn-ghost btn-xs">Display</a>
                                     <a href="{{ path('admin_event_photo_manage', {id: event.id}) }}"
                                        class="btn btn-ghost btn-xs">Photos</a>
                                     <a href="{{ path('admin_event_edit', {id: event.id}) }}"
