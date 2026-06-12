@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\Enum\AuthProvider;
 use App\Repository\UserRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use InvalidArgumentException;
@@ -28,6 +31,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: Types::JSON)]
     private array $roles = [];
 
+    /** @var Collection<int, UserIdentity> */
+    #[ORM\OneToMany(
+        targetEntity: UserIdentity::class,
+        mappedBy: 'user',
+        cascade: ['persist', 'remove'],
+        orphanRemoval: true,
+    )]
+    private Collection $identities;
+
     public function __construct(
         #[ORM\Column(type: Types::STRING, length: 180)]
         private string $email,
@@ -37,6 +49,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         if ($email === '') {
             throw new InvalidArgumentException('User email cannot be empty.');
         }
+
+        $this->identities = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -79,12 +93,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->password = $hashed;
     }
 
+    public function hasUsablePassword(): bool
+    {
+        return $this->password !== '';
+    }
+
     /** @return list<string> */
     public function getRoles(): array
     {
         $roles = $this->roles;
         $roles[] = 'ROLE_USER';
-
         return array_values(array_unique($roles));
     }
 
@@ -98,6 +116,40 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function removeRole(string $role): void
     {
         $this->roles = array_values(array_filter($this->roles, static fn (string $r): bool => $r !== $role));
+    }
+
+    /** @return Collection<int, UserIdentity> */
+    public function getIdentities(): Collection
+    {
+        return $this->identities;
+    }
+
+    public function addIdentity(UserIdentity $identity): void
+    {
+        if (!$this->identities->contains($identity)) {
+            $this->identities->add($identity);
+        }
+    }
+
+    public function removeIdentity(UserIdentity $identity): void
+    {
+        $this->identities->removeElement($identity);
+    }
+
+    public function hasIdentityFor(AuthProvider $provider): bool
+    {
+        return $this->getIdentityFor($provider) instanceof UserIdentity;
+    }
+
+    public function getIdentityFor(AuthProvider $provider): ?UserIdentity
+    {
+        foreach ($this->identities as $identity) {
+            if ($identity->getProvider() === $provider) {
+                return $identity;
+            }
+        }
+
+        return null;
     }
 
     public function eraseCredentials(): void

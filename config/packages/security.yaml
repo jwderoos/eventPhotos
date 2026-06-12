@@ -32,6 +32,7 @@ security:
         - { path: ^/login, roles: PUBLIC_ACCESS }
         - { path: ^/reset-password, roles: PUBLIC_ACCESS }
         - { path: ^/setup, roles: PUBLIC_ACCESS }
+        - { path: ^/account, roles: ROLE_USER }
         - { path: ^/admin/users, roles: ROLE_ADMIN }
         - { path: ^/admin/invites, roles: ROLE_ADMIN }
         - { path: ^/admin, roles: ROLE_ORGANIZER }

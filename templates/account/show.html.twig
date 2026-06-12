@@ -1,0 +1,63 @@
+{% extends 'admin/_base.html.twig' %}
+
+{% block title %}My account{% endblock %}
+
+{% block admin_shell %}
+<div class="mx-auto max-w-2xl p-8 space-y-8">
+    <h1 class="text-2xl font-semibold">My account</h1>
+
+    {% for message in app.flashes('success') %}
+        <div class="alert alert-success">{{ message }}</div>
+    {% endfor %}
+    {% for message in app.flashes('error') %}
+        <div class="alert alert-error">{{ message }}</div>
+    {% endfor %}
+
+    <section class="space-y-3">
+        <h2 class="text-lg font-medium">Linked identities</h2>
+
+        {% if identities is empty %}
+            <p class="text-sm text-base-content/70">No identities linked.</p>
+        {% else %}
+            <table class="table">
+                <thead>
+                    <tr><th>Provider</th><th>Email</th><th>Linked</th><th></th></tr>
+                </thead>
+                <tbody>
+                {% for identity in identities %}
+                    <tr>
+                        <td>{{ identity.provider.value|capitalize }}</td>
+                        <td>{{ identity.email }}</td>
+                        <td>{{ identity.linkedAt|date('Y-m-d H:i') }}</td>
+                        <td>
+                            <form method="post" action="{{ path('account_identity_unlink', {id: identity.id}) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('unlink-identity-' ~ identity.id) }}">
+                                <button class="btn btn-sm btn-ghost">Unlink</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+        {% if google_oauth_enabled() and not user.hasIdentityFor(constant('App\\Enum\\AuthProvider::Google')) %}
+            <a href="{{ path('oauth_google_link_start') }}" class="btn btn-primary">Link Google</a>
+        {% endif %}
+    </section>
+
+    {% if passwordForm is defined %}
+    <section class="space-y-3">
+        <h2 class="text-lg font-medium">{% if user.hasUsablePassword %}Change password{% else %}Set password{% endif %}</h2>
+        {{ form(passwordForm) }}
+    </section>
+    {% endif %}
+
+    {% if displayNameForm is defined %}
+    <section class="space-y-3">
+        <h2 class="text-lg font-medium">Display name</h2>
+        {{ form(displayNameForm) }}
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

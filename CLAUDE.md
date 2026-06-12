@@ -82,6 +82,10 @@ When injecting a specific storage, use `#[Autowire(service: 'photo_originals_sto
 
 Form-login firewall (`/login`), entity user provider on `User.email`. Access control: `/admin/**` requires `ROLE_ORGANIZER`, everything else `PUBLIC_ACCESS`. Authorization is done via voters (`EventVoter`, `EventCollectionVoter`, `PhotoVoter`) — pattern is *admin bypass, otherwise ownership check*. Controllers should call `$this->denyAccessUnlessGranted(EventVoter::EDIT, $event)` (use the constants, not raw strings) and use `$this->isCsrfTokenValid(...)` for state-changing POSTs.
 
+### Federated identity (Google SSO)
+
+Google login is wired via `knpuniversity/oauth2-client-bundle` (Google client). All `/oauth/google/*` routes are gated by `App\Service\Auth\GoogleOAuthFeatureFlag::isEnabled()` — empty `GOOGLE_OAUTH_CLIENT_ID` → routes 404 + no UI. One redirect URI per environment, `/oauth/google/callback`, handled by `App\Controller\OAuth\OAuthDispatcherController` which redirects to the per-purpose callback based on a session-stashed `oauth_google_purpose`. Login resolution lives in `App\Service\Auth\IdentityLinker`; invite redemption via Google in `App\Service\Auth\IdentityCreator` (PESSIMISTIC_WRITE transaction mirroring the password redemption). Identities are stored in `user_identities`, unique on `(provider, subject)` and `(user_id, provider)`. Tests bind `App\Tests\Fake\FakeGoogleOAuthClient` in `config/services.yaml` under `when@test:` — no real network. Operational prerequisites and per-env Google Cloud Console setup are in `docs/superpowers/specs/2026-06-12-19-google-sso-design.md`.
+
 ### Controllers
 
 Split into `App\Controller\Admin\*` (behind `/admin`, organizer-gated) and `App\Controller\Public\*`. Both extend `AbstractController`. All routes use `#[Route]` attributes — no YAML routing beyond `config/routes.yaml` glob.
