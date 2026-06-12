@@ -33,7 +33,7 @@ final class DashboardController extends AbstractController
         $eventCriteria = $isAdmin ? [] : ['owner' => $user];
         $collectionCriteria = $isAdmin ? [] : ['owner' => $user];
         /** @var list<Event> $eventList */
-        $eventList = $this->events->findBy($eventCriteria, ['date' => 'DESC'], 25);
+        $eventList = $this->events->findBy($eventCriteria, ['startsAt' => 'DESC'], 25);
         /** @var list<EventCollection> $collectionList */
         $collectionList = $this->collections->findBy($collectionCriteria, ['name' => 'ASC'], 25);
         return $this->render('admin/dashboard.html.twig', [

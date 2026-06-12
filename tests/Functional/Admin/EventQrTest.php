@@ -29,7 +29,13 @@ final class EventQrTest extends WebTestCase
         $alice->addRole('ROLE_ORGANIZER');
         $alice->setPassword($hasher->hashPassword($alice, 'pw'));
 
-        $event = new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $alice);
+        $event = new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $alice,
+        );
 
         $em->persist($alice);
         $em->persist($event);
@@ -59,7 +65,13 @@ final class EventQrTest extends WebTestCase
         $alice->addRole('ROLE_ORGANIZER');
         $alice->setPassword($hasher->hashPassword($alice, 'pw'));
 
-        $event = new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $alice);
+        $event = new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $alice,
+        );
 
         $em->persist($alice);
         $em->persist($event);
@@ -93,7 +105,13 @@ final class EventQrTest extends WebTestCase
         $bob->addRole('ROLE_ORGANIZER');
         $bob->setPassword($hasher->hashPassword($bob, 'pw'));
 
-        $aliceEvent = new Event('alice-fest', 'Alice Fest', new DateTimeImmutable('2026-07-15'), $alice);
+        $aliceEvent = new Event(
+            'alice-fest',
+            'Alice Fest',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $alice,
+        );
 
         $em->persist($alice);
         $em->persist($bob);
@@ -124,7 +142,13 @@ final class EventQrTest extends WebTestCase
         $bob->addRole('ROLE_ORGANIZER');
         $bob->setPassword($hasher->hashPassword($bob, 'pw'));
 
-        $event = new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $alice);
+        $event = new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $alice,
+        );
 
         $em->persist($alice);
         $em->persist($bob);
@@ -153,7 +177,13 @@ final class EventQrTest extends WebTestCase
         $alice->addRole('ROLE_ORGANIZER');
         $alice->setPassword($hasher->hashPassword($alice, 'pw'));
 
-        $event = new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $alice);
+        $event = new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $alice,
+        );
 
         $em->persist($alice);
         $em->persist($event);
@@ -194,7 +224,13 @@ final class EventQrTest extends WebTestCase
         $alice->addRole('ROLE_ORGANIZER');
         $alice->setPassword($hasher->hashPassword($alice, 'pw'));
 
-        $event = new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $alice);
+        $event = new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $alice,
+        );
         $event->setLogoFilename('does-not-exist.png');
 
         $em->persist($alice);

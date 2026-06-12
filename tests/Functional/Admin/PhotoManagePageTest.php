@@ -41,7 +41,13 @@ final class PhotoManagePageTest extends WebTestCase
 
         $this->em->persist($this->owner);
 
-        $this->event = new Event('demo', 'Demo', new DateTimeImmutable('2026-06-10'), $this->owner);
+        $this->event = new Event(
+            'demo',
+            'Demo',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $this->owner,
+        );
         $this->event->setTimezone('Europe/Amsterdam');
 
         $this->em->persist($this->event);

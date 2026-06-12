@@ -24,7 +24,13 @@ final class EventLandingTest extends WebTestCase
         $owner->setPassword('x');
 
         $em->persist($owner);
-        $em->persist(new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $owner));
+        $em->persist(new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $owner,
+        ));
         $em->flush();
 
         $crawler = $client->request(Request::METHOD_GET, '/e/summer-fest');

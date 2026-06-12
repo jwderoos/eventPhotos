@@ -35,7 +35,7 @@
                         <tr>
                             <td><code class="text-xs">{{ event.slug }}</code></td>
                             <td class="font-medium">{{ event.name }}</td>
-                            <td>{{ event.date|date('Y-m-d') }}</td>
+                            <td>{{ event|event_date_in_tz }}</td>
                             <td>{{ event.resolveWindowMinutes }} min</td>
                             <td class="text-sm text-base-content/70">{{ event.owner.email }}</td>
                             <td class="text-right">

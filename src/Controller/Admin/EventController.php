@@ -46,7 +46,7 @@ final class EventController extends AbstractController
 
         $criteria = $this->isGranted('ROLE_ADMIN') ? [] : ['owner' => $user];
         return $this->render('admin/event/index.html.twig', [
-            'events' => $this->events->findBy($criteria, ['date' => 'DESC']),
+            'events' => $this->events->findBy($criteria, ['startsAt' => 'DESC']),
         ]);
     }
 
@@ -59,7 +59,10 @@ final class EventController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
-        $event = new Event('', '', new DateTimeImmutable('today'), $user);
+        $now      = new DateTimeImmutable('today 10:00');
+        $startsAt = $now;
+        $endsAt   = $now->modify('+2 hours');
+        $event    = new Event('', '', $startsAt, $endsAt, $user);
 
         $form = $this->createForm(EventType::class, $event);
         $form->handleRequest($request);

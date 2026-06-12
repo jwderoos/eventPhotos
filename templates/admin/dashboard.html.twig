@@ -32,7 +32,7 @@
                                     {{ event.name }}
                                 </a>
                                 <span class="text-sm text-base-content/70">
-                                    — {{ event.date|date('Y-m-d') }} (slug: <code class="text-xs">{{ event.slug }}</code>)
+                                    — {{ event|event_date_in_tz }} (slug: <code class="text-xs">{{ event.slug }}</code>)
                                 </span>
                             </li>
                         {% endfor %}

@@ -31,9 +31,27 @@ final class CountByOwnerTest extends KernelTestCase
         $em->persist($owner);
         $em->persist($someone);
 
-        $em->persist(new Event('e1', 'E1', new DateTimeImmutable('2026-07-01'), $owner));
-        $em->persist(new Event('e2', 'E2', new DateTimeImmutable('2026-07-02'), $owner));
-        $em->persist(new Event('e3', 'E3', new DateTimeImmutable('2026-07-03'), $someone));
+        $em->persist(new Event(
+            'e1',
+            'E1',
+            new DateTimeImmutable('2026-07-01 10:00'),
+            new DateTimeImmutable('2026-07-01 14:00'),
+            $owner,
+        ));
+        $em->persist(new Event(
+            'e2',
+            'E2',
+            new DateTimeImmutable('2026-07-02 10:00'),
+            new DateTimeImmutable('2026-07-02 14:00'),
+            $owner,
+        ));
+        $em->persist(new Event(
+            'e3',
+            'E3',
+            new DateTimeImmutable('2026-07-03 10:00'),
+            new DateTimeImmutable('2026-07-03 14:00'),
+            $someone,
+        ));
         $em->persist(new EventCollection('c1', 'C1', $owner));
         $em->flush();
 

@@ -35,8 +35,20 @@ final class OwnershipScopingTest extends WebTestCase
         $em->persist($alice);
         $em->persist($bob);
 
-        $em->persist(new Event('alice-event', 'Alice Event', new DateTimeImmutable('2026-07-15'), $alice));
-        $em->persist(new Event('bob-event', 'Bob Event', new DateTimeImmutable('2026-07-15'), $bob));
+        $em->persist(new Event(
+            'alice-event',
+            'Alice Event',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $alice,
+        ));
+        $em->persist(new Event(
+            'bob-event',
+            'Bob Event',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $bob,
+        ));
         $em->flush();
 
         $client->loginUser($alice);
@@ -66,7 +78,13 @@ final class OwnershipScopingTest extends WebTestCase
         $bob->addRole('ROLE_ORGANIZER');
         $bob->setPassword($hasher->hashPassword($bob, 'pw'));
 
-        $bobEvent = new Event('bob-event', 'Bob Event', new DateTimeImmutable('2026-07-15'), $bob);
+        $bobEvent = new Event(
+            'bob-event',
+            'Bob Event',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $bob,
+        );
         $em->persist($alice);
         $em->persist($bob);
         $em->persist($bobEvent);

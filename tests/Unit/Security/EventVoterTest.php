@@ -17,7 +17,13 @@ final class EventVoterTest extends TestCase
     public function testOwnerCanEdit(): void
     {
         $owner = new User('owner@example.com', 'Owner');
-        $event = new Event('e', 'E', new DateTimeImmutable('2026-07-15'), $owner);
+        $event = new Event(
+            'e',
+            'E',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $owner,
+        );
 
         $security = $this->createStub(Security::class);
         $security->method('isGranted')->willReturnMap([['ROLE_ADMIN', null, false]]);
@@ -34,7 +40,13 @@ final class EventVoterTest extends TestCase
     {
         $owner    = new User('owner@example.com', 'Owner');
         $intruder = new User('intruder@example.com', 'Intruder');
-        $event = new Event('e', 'E', new DateTimeImmutable('2026-07-15'), $owner);
+        $event = new Event(
+            'e',
+            'E',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $owner,
+        );
 
         $security = $this->createStub(Security::class);
         $security->method('isGranted')->willReturnMap([['ROLE_ADMIN', null, false]]);
@@ -51,7 +63,13 @@ final class EventVoterTest extends TestCase
     {
         $owner = new User('owner@example.com', 'Owner');
         $admin = new User('admin@example.com', 'Admin');
-        $event = new Event('e', 'E', new DateTimeImmutable('2026-07-15'), $owner);
+        $event = new Event(
+            'e',
+            'E',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $owner,
+        );
 
         $security = $this->createStub(Security::class);
         $security->method('isGranted')->willReturnMap([['ROLE_ADMIN', null, true]]);
@@ -67,7 +85,13 @@ final class EventVoterTest extends TestCase
     public function testUnsupportedAttributeAbstains(): void
     {
         $owner = new User('owner@example.com', 'Owner');
-        $event = new Event('e', 'E', new DateTimeImmutable('2026-07-15'), $owner);
+        $event = new Event(
+            'e',
+            'E',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $owner,
+        );
 
         $security = $this->createStub(Security::class);
 

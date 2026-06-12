@@ -28,7 +28,8 @@ final class EventDisplayTest extends WebTestCase
         $event = new Event(
             'big-night',
             'Big Night',
-            new DateTimeImmutable('2026-06-12'),
+            new DateTimeImmutable('2026-06-12 10:00'),
+            new DateTimeImmutable('2026-06-12 14:00'),
             $owner,
         );
         $event->setTimezone('Europe/Amsterdam');
@@ -93,7 +94,8 @@ final class EventDisplayTest extends WebTestCase
         $event = new Event(
             'refresh-night',
             'Refresh Night',
-            new DateTimeImmutable('2026-06-12'),
+            new DateTimeImmutable('2026-06-12 10:00'),
+            new DateTimeImmutable('2026-06-12 14:00'),
             $owner,
         );
         $event->setTimezone('Europe/Amsterdam');

@@ -36,7 +36,13 @@ final class PhotoRepositoryPaginationTest extends KernelTestCase
 
         $this->em->persist($owner);
 
-        $this->event = new Event('demo', 'Demo', new DateTimeImmutable('2026-06-10'), $owner);
+        $this->event = new Event(
+            'demo',
+            'Demo',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
         $this->event->setTimezone('UTC');
 
         $this->em->persist($this->event);
@@ -82,7 +88,13 @@ final class PhotoRepositoryPaginationTest extends KernelTestCase
 
     public function testScopesToTheGivenEventOnly(): void
     {
-        $other = new Event('other', 'Other', new DateTimeImmutable('2026-06-10'), $this->event->getOwner());
+        $other = new Event(
+            'other',
+            'Other',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $this->event->getOwner(),
+        );
         $other->setTimezone('UTC');
 
         $this->em->persist($other);

@@ -60,7 +60,13 @@ final class PhotoVoterTest extends TestCase
 
     private function makePhoto(User $owner): Photo
     {
-        $event = new Event('e', 'E', new DateTimeImmutable('2026-06-10'), $owner);
+        $event = new Event(
+            'e',
+            'E',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
         return new Photo($event, str_repeat('a', 64), 'x.jpg', 100);
     }
 

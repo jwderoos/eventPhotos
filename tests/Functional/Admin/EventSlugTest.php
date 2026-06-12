@@ -37,8 +37,10 @@ final class EventSlugTest extends WebTestCase
         $client->loginUser($alice);
         $crawler = $client->request(Request::METHOD_GET, '/admin/events/new');
         $form = $crawler->selectButton('Create')->form([
-            'event[name]' => 'My Brand New Event',
-            'event[date]' => '2026-08-01',
+            'event[name]'      => 'My Brand New Event',
+            'event[eventDate]' => '2026-08-01',
+            'event[startTime]' => '10:00',
+            'event[endTime]'   => '14:00',
         ]);
         $client->submit($form);
 
@@ -59,7 +61,13 @@ final class EventSlugTest extends WebTestCase
 
         /** @var EntityManagerInterface $em */
         $em = $container->get(EntityManagerInterface::class);
-        $event = new Event('legacy-slug-xyz999', 'Original Name', new DateTimeImmutable('2026-07-15'), $alice);
+        $event = new Event(
+            'legacy-slug-xyz999',
+            'Original Name',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $alice,
+        );
         $em->persist($event);
         $em->flush();
 
