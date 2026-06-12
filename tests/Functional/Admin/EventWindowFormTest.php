@@ -7,6 +7,7 @@ namespace App\Tests\Functional\Admin;
 use App\Entity\Event;
 use App\Entity\User;
 use App\Repository\EventRepository;
+use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -47,6 +48,38 @@ final class EventWindowFormTest extends WebTestCase
             '2026-07-15 12:00:00',
             $created->getEndsAt()->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s'),
         );
+    }
+
+    public function testEditFormPrefillsDateAndTimeFromExistingEvent(): void
+    {
+        $client    = self::createClient();
+        $container = self::getContainer();
+        /** @var EntityManagerInterface $em */
+        $em    = $container->get(EntityManagerInterface::class);
+        $alice = $this->seedOrganizer();
+
+        $event = new Event(
+            'prefill-fest',
+            'Prefill Fest',
+            new DateTimeImmutable('2026-07-15 08:00:00', new DateTimeZone('UTC')),
+            new DateTimeImmutable('2026-07-15 12:00:00', new DateTimeZone('UTC')),
+            $alice,
+        );
+        $em->persist($event);
+        $em->flush();
+
+        $client->loginUser($alice);
+        $crawler = $client->request(Request::METHOD_GET, sprintf('/admin/events/%d/edit', (int) $event->getId()));
+        self::assertResponseIsSuccessful();
+
+        $form = $crawler->selectButton('Save')->form();
+
+        /** @phpstan-ignore-next-line method.nonObject */
+        $this->assertSame('2026-07-15', $form['event[eventDate]']->getValue());
+        /** @phpstan-ignore-next-line method.nonObject */
+        $this->assertSame('10:00', $form['event[startTime]']->getValue());
+        /** @phpstan-ignore-next-line method.nonObject */
+        $this->assertSame('14:00', $form['event[endTime]']->getValue());
     }
 
     public function testCreateEventRejectsInvalidStartTimeFormat(): void

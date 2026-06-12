@@ -107,7 +107,7 @@ final class EventType extends AbstractType
             ]);
         }
 
-        $builder->addEventListener(FormEvents::PRE_SET_DATA, $this->prefillUnmappedFields(...));
+        $builder->addEventListener(FormEvents::POST_SET_DATA, $this->prefillUnmappedFields(...));
         $builder->addEventListener(FormEvents::SUBMIT, $this->composeStartsAndEnds(...));
     }
 
