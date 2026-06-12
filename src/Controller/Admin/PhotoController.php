@@ -189,34 +189,6 @@ final class PhotoController extends AbstractController
     }
 
     #[Route(
-        '/admin/events/{eventId}/photos/{photoId}/retry',
-        name: 'admin_photo_retry',
-        requirements: ['eventId' => '\d+', 'photoId' => '\d+'],
-        methods: ['POST'],
-    )]
-    public function retry(int $eventId, int $photoId, Request $request): RedirectResponse
-    {
-        $photo = $this->loadOrThrow($eventId, $photoId);
-        $this->denyAccessUnlessGranted(PhotoVoter::EDIT, $photo);
-        $this->assertCsrf($request, 'retry_photo_' . $photoId);
-
-        if ($photo->getStatus() === PhotoStatus::Failed) {
-            $photo->resetForRetry();
-            $this->em->flush();
-        }
-
-        // For pending/ready: no state change. Either way, re-dispatching is safe (handler is idempotent).
-        $this->bus->dispatch(new ProcessPhoto($photoId));
-
-        $this->addFlash('success', 'Photo re-queued.');
-
-        return $this->redirectToRoute('admin_photo_grid', [
-            'id'   => $eventId,
-            'page' => max(1, $request->request->getInt('page', 1)),
-        ]);
-    }
-
-    #[Route(
         '/admin/events/{id}/photos/delete-all',
         name: 'admin_photo_delete_all',
         requirements: ['id' => '\d+'],

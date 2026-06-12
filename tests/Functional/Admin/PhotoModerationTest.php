@@ -75,7 +75,7 @@ final class PhotoModerationTest extends WebTestCase
         $this->client->loginUser($owner);
     }
 
-    public function testRetryFlipsFailedToPending(): void
+    public function testRetryRouteIsGone(): void
     {
         $photo = new Photo($this->event, str_repeat('a', 64), 'x.jpg', 100);
         $photo->markFailed('boom');
@@ -83,20 +83,12 @@ final class PhotoModerationTest extends WebTestCase
         $this->em->persist($photo);
         $this->em->flush();
 
-        $photoId = (int) $photo->getId();
-        $token   = $this->primeCsrfToken('retry_photo_' . $photoId);
-
         $this->client->request(
             Request::METHOD_POST,
-            sprintf('/admin/events/%d/photos/%d/retry', (int) $this->event->getId(), $photoId),
-            ['_token' => $token, 'page' => 2],
+            sprintf('/admin/events/%d/photos/%d/retry', (int) $this->event->getId(), (int) $photo->getId()),
         );
 
-        self::assertResponseRedirects(sprintf('/admin/events/%d/photos-grid?page=2', (int) $this->event->getId()));
-
-        $reloaded = $this->em->find(Photo::class, $photoId);
-        $this->assertInstanceOf(Photo::class, $reloaded);
-        $this->assertSame(PhotoStatus::Pending, $reloaded->getStatus());
+        self::assertResponseStatusCodeSame(404);
     }
 
     public function testDeleteRemovesRowAndStorageFiles(): void

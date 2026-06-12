@@ -13,7 +13,9 @@ use App\Service\Photo\ExifReader;
 use App\Service\Photo\PhotoRejected;
 use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
+use League\Flysystem\FilesystemException;
 use League\Flysystem\FilesystemOperator;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -27,6 +29,7 @@ final readonly class ProcessPhotoHandler
         private DerivativeGenerator $derivatives,
         #[Autowire(service: 'photo_originals_storage')]
         private FilesystemOperator $originals,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -58,9 +61,28 @@ final readonly class ProcessPhotoHandler
             [$width, $height] = $this->derivatives->generate($path);
             $photo->markReady($takenAt, $width, $height);
             $this->em->flush();
+            $this->deleteOriginalQuietly($path, (int) $photo->getId());
         } catch (PhotoRejected $photoRejected) {
             $photo->markFailed($photoRejected->getMessage());
             $this->em->flush();
+            $this->deleteOriginalQuietly($path, (int) $photo->getId());
+        }
+    }
+
+    /**
+     * Best-effort delete: the status transition has already committed, so a stray
+     * original is a janitorial concern, not a user-visible bug.
+     */
+    private function deleteOriginalQuietly(string $path, int $photoId): void
+    {
+        try {
+            $this->originals->delete($path);
+        } catch (FilesystemException $filesystemException) {
+            $this->logger->warning('Failed to delete photo original after ingest.', [
+                'photoId'   => $photoId,
+                'path'      => $path,
+                'exception' => $filesystemException,
+            ]);
         }
     }
 
