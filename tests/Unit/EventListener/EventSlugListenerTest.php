@@ -16,7 +16,13 @@ final class EventSlugListenerTest extends TestCase
     public function testGeneratesSlugWhenEntitySlugIsEmpty(): void
     {
         $listener = new EventSlugListener(new EventSlugGenerator());
-        $event = new Event('', 'Summer Fest', new DateTimeImmutable('2026-07-15'), new User('o@x', 'Owner'));
+        $event = new Event(
+            '',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            new User('o@x', 'Owner'),
+        );
 
         $listener->prePersist($event);
 
@@ -29,7 +35,8 @@ final class EventSlugListenerTest extends TestCase
         $event = new Event(
             'existing-slug',
             'Original Name',
-            new DateTimeImmutable('2026-07-15'),
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
             new User('o@x', 'Owner'),
         );
 

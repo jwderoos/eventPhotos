@@ -78,7 +78,13 @@ final class PhotoTest extends TestCase
     private function makePhoto(): Photo
     {
         $owner = new User('owner@example.test', 'Owner');
-        $event = new Event('slug', 'Event', new DateTimeImmutable('2026-06-10'), $owner);
+        $event = new Event(
+            'slug',
+            'Event',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
 
         return new Photo(
             event: $event,

@@ -33,7 +33,13 @@ final class EventLogoUploadTest extends WebTestCase
         $alice->addRole('ROLE_ORGANIZER');
         $alice->setPassword($hasher->hashPassword($alice, 'pw'));
 
-        $event = new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $alice);
+        $event = new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $alice,
+        );
 
         $em->persist($alice);
         $em->persist($event);
@@ -75,7 +81,13 @@ final class EventLogoUploadTest extends WebTestCase
         $alice->addRole('ROLE_ORGANIZER');
         $alice->setPassword($hasher->hashPassword($alice, 'pw'));
 
-        $event = new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $alice);
+        $event = new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $alice,
+        );
 
         $em->persist($alice);
         $em->persist($event);
@@ -122,7 +134,13 @@ final class EventLogoUploadTest extends WebTestCase
         $alice->addRole('ROLE_ORGANIZER');
         $alice->setPassword($hasher->hashPassword($alice, 'pw'));
 
-        $event = new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $alice);
+        $event = new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $alice,
+        );
 
         $em->persist($alice);
         $em->persist($event);
@@ -169,7 +187,13 @@ final class EventLogoUploadTest extends WebTestCase
         $alice->addRole('ROLE_ORGANIZER');
         $alice->setPassword($hasher->hashPassword($alice, 'pw'));
 
-        $event = new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $alice);
+        $event = new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $alice,
+        );
 
         $em->persist($alice);
         $em->persist($event);

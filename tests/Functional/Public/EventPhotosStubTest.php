@@ -23,7 +23,13 @@ final class EventPhotosStubTest extends WebTestCase
         $owner->setPassword('x');
 
         $em->persist($owner);
-        $em->persist(new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $owner));
+        $em->persist(new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 06:00'),
+            new DateTimeImmutable('2026-07-15 18:00'),
+            $owner,
+        ));
         $em->flush();
 
         $client->request(Request::METHOD_GET, '/e/summer-fest/photos?t=18:30');
@@ -47,7 +53,13 @@ final class EventPhotosStubTest extends WebTestCase
         $owner->setPassword('x');
 
         $em->persist($owner);
-        $em->persist(new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $owner));
+        $em->persist(new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 06:00'),
+            new DateTimeImmutable('2026-07-15 18:00'),
+            $owner,
+        ));
         $em->flush();
 
         $client->request(Request::METHOD_GET, '/e/summer-fest/photos');
@@ -69,7 +81,13 @@ final class EventPhotosStubTest extends WebTestCase
         $owner->setPassword('x');
 
         $em->persist($owner);
-        $em->persist(new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $owner));
+        $em->persist(new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 06:00'),
+            new DateTimeImmutable('2026-07-15 18:00'),
+            $owner,
+        ));
         $em->flush();
 
         $crawler = $client->request(Request::METHOD_GET, '/e/summer-fest/photos?t=09:15');
@@ -97,7 +115,13 @@ final class EventPhotosStubTest extends WebTestCase
         $owner->setPassword('x');
 
         $em->persist($owner);
-        $em->persist(new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $owner));
+        $em->persist(new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 06:00'),
+            new DateTimeImmutable('2026-07-15 18:00'),
+            $owner,
+        ));
         $em->flush();
 
         $client->request(Request::METHOD_GET, '/e/summer-fest/photos?t=not-a-date');
@@ -115,7 +139,13 @@ final class EventPhotosStubTest extends WebTestCase
         $owner->setPassword('x');
 
         $em->persist($owner);
-        $em->persist(new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $owner));
+        $em->persist(new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 06:00'),
+            new DateTimeImmutable('2026-07-15 18:00'),
+            $owner,
+        ));
         $em->flush();
 
         $client->request(Request::METHOD_GET, '/e/summer-fest/photos?t=2026-07-15T18:30:00%2B00:00');
@@ -133,7 +163,13 @@ final class EventPhotosStubTest extends WebTestCase
         $owner->setPassword('x');
 
         $em->persist($owner);
-        $em->persist(new Event('summer-fest', 'Summer Fest', new DateTimeImmutable('2026-07-15'), $owner));
+        $em->persist(new Event(
+            'summer-fest',
+            'Summer Fest',
+            new DateTimeImmutable('2026-07-15 06:00'),
+            new DateTimeImmutable('2026-07-15 18:00'),
+            $owner,
+        ));
         $em->flush();
 
         $client->request(Request::METHOD_GET, '/e/summer-fest/photos?t=12:00&w=20');

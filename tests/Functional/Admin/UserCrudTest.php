@@ -191,7 +191,13 @@ final class UserCrudTest extends WebTestCase
         $container = self::getContainer();
         /** @var EntityManagerInterface $em */
         $em = $container->get(EntityManagerInterface::class);
-        $em->persist(new Event('o-1', 'Owned', new DateTimeImmutable('2026-07-15'), $owner));
+        $em->persist(new Event(
+            'o-1',
+            'Owned',
+            new DateTimeImmutable('2026-07-15 10:00'),
+            new DateTimeImmutable('2026-07-15 14:00'),
+            $owner,
+        ));
         $em->flush();
 
         $client->loginUser($admin);

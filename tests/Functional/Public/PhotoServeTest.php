@@ -30,7 +30,13 @@ final class PhotoServeTest extends WebTestCase
         $owner->setPassword('x');
 
         $em->persist($owner);
-        $event = new Event('e', 'E', new DateTimeImmutable('2026-06-10'), $owner);
+        $event = new Event(
+            'e',
+            'E',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
         $event->setTimezone('UTC');
 
         $em->persist($event);
@@ -67,7 +73,13 @@ final class PhotoServeTest extends WebTestCase
         $owner->setPassword('x');
 
         $em->persist($owner);
-        $event = new Event('e2', 'E2', new DateTimeImmutable('2026-06-10'), $owner);
+        $event = new Event(
+            'e2',
+            'E2',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
         $event->setTimezone('UTC');
 
         $em->persist($event);
@@ -95,7 +107,13 @@ final class PhotoServeTest extends WebTestCase
         $owner->setPassword('x');
 
         $em->persist($owner);
-        $event = new Event('e3', 'E3', new DateTimeImmutable('2026-06-10'), $owner);
+        $event = new Event(
+            'e3',
+            'E3',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
         $event->setTimezone('UTC');
 
         $em->persist($event);
@@ -138,12 +156,24 @@ final class PhotoServeTest extends WebTestCase
 
         $em->persist($owner);
 
-        $eventA = new Event('e4a', 'E4A', new DateTimeImmutable('2026-06-10'), $owner);
+        $eventA = new Event(
+            'e4a',
+            'E4A',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
         $eventA->setTimezone('UTC');
 
         $em->persist($eventA);
 
-        $eventB = new Event('e4b', 'E4B', new DateTimeImmutable('2026-06-10'), $owner);
+        $eventB = new Event(
+            'e4b',
+            'E4B',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
         $eventB->setTimezone('UTC');
 
         $em->persist($eventB);
@@ -182,7 +212,13 @@ final class PhotoServeTest extends WebTestCase
 
         $em->persist($owner);
 
-        $event = new Event('e5', 'E5', new DateTimeImmutable('2026-06-10'), $owner);
+        $event = new Event(
+            'e5',
+            'E5',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
         $event->setTimezone('UTC');
 
         $em->persist($event);

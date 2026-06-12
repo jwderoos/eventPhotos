@@ -18,7 +18,7 @@
         </div>
 
         <h1 class="text-3xl font-semibold mb-1">{{ event.name }}</h1>
-        <p class="text-base-content/70 mb-2">{{ event.date|date('Y-m-d') }}</p>
+        <p class="text-base-content/70 mb-2">{{ event|event_date_in_tz }}</p>
         <p class="text-lg mb-4">Scan to see your photos</p>
 
         <p class="text-xs text-base-content/50 break-all mb-6">{{ url }}</p>

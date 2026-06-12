@@ -159,11 +159,33 @@ final class EventController extends AbstractController
             throw new BadRequestHttpException('Invalid time. Expected HH:mm.');
         }
 
-        $eventDate = $event->getDate()->format('Y-m-d');
-        $resolved  = DateTimeImmutable::createFromFormat(
+        $tz       = new DateTimeZone($event->getTimezone());
+        $startsAt = $event->getStartsAt();
+        $endsAt   = $event->getEndsAt();
+        $startDay = $startsAt->setTimezone($tz)->format('Y-m-d');
+        $endDay   = $endsAt->setTimezone($tz)->format('Y-m-d');
+
+        $candidate = $this->composeOnDay($startDay, $raw, $tz);
+        if ($candidate >= $startsAt && $candidate <= $endsAt) {
+            return $candidate;
+        }
+
+        if ($endDay !== $startDay) {
+            $candidate = $this->composeOnDay($endDay, $raw, $tz);
+            if ($candidate >= $startsAt && $candidate <= $endsAt) {
+                return $candidate;
+            }
+        }
+
+        throw new BadRequestHttpException('Time is outside the event window.');
+    }
+
+    private function composeOnDay(string $day, string $time, DateTimeZone $tz): DateTimeImmutable
+    {
+        $resolved = DateTimeImmutable::createFromFormat(
             'Y-m-d H:i',
-            sprintf('%s %s', $eventDate, $raw),
-            new DateTimeZone($event->getTimezone()),
+            sprintf('%s %s', $day, $time),
+            $tz,
         );
 
         if (!$resolved instanceof DateTimeImmutable) {

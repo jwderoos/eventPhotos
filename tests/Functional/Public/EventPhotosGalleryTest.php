@@ -26,7 +26,13 @@ final class EventPhotosGalleryTest extends WebTestCase
 
         $em->persist($owner);
 
-        $event = new Event('gallery', 'Gallery', new DateTimeImmutable('2026-06-10'), $owner);
+        $event = new Event(
+            'gallery',
+            'Gallery',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
         $event->setTimezone('UTC');
 
         $em->persist($event);
@@ -62,7 +68,13 @@ final class EventPhotosGalleryTest extends WebTestCase
 
         $em->persist($owner);
 
-        $event = new Event('g2', 'G2', new DateTimeImmutable('2026-06-10'), $owner);
+        $event = new Event(
+            'g2',
+            'G2',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
         $event->setTimezone('UTC');
         $event->setDefaultWindowMinutes(720);
 

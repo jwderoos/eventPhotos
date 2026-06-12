@@ -60,7 +60,13 @@ final class PhotoModerationTest extends WebTestCase
 
         $this->em->persist($owner);
 
-        $this->event = new Event('e', 'E', new DateTimeImmutable('2026-06-10'), $owner);
+        $this->event = new Event(
+            'e',
+            'E',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
         $this->event->setTimezone('UTC');
 
         $this->em->persist($this->event);

@@ -11,6 +11,7 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\HttpFoundation\File\File;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 use Vich\UploaderBundle\Mapping\Attribute as Vich;
 
 #[ORM\Entity(repositoryClass: EventRepository::class)]
@@ -21,6 +22,8 @@ class Event implements Stringable
 {
     public const int DEFAULT_WINDOW_MINUTES = 30;
 
+    public const int MAX_WINDOW_MINUTES = 1440;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: Types::INTEGER)]
@@ -28,12 +31,6 @@ class Event implements Stringable
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
-
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
-    private ?DateTimeImmutable $startsAt = null;
-
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
-    private ?DateTimeImmutable $endsAt = null;
 
     #[ORM\Column(type: Types::INTEGER, nullable: true)]
     private ?int $defaultWindowMinutes = null;
@@ -65,8 +62,10 @@ class Event implements Stringable
         private string $slug,
         #[ORM\Column(type: Types::STRING, length: 200)]
         private string $name,
-        #[ORM\Column(type: Types::DATE_IMMUTABLE)]
-        private DateTimeImmutable $date,
+        #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+        private DateTimeImmutable $startsAt,
+        #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+        private DateTimeImmutable $endsAt,
         #[ORM\ManyToOne(targetEntity: User::class)]
         #[ORM\JoinColumn(nullable: false)]
         private User $owner,
@@ -108,32 +107,22 @@ class Event implements Stringable
         $this->description = $description;
     }
 
-    public function getDate(): DateTimeImmutable
-    {
-        return $this->date;
-    }
-
-    public function setDate(DateTimeImmutable $date): void
-    {
-        $this->date = $date;
-    }
-
-    public function getStartsAt(): ?DateTimeImmutable
+    public function getStartsAt(): DateTimeImmutable
     {
         return $this->startsAt;
     }
 
-    public function setStartsAt(?DateTimeImmutable $startsAt): void
+    public function setStartsAt(DateTimeImmutable $startsAt): void
     {
         $this->startsAt = $startsAt;
     }
 
-    public function getEndsAt(): ?DateTimeImmutable
+    public function getEndsAt(): DateTimeImmutable
     {
         return $this->endsAt;
     }
 
-    public function setEndsAt(?DateTimeImmutable $endsAt): void
+    public function setEndsAt(DateTimeImmutable $endsAt): void
     {
         $this->endsAt = $endsAt;
     }
@@ -181,6 +170,27 @@ class Event implements Stringable
     public function resolveWindowMinutes(): int
     {
         return $this->defaultWindowMinutes ?? self::DEFAULT_WINDOW_MINUTES;
+    }
+
+    #[Assert\Callback]
+    public function assertValidWindow(ExecutionContextInterface $context): void
+    {
+        if ($this->endsAt <= $this->startsAt) {
+            $context->buildViolation('End must be strictly after start.')
+                ->atPath('endsAt')
+                ->addViolation();
+
+            return;
+        }
+
+        $diffMinutes = (int) floor(
+            ($this->endsAt->getTimestamp() - $this->startsAt->getTimestamp()) / 60
+        );
+        if ($diffMinutes > self::MAX_WINDOW_MINUTES) {
+            $context->buildViolation('Event window cannot exceed 24 hours.')
+                ->atPath('endsAt')
+                ->addViolation();
+        }
     }
 
     public function getLogoFilename(): ?string
