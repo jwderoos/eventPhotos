@@ -1,15 +1,19 @@
 import { Controller } from '@hotwired/stimulus';
 
 export default class extends Controller {
-    static targets = ['qr', 'updated'];
+    static targets = ['qr', 'updated', 'photosUrl'];
 
     static values = {
         endpoint: String,
         timezone: String,
+        state: String,
         intervalMs: { type: Number, default: 60000 },
     };
 
     connect() {
+        if (this.stateValue === 'post') {
+            return;
+        }
         this.boundRefresh = this.refresh.bind(this);
         this.timer = setInterval(this.boundRefresh, this.intervalMsValue);
     }
@@ -27,13 +31,29 @@ export default class extends Controller {
                 headers: { Accept: 'image/svg+xml' },
                 cache: 'no-store',
             });
+
+            const serverState = response.headers.get('X-Display-State');
+
+            if (serverState && serverState !== this.stateValue) {
+                window.location.reload();
+                return;
+            }
+
             if (!response.ok) {
                 return;
             }
+
             const svg = await response.text();
             if (this.hasQrTarget) {
                 this.qrTarget.innerHTML = svg;
             }
+
+            const photosUrl = response.headers.get('X-Photos-Url');
+            if (photosUrl && this.hasPhotosUrlTarget) {
+                this.photosUrlTarget.href = photosUrl;
+                this.photosUrlTarget.textContent = photosUrl;
+            }
+
             if (this.hasUpdatedTarget) {
                 this.updateTimestamp();
             }

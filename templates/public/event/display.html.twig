@@ -8,28 +8,45 @@
 </head>
 <body class="min-h-screen bg-base-100 text-base-content">
     <main
+        {% if state.value != 'post' %}
         {{ stimulus_controller('qr-refresh', {
             endpoint: path('public_event_display_qr', {slug: event.slug}),
             timezone: event.timezone,
+            state: state.value,
             intervalMs: 60000,
         }) }}
+        {% endif %}
         class="flex min-h-screen flex-col items-center justify-center gap-6 px-8 py-10"
     >
         <h1 class="text-5xl font-semibold tracking-tight text-center">{{ event.name }}</h1>
 
-        <div
-            {{ stimulus_target('qr-refresh', 'qr') }}
-            class="w-[min(80vh,80vw)] aspect-square bg-base-100 rounded-2xl shadow-xl p-6 flex items-center justify-center"
-        >
-            {{ qrSvg|raw }}
-        </div>
+        {% if state.value == 'post' %}
+            <p class="text-2xl text-base-content/70">This event has ended.</p>
+        {% else %}
+            <div
+                {{ stimulus_target('qr-refresh', 'qr') }}
+                class="w-[min(80vh,80vw)] aspect-square bg-base-100 rounded-2xl shadow-xl p-6 flex items-center justify-center"
+            >
+                {{ qrSvg|raw }}
+            </div>
 
-        <p class="text-base text-base-content/60">
-            Scan to see your photos · Updated
-            <time {{ stimulus_target('qr-refresh', 'updated') }} datetime="{{ now|date('c') }}">
-                {{ now|date('H:i', event.timezone) }}
-            </time>
-        </p>
+            <p class="text-base text-base-content/60 text-center">
+                {% if state.value == 'pre' %}
+                    Starts <time datetime="{{ event.startsAt|date('c') }}">{{ event.startsAt|date('H:i', event.timezone) }}</time>
+                {% else %}
+                    Updated
+                    <time {{ stimulus_target('qr-refresh', 'updated') }} datetime="{{ now|date('c') }}">
+                        {{ now|date('H:i', event.timezone) }}
+                    </time>
+                {% endif %}
+                ·
+                <a
+                    {{ stimulus_target('qr-refresh', 'photosUrl') }}
+                    href="{{ photosUrl }}"
+                    class="underline decoration-dotted underline-offset-2"
+                >{{ photosUrl }}</a>
+            </p>
+        {% endif %}
     </main>
 </body>
 </html>

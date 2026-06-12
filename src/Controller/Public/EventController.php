@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller\Public;
 
 use App\Entity\Event;
+use App\Entity\EventDisplayState;
 use App\Repository\EventRepository;
 use App\Repository\PhotoRepository;
 use App\Service\Event\PhotosUrlBuilder;
@@ -91,18 +92,23 @@ final class EventController extends AbstractController
     )]
     public function display(string $slug): Response
     {
-        $event     = $this->resolve($slug);
-        $now       = $this->nowInEventTimezone($event);
-        $photosUrl = $this->photosUrl->build($event, $now, absolute: true);
-
-        return $this->render('public/event/display.html.twig', [
-            'event' => $event,
-            'now'   => $now,
-            'qrSvg' => $this->qr->svg(
+        $event         = $this->resolve($slug);
+        [$now, $state] = $this->resolveNowAndState($event);
+        $photosUrl     = $this->buildPhotosUrlForState($event, $now, $state);
+        $qrSvg         = $photosUrl === null
+            ? null
+            : $this->qr->svg(
                 $photosUrl,
                 $this->readLogoBytes($event),
                 size: self::DISPLAY_QR_SIZE,
-            ),
+            );
+
+        return $this->render('public/event/display.html.twig', [
+            'event'     => $event,
+            'now'       => $now,
+            'state'     => $state,
+            'photosUrl' => $photosUrl,
+            'qrSvg'     => $qrSvg,
         ]);
     }
 
@@ -114,21 +120,33 @@ final class EventController extends AbstractController
     )]
     public function displayQr(string $slug): Response
     {
-        $event = $this->resolve($slug);
-        $now   = $this->nowInEventTimezone($event);
+        $event         = $this->resolve($slug);
+        [$now, $state] = $this->resolveNowAndState($event);
+
+        if ($state === EventDisplayState::Post) {
+            $response = new Response('', Response::HTTP_NO_CONTENT);
+            $response->headers->set('X-Display-State', $state->value);
+
+            return $response;
+        }
+
+        $photosUrl = $this->buildPhotosUrlForState($event, $now, $state);
+        assert($photosUrl !== null);
 
         $svg = $this->qr->svg(
-            $this->photosUrl->build($event, $now, absolute: true),
+            $photosUrl,
             $this->readLogoBytes($event),
             size: self::DISPLAY_QR_SIZE,
         );
 
         $response = new Response($svg);
         $response->headers->set('Content-Type', 'image/svg+xml');
-        $response->headers->set('Cache-Control', 'no-store');
         // Note: Symfony's ResponseHeaderBag auto-appends `private` when no public/s-maxage
         // directive is set, so the wire value will be `no-store, private`. That's correct
         // (and harmless) for this anonymous public route.
+        $response->headers->set('Cache-Control', 'no-store');
+        $response->headers->set('X-Display-State', $state->value);
+        $response->headers->set('X-Photos-Url', $photosUrl);
 
         return $response;
     }
@@ -193,6 +211,32 @@ final class EventController extends AbstractController
         }
 
         return $resolved;
+    }
+
+    /**
+     * @return array{0: DateTimeImmutable, 1: EventDisplayState}
+     */
+    private function resolveNowAndState(Event $event): array
+    {
+        $now = $this->nowInEventTimezone($event);
+
+        return [$now, $event->computeDisplayState($now)];
+    }
+
+    private function buildPhotosUrlForState(
+        Event $event,
+        DateTimeImmutable $now,
+        EventDisplayState $state,
+    ): ?string {
+        return match ($state) {
+            EventDisplayState::Pre  => $this->photosUrl->build(
+                $event,
+                $event->getStartsAt()->setTimezone(new DateTimeZone($event->getTimezone())),
+                absolute: true,
+            ),
+            EventDisplayState::Live => $this->photosUrl->build($event, $now, absolute: true),
+            EventDisplayState::Post => null,
+        };
     }
 
     private function readLogoBytes(Event $event): ?string

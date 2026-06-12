@@ -21,3 +21,14 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+when@test:
+    services:
+        Symfony\Component\Clock\MockClock:
+            arguments:
+                $now: '2026-06-12 12:00:00'
+                $timezone: 'UTC'
+
+        Symfony\Component\Clock\ClockInterface:
+            alias: Symfony\Component\Clock\MockClock
+            public: true

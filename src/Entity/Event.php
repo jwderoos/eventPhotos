@@ -172,6 +172,19 @@ class Event implements Stringable
         return $this->defaultWindowMinutes ?? self::DEFAULT_WINDOW_MINUTES;
     }
 
+    public function computeDisplayState(DateTimeImmutable $now): EventDisplayState
+    {
+        if ($now < $this->startsAt) {
+            return EventDisplayState::Pre;
+        }
+
+        if ($now > $this->endsAt) {
+            return EventDisplayState::Post;
+        }
+
+        return EventDisplayState::Live;
+    }
+
     #[Assert\Callback]
     public function assertValidWindow(ExecutionContextInterface $context): void
     {
