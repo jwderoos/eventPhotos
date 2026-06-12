@@ -7,9 +7,8 @@ namespace App\Controller\Public;
 use App\Entity\Invitation;
 use App\Entity\User;
 use App\Form\InvitationRedeemType;
-use App\Repository\InvitationRepository;
 use App\Repository\UserRepository;
-use App\Service\Invitation\InvitationTokenService;
+use App\Service\Invitation\InvitationResolver;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -26,8 +25,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 final class InvitationRedemptionController extends AbstractController
 {
     public function __construct(
-        private readonly InvitationRepository $invitations,
-        private readonly InvitationTokenService $tokens,
+        private readonly InvitationResolver $invitationResolver,
         private readonly LoggerInterface $logger,
         private readonly EntityManagerInterface $em,
         private readonly UserRepository $users,
@@ -48,7 +46,7 @@ final class InvitationRedemptionController extends AbstractController
             return $this->render('public/invitation/already_signed_in.html.twig');
         }
 
-        $invite = $this->resolveValidInvite($token);
+        $invite = $this->invitationResolver->resolveValid($token);
         if (!$invite instanceof Invitation) {
             return $this->render('public/invitation/invalid.html.twig', [], new Response(null, Response::HTTP_GONE));
         }
@@ -72,7 +70,7 @@ final class InvitationRedemptionController extends AbstractController
             return $this->render('public/invitation/already_signed_in.html.twig');
         }
 
-        $invite = $this->resolveValidInvite($token);
+        $invite = $this->invitationResolver->resolveValid($token);
         if (!$invite instanceof Invitation) {
             return $this->render('public/invitation/invalid.html.twig', [], new Response(null, Response::HTTP_GONE));
         }
@@ -147,42 +145,5 @@ final class InvitationRedemptionController extends AbstractController
 
         $this->security->login($newUser, 'form_login', 'main');
         return new RedirectResponse($this->generateUrl('admin_dashboard'));
-    }
-
-    private function resolveValidInvite(string $token): ?Invitation
-    {
-        $parsed = $this->tokens->parse($token);
-        if ($parsed === null) {
-            $this->logger->warning('invite.redeem_failed', ['reason' => 'malformed']);
-            return null;
-        }
-
-        $invite = $this->invitations->findBySelector($parsed['selector']);
-        if (!$invite instanceof Invitation) {
-            $this->logger->warning('invite.redeem_failed', [
-                'reason'          => 'unknown',
-                'selector_prefix' => substr($parsed['selector'], 0, 8),
-            ]);
-            return null;
-        }
-
-        if (!$this->tokens->verify($invite->getHashedVerifier(), $parsed['verifier'])) {
-            $this->logger->warning('invite.redeem_failed', [
-                'reason'          => 'verifier_mismatch',
-                'invite_id'       => $invite->getId(),
-                'selector_prefix' => substr($parsed['selector'], 0, 8),
-            ]);
-            return null;
-        }
-
-        if (!$invite->isPending()) {
-            $this->logger->warning('invite.redeem_failed', [
-                'reason'    => $invite->status()->value,
-                'invite_id' => $invite->getId(),
-            ]);
-            return null;
-        }
-
-        return $invite;
     }
 }

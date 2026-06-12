@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Invitation;
 
-final class InvitationTokenService
+class InvitationTokenService
 {
     private const int SELECTOR_BYTES = 16;
 

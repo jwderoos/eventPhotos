@@ -18,6 +18,8 @@
         <server name="APP_ENV" value="test" force="true"/>
         <server name="SHELL_VERBOSITY" value="-1"/>
         <server name="KERNEL_CLASS" value="App\Kernel"/>
+        <server name="GOOGLE_OAUTH_CLIENT_ID" value="test-client-id" force="true"/>
+        <server name="GOOGLE_OAUTH_CLIENT_SECRET" value="test-client-secret" force="true"/>
     </php>
 
     <testsuites>

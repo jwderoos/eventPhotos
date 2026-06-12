@@ -38,6 +38,9 @@
             "migrations/.gitignore"
         ]
     },
+    "knpuniversity/oauth2-client-bundle": {
+        "version": "v2.20.2"
+    },
     "league/flysystem-bundle": {
         "version": "3.7",
         "recipe": {

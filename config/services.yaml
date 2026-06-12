@@ -22,8 +22,20 @@ services:
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
 
+    App\Service\Auth\GoogleOAuthClient:
+        alias: App\Service\Auth\RealGoogleOAuthClient
+
 when@test:
     services:
+        _defaults:
+            autowire: true
+            autoconfigure: true
+
+        App\Tests\:
+            resource: '../tests/'
+            exclude:
+                - '../tests/bootstrap.php'
+
         Symfony\Component\Clock\MockClock:
             arguments:
                 $now: '2026-06-12 12:00:00'
@@ -31,4 +43,13 @@ when@test:
 
         Symfony\Component\Clock\ClockInterface:
             alias: Symfony\Component\Clock\MockClock
+            public: true
+
+        App\Tests\Fake\FakeGoogleOAuthClient:
+            public: true
+            arguments:
+                $requestStack: '@request_stack'
+
+        App\Service\Auth\GoogleOAuthClient:
+            alias: App\Tests\Fake\FakeGoogleOAuthClient
             public: true
