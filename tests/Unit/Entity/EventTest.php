@@ -8,6 +8,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Component\Validator\Validation;
 use App\Entity\EventCollection;
 use App\Entity\Event;
+use App\Entity\EventDisplayState;
 use App\Entity\User;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -189,6 +190,108 @@ final class EventTest extends TestCase
         $violations = $this->validator()->validate($event);
 
         $this->assertNotCount(0, $violations);
+    }
+
+    public function testComputeDisplayStateReturnsPreBeforeStart(): void
+    {
+        $event = new Event(
+            'e',
+            'E',
+            new DateTimeImmutable('2026-07-15 10:00', new DateTimeZone('Europe/Amsterdam')),
+            new DateTimeImmutable('2026-07-15 14:00', new DateTimeZone('Europe/Amsterdam')),
+            new User('o@x', 'Owner'),
+        );
+
+        $state = $event->computeDisplayState(
+            new DateTimeImmutable('2026-07-15 09:59:59', new DateTimeZone('Europe/Amsterdam')),
+        );
+
+        $this->assertSame(EventDisplayState::Pre, $state);
+    }
+
+    public function testComputeDisplayStateReturnsLiveAtStartsAtBoundary(): void
+    {
+        $event = new Event(
+            'e',
+            'E',
+            new DateTimeImmutable('2026-07-15 10:00', new DateTimeZone('Europe/Amsterdam')),
+            new DateTimeImmutable('2026-07-15 14:00', new DateTimeZone('Europe/Amsterdam')),
+            new User('o@x', 'Owner'),
+        );
+
+        $state = $event->computeDisplayState(
+            new DateTimeImmutable('2026-07-15 10:00:00', new DateTimeZone('Europe/Amsterdam')),
+        );
+
+        $this->assertSame(EventDisplayState::Live, $state);
+    }
+
+    public function testComputeDisplayStateReturnsLiveInsideWindow(): void
+    {
+        $event = new Event(
+            'e',
+            'E',
+            new DateTimeImmutable('2026-07-15 10:00', new DateTimeZone('Europe/Amsterdam')),
+            new DateTimeImmutable('2026-07-15 14:00', new DateTimeZone('Europe/Amsterdam')),
+            new User('o@x', 'Owner'),
+        );
+
+        $state = $event->computeDisplayState(
+            new DateTimeImmutable('2026-07-15 12:00:00', new DateTimeZone('Europe/Amsterdam')),
+        );
+
+        $this->assertSame(EventDisplayState::Live, $state);
+    }
+
+    public function testComputeDisplayStateReturnsLiveAtEndsAtBoundary(): void
+    {
+        $event = new Event(
+            'e',
+            'E',
+            new DateTimeImmutable('2026-07-15 10:00', new DateTimeZone('Europe/Amsterdam')),
+            new DateTimeImmutable('2026-07-15 14:00', new DateTimeZone('Europe/Amsterdam')),
+            new User('o@x', 'Owner'),
+        );
+
+        $state = $event->computeDisplayState(
+            new DateTimeImmutable('2026-07-15 14:00:00', new DateTimeZone('Europe/Amsterdam')),
+        );
+
+        $this->assertSame(EventDisplayState::Live, $state);
+    }
+
+    public function testComputeDisplayStateReturnsPostAfterEnd(): void
+    {
+        $event = new Event(
+            'e',
+            'E',
+            new DateTimeImmutable('2026-07-15 10:00', new DateTimeZone('Europe/Amsterdam')),
+            new DateTimeImmutable('2026-07-15 14:00', new DateTimeZone('Europe/Amsterdam')),
+            new User('o@x', 'Owner'),
+        );
+
+        $state = $event->computeDisplayState(
+            new DateTimeImmutable('2026-07-15 14:00:01', new DateTimeZone('Europe/Amsterdam')),
+        );
+
+        $this->assertSame(EventDisplayState::Post, $state);
+    }
+
+    public function testComputeDisplayStateHandlesDstAutumnFallBack(): void
+    {
+        $event = new Event(
+            'e',
+            'E',
+            new DateTimeImmutable('2026-10-25 02:30', new DateTimeZone('Europe/Amsterdam')),
+            new DateTimeImmutable('2026-10-25 04:00', new DateTimeZone('Europe/Amsterdam')),
+            new User('o@x', 'Owner'),
+        );
+
+        $beforeStart = new DateTimeImmutable('2026-10-25 02:29', new DateTimeZone('Europe/Amsterdam'));
+        $atStart = new DateTimeImmutable('2026-10-25 02:30', new DateTimeZone('Europe/Amsterdam'));
+
+        $this->assertSame(EventDisplayState::Pre, $event->computeDisplayState($beforeStart));
+        $this->assertSame(EventDisplayState::Live, $event->computeDisplayState($atStart));
     }
 
     private function validator(): ValidatorInterface
