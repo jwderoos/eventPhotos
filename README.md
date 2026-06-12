@@ -25,6 +25,8 @@ docker compose exec php php bin/console messenger:failed:retry <id>
 
 Google SSO is a login method, not a signup path — new accounts still come from `app:create-user` or invite redemption. The feature is fully optional: with `GOOGLE_OAUTH_CLIENT_ID` empty, the Google buttons disappear and `/oauth/google/*` returns 404.
 
+> Setting it up? Step-by-step guides: [`docs/setup/google-sso-dev.md`](docs/setup/google-sso-dev.md) (local dev) and [`docs/setup/google-sso-prod.md`](docs/setup/google-sso-prod.md) (production).
+
 ### Per-environment Google Cloud Console setup
 
 For each environment (dev, staging, prod) you need one **OAuth 2.0 Web Client** in a Google Cloud project:
