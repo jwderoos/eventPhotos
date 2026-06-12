@@ -25,8 +25,12 @@ final class EventTest extends TestCase
 
         $this->assertSame('summer-fest', $event->getSlug());
         $this->assertSame('Summer Fest', $event->getName());
-        $this->assertSame($startsAt, $event->getStartsAt());
-        $this->assertSame($endsAt, $event->getEndsAt());
+        // Entity pins both timestamps to UTC on assignment (see Event::__construct).
+        // Same instant, different DateTimeImmutable instance — compare by value.
+        $this->assertEquals($startsAt, $event->getStartsAt());
+        $this->assertEquals($endsAt, $event->getEndsAt());
+        $this->assertSame('UTC', $event->getStartsAt()->getTimezone()->getName());
+        $this->assertSame('UTC', $event->getEndsAt()->getTimezone()->getName());
         $this->assertSame($owner, $event->getOwner());
         $this->assertNotInstanceOf(EventCollection::class, $event->getCollection());
         $this->assertNull($event->getDefaultWindowMinutes());

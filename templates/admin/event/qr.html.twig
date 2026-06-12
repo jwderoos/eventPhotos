@@ -21,7 +21,7 @@
         <p class="text-base-content/70 mb-2">{{ event|event_date_in_tz }}</p>
         <p class="text-lg mb-4">Scan to see your photos</p>
 
-        <p class="text-xs text-base-content/50 break-all mb-6">{{ url }}</p>
+        <p class="text-xs text-base-content/50 break-all mb-6"><a href="{{ url }}" target="_blank">{{ url }}</a></p>
 
         <div class="no-print flex gap-2 justify-center">
             <button type="button" onclick="window.print()" class="btn btn-primary btn-sm">Print</button>

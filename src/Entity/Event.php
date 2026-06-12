@@ -7,6 +7,7 @@ namespace App\Entity;
 use Stringable;
 use App\Repository\EventRepository;
 use DateTimeImmutable;
+use DateTimeZone;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\HttpFoundation\File\File;
@@ -70,6 +71,12 @@ class Event implements Stringable
         #[ORM\JoinColumn(nullable: false)]
         private User $owner,
     ) {
+        // Doctrine's datetime_immutable type writes via $value->format('Y-m-d H:i:s')
+        // (using the object's tz) but loads with PHP's default tz (UTC here). Storing in
+        // any non-UTC tz therefore corrupts the wall clock on the next hydration. Pin
+        // both timestamps to UTC at the entity boundary so the round-trip is stable.
+        $this->startsAt = $startsAt->setTimezone(new DateTimeZone('UTC'));
+        $this->endsAt   = $endsAt->setTimezone(new DateTimeZone('UTC'));
     }
 
     public function getId(): ?int
@@ -114,7 +121,7 @@ class Event implements Stringable
 
     public function setStartsAt(DateTimeImmutable $startsAt): void
     {
-        $this->startsAt = $startsAt;
+        $this->startsAt = $startsAt->setTimezone(new DateTimeZone('UTC'));
     }
 
     public function getEndsAt(): DateTimeImmutable
@@ -124,7 +131,7 @@ class Event implements Stringable
 
     public function setEndsAt(DateTimeImmutable $endsAt): void
     {
-        $this->endsAt = $endsAt;
+        $this->endsAt = $endsAt->setTimezone(new DateTimeZone('UTC'));
     }
 
     public function getDefaultWindowMinutes(): ?int
