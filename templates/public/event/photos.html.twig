@@ -33,20 +33,63 @@
                 <p class="text-base-content/70">No photos in this window yet.</p>
             </div>
         {% else %}
-            <ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {% for photo in photos %}
-                    <li>
-                        <a href="{{ path('photo_serve_preview', {slug: event.slug, id: photo.id}) }}"
-                           target="_blank"
-                           rel="noopener">
-                            <img src="{{ path('photo_serve_thumb', {slug: event.slug, id: photo.id}) }}"
-                                 alt="{{ event.name }}"
-                                 loading="lazy"
-                                 class="w-full aspect-square object-cover rounded-box">
-                        </a>
-                    </li>
-                {% endfor %}
-            </ul>
+            <div data-controller="lightbox">
+                <ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {% for photo in photos %}
+                        {% set previewUrl = path('photo_serve_preview', {slug: event.slug, id: photo.id}) %}
+                        <li data-lightbox-target="trigger"
+                            data-photo-id="{{ photo.id }}"
+                            data-preview-url="{{ previewUrl }}">
+                            <a href="{{ previewUrl }}" rel="noopener">
+                                <img src="{{ path('photo_serve_thumb', {slug: event.slug, id: photo.id}) }}"
+                                     alt="{{ event.name }}"
+                                     loading="lazy"
+                                     class="w-full aspect-square object-cover rounded-box">
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+
+                <dialog data-lightbox-target="dialog" class="modal">
+                    <div class="modal-box max-w-full w-full h-full p-0 m-0 rounded-none bg-black/95 flex items-center justify-center">
+                        <button type="button"
+                                data-action="click->lightbox#close"
+                                aria-label="Close"
+                                class="btn btn-circle btn-sm btn-ghost absolute top-3 right-3 z-20 text-white bg-black/40 hover:bg-black/60">×</button>
+
+                        <button type="button"
+                                data-lightbox-target="prevButton"
+                                data-action="click->lightbox#previous"
+                                aria-label="Previous photo"
+                                class="btn btn-circle absolute left-3 top-1/2 -translate-y-1/2 z-10 text-white bg-black/40 hover:bg-black/60 border-0">‹</button>
+
+                        <img data-lightbox-target="image"
+                             alt="{{ event.name }}"
+                             class="max-w-full max-h-full object-contain select-none">
+
+                        <div data-lightbox-target="spinner"
+                             class="hidden absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                            <span class="loading loading-spinner loading-lg text-white"></span>
+                        </div>
+
+                        <div data-lightbox-target="error"
+                             class="hidden absolute inset-0 flex items-center justify-center z-10 text-white text-sm pointer-events-none">
+                            Couldn't load this photo
+                        </div>
+
+                        <button type="button"
+                                data-lightbox-target="nextButton"
+                                data-action="click->lightbox#next"
+                                aria-label="Next photo"
+                                class="btn btn-circle absolute right-3 top-1/2 -translate-y-1/2 z-10 text-white bg-black/40 hover:bg-black/60 border-0">›</button>
+
+                        <div data-lightbox-target="counter"
+                             aria-live="polite"
+                             class="absolute bottom-3 left-1/2 -translate-x-1/2 text-white text-sm bg-black/40 rounded-full px-3 py-1"></div>
+                    </div>
+                    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+                </dialog>
+            </div>
             {% if capHit %}
                 <p class="text-sm text-warning">
                     Showing the first 200 photos in this window. Narrow your time range to see others.
