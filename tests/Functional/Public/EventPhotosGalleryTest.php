@@ -118,6 +118,58 @@ final class EventPhotosGalleryTest extends WebTestCase
         }
     }
 
+    public function testRendersLightboxMarkup(): void
+    {
+        $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+
+        $owner = new User('lb@example.test', 'L');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+
+        $event = new Event(
+            'lb',
+            'Lightbox',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
+        $event->setTimezone('UTC');
+
+        $em->persist($event);
+
+        $photo = new Photo($event, str_repeat('d', 64), 'd.jpg', 100);
+        $photo->markReady(new DateTimeImmutable('2026-06-10 12:00:00', new DateTimeZone('UTC')), 100, 100, 1024);
+
+        $em->persist($photo);
+        $em->flush();
+
+        $crawler = $client->request(Request::METHOD_GET, '/e/lb/photos?t=12:00');
+
+        $this->assertResponseIsSuccessful();
+
+        $controllerNode = $crawler->filter('[data-controller~="lightbox"]');
+        $this->assertGreaterThan(0, $controllerNode->count(), 'Grid must be mounted as a lightbox controller');
+
+        $trigger = $crawler->filter('li[data-lightbox-target="trigger"]');
+        $this->assertCount(1, $trigger, 'Each photo tile must declare itself as a lightbox trigger');
+        $this->assertSame((string) $photo->getId(), $trigger->attr('data-photo-id'));
+        $this->assertSame(sprintf('/e/lb/p/%d/preview.jpg', $photo->getId()), $trigger->attr('data-preview-url'));
+
+        $anchor = $trigger->filter('a');
+        $this->assertSame(
+            sprintf('/e/lb/p/%d/preview.jpg', $photo->getId()),
+            $anchor->attr('href'),
+            'Anchor must keep its href for graceful degradation',
+        );
+        $this->assertNull($anchor->attr('target'), 'Lightbox replaces new-tab open; target attribute must be dropped');
+
+        $dialog = $crawler->filter('dialog[data-lightbox-target="dialog"]');
+        $this->assertCount(1, $dialog, 'Lightbox dialog element must be rendered');
+    }
+
     public function testHidesPendingPhotos(): void
     {
         $client = self::createClient();
