@@ -20,6 +20,43 @@
                 <button type="submit" class="btn btn-sm">Update</button>
             </form>
 
+            {% set nav_targets = {
+                'first': firstAt,
+                'prev':  prevAt,
+                'next':  nextAt,
+                'last':  lastAt,
+            } %}
+            {% set nav_labels = {
+                'first': '« First',
+                'prev':  '‹ Previous',
+                'next':  'Next ›',
+                'last':  'Last »',
+            } %}
+
+            <nav data-testid="cross-window-nav"
+                 aria-label="Photo timeline navigation"
+                 class="flex flex-wrap items-center gap-1 text-sm">
+                {% for key, target in nav_targets %}
+                    {% if target is null %}
+                        <span data-testid="nav-{{ key }}"
+                              aria-disabled="true"
+                              class="btn btn-sm btn-disabled pointer-events-none opacity-50">
+                            {{ nav_labels[key] }}
+                        </span>
+                    {% else %}
+                        <span data-testid="nav-{{ key }}">
+                            <a href="{{ path('public_event_photos', {
+                                    slug: event.slug,
+                                    t:    target|date('H:i', event.timezone),
+                               }) }}"
+                               class="btn btn-sm">
+                                {{ nav_labels[key] }}
+                            </a>
+                        </span>
+                    {% endif %}
+                {% endfor %}
+            </nav>
+
             <p class="text-sm text-base-content/70">
                 Showing
                 <time data-testid="timestamp" datetime="{{ timestamp|date('c') }}">{{ timestamp|date('H:i', event.timezone) }}</time>

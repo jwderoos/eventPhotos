@@ -83,6 +83,27 @@ final class EventController extends AbstractController
         $end    = $timestamp->modify(sprintf('+%d minutes', Event::WINDOW_AFTER_MINUTES));
         $photos = $this->photos->findReadyInWindow($event, $start, $end);
 
+        // Cross-window navigation cursors (issue #62). All four are `?DateTimeImmutable`;
+        // `null` means "no Ready photo exists in that direction" → template renders disabled.
+        // First/Last are clamped to the cursor's side: nav-first only "rewinds" (disabled
+        // when the earliest Ready photo is *after* the cursor), nav-last only "fast-forwards"
+        // (disabled when the latest Ready photo is *before* the cursor). Without this clamp,
+        // nav-first would silently advance the cursor forward, which is the opposite of its
+        // affordance.
+        // Caveat: `?t=` is `HH:mm` only, so for multi-day events the firstAt/lastAt links
+        // may collapse back to the start day via `resolveTimestamp`. Acceptable for now
+        // (per grooming note in issue #62); follow-up only if real events trip on it.
+        $earliestReady = $this->photos->findFirstReadyTakenAt($event);
+        $latestReady   = $this->photos->findLastReadyTakenAt($event);
+        $firstAt       = ($earliestReady instanceof DateTimeImmutable && $earliestReady <= $timestamp)
+            ? $earliestReady
+            : null;
+        $lastAt        = ($latestReady instanceof DateTimeImmutable && $latestReady >= $timestamp)
+            ? $latestReady
+            : null;
+        $prevAt        = $this->photos->findPreviousReadyTakenAt($event, $timestamp);
+        $nextAt        = $this->photos->findNextReadyTakenAt($event, $timestamp);
+
         return $this->render('public/event/photos.html.twig', [
             'event'        => $event,
             'timestamp'    => $timestamp,
@@ -90,6 +111,10 @@ final class EventController extends AbstractController
             'windowAfter'  => Event::WINDOW_AFTER_MINUTES,
             'photos'       => $photos,
             'capHit'       => count($photos) === self::HARD_CAP,
+            'firstAt'      => $firstAt,
+            'lastAt'       => $lastAt,
+            'prevAt'       => $prevAt,
+            'nextAt'       => $nextAt,
         ]);
     }
 

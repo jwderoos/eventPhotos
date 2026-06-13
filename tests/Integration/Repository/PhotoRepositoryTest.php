@@ -126,4 +126,164 @@ final class PhotoRepositoryTest extends KernelTestCase
         $this->em->persist($photo);
         return $photo;
     }
+
+    public function testFindFirstReadyTakenAtReturnsNullWhenNoReadyPhotos(): void
+    {
+        $this->createPending();
+        $this->em->flush();
+
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $this->repo->findFirstReadyTakenAt($this->event));
+    }
+
+    public function testFindLastReadyTakenAtReturnsNullWhenNoReadyPhotos(): void
+    {
+        $this->createPending();
+        $this->em->flush();
+
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $this->repo->findLastReadyTakenAt($this->event));
+    }
+
+    public function testFindFirstReadyTakenAtReturnsEarliestReady(): void
+    {
+        $this->createReady('2026-06-10 12:30:00');
+        $this->createReady('2026-06-10 11:00:00');
+        $this->createReady('2026-06-10 13:45:00');
+        $this->em->flush();
+
+        $first = $this->repo->findFirstReadyTakenAt($this->event);
+
+        $this->assertInstanceOf(DateTimeImmutable::class, $first);
+        $this->assertSame('2026-06-10 11:00:00', $first->format('Y-m-d H:i:s'));
+    }
+
+    public function testFindLastReadyTakenAtReturnsLatestReady(): void
+    {
+        $this->createReady('2026-06-10 12:30:00');
+        $this->createReady('2026-06-10 11:00:00');
+        $this->createReady('2026-06-10 13:45:00');
+        $this->em->flush();
+
+        $last = $this->repo->findLastReadyTakenAt($this->event);
+
+        $this->assertInstanceOf(DateTimeImmutable::class, $last);
+        $this->assertSame('2026-06-10 13:45:00', $last->format('Y-m-d H:i:s'));
+    }
+
+    public function testFindFirstLastIgnorePendingAndFailedPhotos(): void
+    {
+        $this->createPending();                          // takenAt is null
+        $ready = $this->createReady('2026-06-10 12:00:00');
+        // Photo::markFailed refuses transition from Ready; failed photos
+        // can only originate from Pending, so we mark a pending photo failed.
+        $failed = $this->createPending();
+        $failed->markFailed('forced');
+
+        $this->em->flush();
+
+        $first = $this->repo->findFirstReadyTakenAt($this->event);
+        $last  = $this->repo->findLastReadyTakenAt($this->event);
+
+        $readyTakenAt = $ready->getTakenAt();
+        $this->assertInstanceOf(DateTimeImmutable::class, $first);
+        $this->assertInstanceOf(DateTimeImmutable::class, $last);
+        $this->assertInstanceOf(DateTimeImmutable::class, $readyTakenAt);
+        $this->assertSame($readyTakenAt->format('Y-m-d H:i:s'), $first->format('Y-m-d H:i:s'));
+        $this->assertSame($readyTakenAt->format('Y-m-d H:i:s'), $last->format('Y-m-d H:i:s'));
+    }
+
+    public function testFindPreviousReadyTakenAtReturnsNullWhenCursorAtOrBeforeEarliest(): void
+    {
+        $this->createReady('2026-06-10 12:00:00');
+        $this->createReady('2026-06-10 13:00:00');
+        $this->em->flush();
+
+        $tz = new DateTimeZone('UTC');
+
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $this->repo->findPreviousReadyTakenAt(
+            $this->event,
+            new DateTimeImmutable('2026-06-10 12:00:00', $tz),
+        ));
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $this->repo->findPreviousReadyTakenAt(
+            $this->event,
+            new DateTimeImmutable('2026-06-10 11:00:00', $tz),
+        ));
+    }
+
+    public function testFindPreviousReadyTakenAtReturnsStrictlyEarlierPhoto(): void
+    {
+        $this->createReady('2026-06-10 11:00:00');
+        $this->createReady('2026-06-10 12:00:00');
+        $this->createReady('2026-06-10 13:00:00');
+        $this->em->flush();
+
+        $previous = $this->repo->findPreviousReadyTakenAt(
+            $this->event,
+            new DateTimeImmutable('2026-06-10 12:30:00', new DateTimeZone('UTC')),
+        );
+
+        $this->assertInstanceOf(DateTimeImmutable::class, $previous);
+        $this->assertSame('2026-06-10 12:00:00', $previous->format('Y-m-d H:i:s'));
+    }
+
+    public function testFindNextReadyTakenAtReturnsNullWhenCursorAtOrAfterLatest(): void
+    {
+        $this->createReady('2026-06-10 12:00:00');
+        $this->createReady('2026-06-10 13:00:00');
+        $this->em->flush();
+
+        $tz = new DateTimeZone('UTC');
+
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $this->repo->findNextReadyTakenAt(
+            $this->event,
+            new DateTimeImmutable('2026-06-10 13:00:00', $tz),
+        ));
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $this->repo->findNextReadyTakenAt(
+            $this->event,
+            new DateTimeImmutable('2026-06-10 14:30:00', $tz),
+        ));
+    }
+
+    public function testFindNextReadyTakenAtReturnsStrictlyLaterPhoto(): void
+    {
+        $this->createReady('2026-06-10 11:00:00');
+        $this->createReady('2026-06-10 12:00:00');
+        $this->createReady('2026-06-10 13:00:00');
+        $this->em->flush();
+
+        $next = $this->repo->findNextReadyTakenAt(
+            $this->event,
+            new DateTimeImmutable('2026-06-10 11:30:00', new DateTimeZone('UTC')),
+        );
+
+        $this->assertInstanceOf(DateTimeImmutable::class, $next);
+        $this->assertSame('2026-06-10 12:00:00', $next->format('Y-m-d H:i:s'));
+    }
+
+    public function testFindPreviousNextSkipPending(): void
+    {
+        // Note: Photo::markFailed forbids Ready→Failed. Only Pending→Failed is legal,
+        // so a "Failed photo with a real takenAt" is not constructible. We exercise
+        // the status filter via a Pending photo (no takenAt) and confirm Previous/Next
+        // jump straight from earliest Ready to latest Ready across the gap.
+        $this->createReady('2026-06-10 11:00:00');
+        $this->createPending();
+        $this->createReady('2026-06-10 13:00:00');
+        $this->em->flush();
+
+        $tz = new DateTimeZone('UTC');
+
+        $next = $this->repo->findNextReadyTakenAt(
+            $this->event,
+            new DateTimeImmutable('2026-06-10 11:30:00', $tz),
+        );
+        $previous = $this->repo->findPreviousReadyTakenAt(
+            $this->event,
+            new DateTimeImmutable('2026-06-10 12:30:00', $tz),
+        );
+
+        $this->assertInstanceOf(DateTimeImmutable::class, $next);
+        $this->assertInstanceOf(DateTimeImmutable::class, $previous);
+        $this->assertSame('2026-06-10 13:00:00', $next->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-06-10 11:00:00', $previous->format('Y-m-d H:i:s'));
+    }
 }
