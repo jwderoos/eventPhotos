@@ -111,6 +111,45 @@ final class PhotoRepository extends ServiceEntityRepository
     }
 
     /**
+     * Lightbox cross-window navigation (#67). Returns the Ready photo
+     * adjacent to `$photo` in the event's takenAt timeline, with a stable
+     * tiebreaker on `id` so two photos at the same instant always order
+     * deterministically. Caller must ensure `$photo` is itself Ready.
+     *
+     * @param 'next'|'prev' $direction
+     */
+    public function findReadyNeighbor(Photo $photo, string $direction): ?Photo
+    {
+        $takenAt = $photo->getTakenAt();
+        if (!$takenAt instanceof DateTimeImmutable) {
+            return null;
+        }
+
+        $comparison = $direction === 'next' ? '>' : '<';
+        $sort       = $direction === 'next' ? 'ASC' : 'DESC';
+
+        /** @var Photo|null $result */
+        $result = $this->createQueryBuilder('p')
+            ->andWhere('p.event = :event')
+            ->andWhere('p.status = :status')
+            ->andWhere(sprintf(
+                '(p.takenAt %1$s :takenAt OR (p.takenAt = :takenAt AND p.id %1$s :id))',
+                $comparison,
+            ))
+            ->setParameter('event', $photo->getEvent())
+            ->setParameter('status', PhotoStatus::Ready)
+            ->setParameter('takenAt', $this->toUtc($takenAt))
+            ->setParameter('id', $photo->getId())
+            ->orderBy('p.takenAt', $sort)
+            ->addOrderBy('p.id', $sort)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result;
+    }
+
+    /**
      * Returns total stored bytes per event id (derivative bytes if recorded,
      * else original upload size). Events with no photos are absent from the
      * returned map.

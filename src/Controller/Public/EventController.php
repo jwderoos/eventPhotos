@@ -6,6 +6,8 @@ namespace App\Controller\Public;
 
 use App\Entity\Event;
 use App\Entity\EventDisplayState;
+use App\Entity\Photo;
+use App\Entity\PhotoStatus;
 use App\Repository\EventRepository;
 use App\Repository\PhotoRepository;
 use App\Service\Event\PhotosUrlBuilder;
@@ -18,6 +20,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -83,26 +86,25 @@ final class EventController extends AbstractController
         $end    = $timestamp->modify(sprintf('+%d minutes', Event::WINDOW_AFTER_MINUTES));
         $photos = $this->photos->findReadyInWindow($event, $start, $end);
 
-        // Cross-window navigation cursors (issue #62). All four are `?DateTimeImmutable`;
-        // `null` means "no Ready photo exists in that direction" → template renders disabled.
-        // First/Last are clamped to the cursor's side: nav-first only "rewinds" (disabled
-        // when the earliest Ready photo is *after* the cursor), nav-last only "fast-forwards"
-        // (disabled when the latest Ready photo is *before* the cursor). Without this clamp,
-        // nav-first would silently advance the cursor forward, which is the opposite of its
-        // affordance.
-        // Caveat: `?t=` is `HH:mm` only, so for multi-day events the firstAt/lastAt links
-        // may collapse back to the start day via `resolveTimestamp`. Acceptable for now
-        // (per grooming note in issue #62); follow-up only if real events trip on it.
+        // Cross-window navigation cursors (issues #62, #67). Anchored to the
+        // window *edges*, not the cursor: prev/next/first/last must jump to
+        // photos that are NOT already visible on the current page. If they
+        // anchored on $timestamp, the closest neighbor often falls inside the
+        // visible window and clicking the button slides the window by seconds
+        // — perceived as a no-op (#67).
+        // Caveat: `?t=` is `HH:mm` only, so for multi-day events the firstAt/lastAt
+        // links may collapse back to the start day via `resolveTimestamp`. Acceptable
+        // for now (per grooming note in #62); follow up only if real events trip on it.
         $earliestReady = $this->photos->findFirstReadyTakenAt($event);
         $latestReady   = $this->photos->findLastReadyTakenAt($event);
-        $firstAt       = ($earliestReady instanceof DateTimeImmutable && $earliestReady <= $timestamp)
+        $firstAt       = ($earliestReady instanceof DateTimeImmutable && $earliestReady < $start)
             ? $earliestReady
             : null;
-        $lastAt        = ($latestReady instanceof DateTimeImmutable && $latestReady >= $timestamp)
+        $lastAt        = ($latestReady instanceof DateTimeImmutable && $latestReady > $end)
             ? $latestReady
             : null;
-        $prevAt        = $this->photos->findPreviousReadyTakenAt($event, $timestamp);
-        $nextAt        = $this->photos->findNextReadyTakenAt($event, $timestamp);
+        $prevAt        = $this->photos->findPreviousReadyTakenAt($event, $start);
+        $nextAt        = $this->photos->findNextReadyTakenAt($event, $end);
 
         return $this->render('public/event/photos.html.twig', [
             'event'        => $event,
@@ -115,6 +117,41 @@ final class EventController extends AbstractController
             'lastAt'       => $lastAt,
             'prevAt'       => $prevAt,
             'nextAt'       => $nextAt,
+        ]);
+    }
+
+    #[Route(
+        '/e/{slug}/photos/{id}/neighbor',
+        name: 'public_event_photos_neighbor',
+        requirements: ['slug' => '[a-z0-9-]+', 'id' => '\d+'],
+        methods: ['GET'],
+    )]
+    public function photoNeighbor(string $slug, int $id, Request $request): Response
+    {
+        $event     = $this->resolve($slug);
+        $direction = $request->query->get('direction');
+        if ($direction !== 'next' && $direction !== 'prev') {
+            throw new BadRequestHttpException('direction must be "next" or "prev".');
+        }
+
+        $photo = $this->photos->find($id);
+        if (
+            !$photo instanceof Photo
+            || $photo->getEvent()->getId() !== $event->getId()
+            || $photo->getStatus() !== PhotoStatus::Ready
+        ) {
+            throw new NotFoundHttpException();
+        }
+
+        $neighbor = $this->photos->findReadyNeighbor($photo, $direction);
+        if (!$neighbor instanceof Photo) {
+            return new Response('', Response::HTTP_NO_CONTENT);
+        }
+
+        return new JsonResponse([
+            'id'         => $neighbor->getId(),
+            'previewUrl' => $this->generateUrl('photo_serve_preview', ['slug' => $slug, 'id' => $neighbor->getId()]),
+            'thumbUrl'   => $this->generateUrl('photo_serve_thumb', ['slug' => $slug, 'id' => $neighbor->getId()]),
         ]);
     }
 

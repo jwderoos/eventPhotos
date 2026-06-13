@@ -259,6 +259,57 @@ final class PhotoRepositoryTest extends KernelTestCase
         $this->assertSame('2026-06-10 12:00:00', $next->format('Y-m-d H:i:s'));
     }
 
+    public function testFindReadyNeighborNextReturnsImmediateLaterPhoto(): void
+    {
+        $earlier = $this->createReady('2026-06-10 11:00:00');
+        $middle  = $this->createReady('2026-06-10 12:00:00');
+        $later   = $this->createReady('2026-06-10 13:00:00');
+        $this->em->flush();
+
+        $this->assertSame($middle->getId(), $this->repo->findReadyNeighbor($earlier, 'next')?->getId());
+        $this->assertSame($later->getId(), $this->repo->findReadyNeighbor($middle, 'next')?->getId());
+        $this->assertNotInstanceOf(Photo::class, $this->repo->findReadyNeighbor($later, 'next'));
+    }
+
+    public function testFindReadyNeighborPrevReturnsImmediateEarlierPhoto(): void
+    {
+        $earlier = $this->createReady('2026-06-10 11:00:00');
+        $middle  = $this->createReady('2026-06-10 12:00:00');
+        $later   = $this->createReady('2026-06-10 13:00:00');
+        $this->em->flush();
+
+        $this->assertSame($middle->getId(), $this->repo->findReadyNeighbor($later, 'prev')?->getId());
+        $this->assertSame($earlier->getId(), $this->repo->findReadyNeighbor($middle, 'prev')?->getId());
+        $this->assertNotInstanceOf(Photo::class, $this->repo->findReadyNeighbor($earlier, 'prev'));
+    }
+
+    public function testFindReadyNeighborBreaksTiesOnId(): void
+    {
+        $first  = $this->createReady('2026-06-10 12:00:00');
+        $second = $this->createReady('2026-06-10 12:00:00');
+        $third  = $this->createReady('2026-06-10 12:00:00');
+        $this->em->flush();
+
+        $this->assertSame($second->getId(), $this->repo->findReadyNeighbor($first, 'next')?->getId());
+        $this->assertSame($third->getId(), $this->repo->findReadyNeighbor($second, 'next')?->getId());
+        $this->assertSame($second->getId(), $this->repo->findReadyNeighbor($third, 'prev')?->getId());
+        $this->assertSame($first->getId(), $this->repo->findReadyNeighbor($second, 'prev')?->getId());
+    }
+
+    public function testFindReadyNeighborSkipsPendingAndFailed(): void
+    {
+        $earlier = $this->createReady('2026-06-10 11:00:00');
+        $this->createPending();
+        $failed = $this->createPending();
+        $failed->markFailed('forced');
+
+        $later   = $this->createReady('2026-06-10 13:00:00');
+        $this->em->flush();
+
+        $this->assertSame($later->getId(), $this->repo->findReadyNeighbor($earlier, 'next')?->getId());
+        $this->assertSame($earlier->getId(), $this->repo->findReadyNeighbor($later, 'prev')?->getId());
+    }
+
     public function testFindPreviousNextSkipPending(): void
     {
         // Note: Photo::markFailed forbids Ready→Failed. Only Pending→Failed is legal,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Public;
 
+use Symfony\Component\HttpFoundation\Response;
 use App\Entity\Event;
 use App\Entity\Photo;
 use App\Entity\User;
@@ -239,7 +240,7 @@ final class EventPhotosGalleryTest extends WebTestCase
         }
     }
 
-    public function testNavSinglePhotoFirstAndLastShareHrefPrevNextDisabled(): void
+    public function testNavSinglePhotoInsideWindowAllDisabled(): void
     {
         $client = self::createClient();
         /** @var EntityManagerInterface $em */
@@ -267,26 +268,79 @@ final class EventPhotosGalleryTest extends WebTestCase
         $em->persist($only);
         $em->flush();
 
-        // Visit with ?t=12:15 — cursor sits exactly on the only photo.
+        // Visit with ?t=12:15 — the only photo is inside the current window
+        // [12:05, 12:20], so every nav direction would land on a page that
+        // already shows it. All four cursors must be disabled (#67).
         $crawler = $client->request(Request::METHOD_GET, '/e/nav-single/photos?t=12:15');
         $this->assertResponseIsSuccessful();
 
-        $first = $crawler->filter('[data-testid="nav-first"]');
-        $last  = $crawler->filter('[data-testid="nav-last"]');
-        $prev  = $crawler->filter('[data-testid="nav-prev"]');
-        $next  = $crawler->filter('[data-testid="nav-next"]');
+        foreach (['nav-first', 'nav-prev', 'nav-next', 'nav-last'] as $testId) {
+            $node = $crawler->filter(sprintf('[data-testid="%s"]', $testId));
+            $this->assertCount(1, $node);
+            $this->assertSame('true', $node->attr('aria-disabled'), sprintf('%s should be disabled', $testId));
+            $this->assertCount(0, $node->filter('a'), sprintf('%s must not be a clickable <a>', $testId));
+        }
+    }
 
-        // First & Last should each render an <a> pointing at ?t=12:15
-        $this->assertCount(1, $first->filter('a'));
-        $this->assertCount(1, $last->filter('a'));
-        $this->assertStringContainsString('t=12:15', $first->filter('a')->attr('href') ?? '');
-        $this->assertStringContainsString('t=12:15', $last->filter('a')->attr('href') ?? '');
+    /**
+     * Regression for #67. Prev/Next must jump to photos *outside* the current
+     * visible window, otherwise dense areas of the timeline produce buttons
+     * that visibly do nothing.
+     */
+    public function testNavSkipsPhotosAlreadyInsideTheVisibleWindow(): void
+    {
+        $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
 
-        // Previous & Next disabled (no photo strictly to either side)
-        $this->assertSame('true', $prev->attr('aria-disabled'));
-        $this->assertSame('true', $next->attr('aria-disabled'));
-        $this->assertCount(0, $prev->filter('a'));
-        $this->assertCount(0, $next->filter('a'));
+        $owner = new User('nav-skip@example.test', 'N');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+
+        $event = new Event(
+            'nav-skip',
+            'NavSkip',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
+        $event->setTimezone('UTC');
+
+        $em->persist($event);
+
+        $tz = new DateTimeZone('UTC');
+        $makePhoto = static function (string $hashChar, string $takenAt) use ($event, $em, $tz): void {
+            $photo = new Photo($event, str_repeat($hashChar, 64), $hashChar . '.jpg', 100);
+            $photo->markReady(new DateTimeImmutable($takenAt, $tz), 100, 100, 1024);
+
+            $em->persist($photo);
+        };
+
+        // Window for ?t=12:10 is [12:00, 12:15]. 12:00 and 12:12 are inside;
+        // 11:00 and 12:20 are outside — those are the valid prev/next targets.
+        $makePhoto('a', '2026-06-10 11:00:00'); // outside (before)
+        $makePhoto('b', '2026-06-10 12:00:00'); // inside (start boundary)
+        $makePhoto('c', '2026-06-10 12:12:00'); // inside
+        $makePhoto('d', '2026-06-10 12:20:00'); // outside (after)
+        $em->flush();
+
+        $crawler = $client->request(Request::METHOD_GET, '/e/nav-skip/photos?t=12:10');
+        $this->assertResponseIsSuccessful();
+
+        $prevHref = (string) $crawler->filter('[data-testid="nav-prev"] a')->attr('href');
+        $nextHref = (string) $crawler->filter('[data-testid="nav-next"] a')->attr('href');
+
+        $this->assertStringContainsString(
+            't=11:00',
+            $prevHref,
+            'Previous must skip over photos inside the current window',
+        );
+        $this->assertStringContainsString(
+            't=12:20',
+            $nextHref,
+            'Next must skip over photos inside the current window',
+        );
     }
 
     public function testNavCursorBeforeFirstPhoto(): void
@@ -437,6 +491,200 @@ final class EventPhotosGalleryTest extends WebTestCase
         $this->assertStringContainsString('t=12:00', $prevHref);
         $this->assertStringContainsString('t=13:00', $nextHref);
         $this->assertStringContainsString('t=13:00', $lastHref);
+    }
+
+    public function testPhotoNeighborEndpointReturnsNextAndPrev(): void
+    {
+        $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+
+        $owner = new User('neighbor@example.test', 'N');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+
+        $event = new Event(
+            'neighbor',
+            'Neighbor',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
+        $event->setTimezone('UTC');
+
+        $em->persist($event);
+
+        $tz = new DateTimeZone('UTC');
+        $earlier = new Photo($event, str_repeat('a', 64), 'a.jpg', 100);
+        $earlier->markReady(new DateTimeImmutable('2026-06-10 11:00:00', $tz), 100, 100, 1024);
+
+        $middle = new Photo($event, str_repeat('b', 64), 'b.jpg', 100);
+        $middle->markReady(new DateTimeImmutable('2026-06-10 12:00:00', $tz), 100, 100, 1024);
+
+        $later = new Photo($event, str_repeat('c', 64), 'c.jpg', 100);
+        $later->markReady(new DateTimeImmutable('2026-06-10 13:00:00', $tz), 100, 100, 1024);
+
+        $em->persist($earlier);
+        $em->persist($middle);
+        $em->persist($later);
+        $em->flush();
+
+        $client->request(
+            Request::METHOD_GET,
+            sprintf('/e/neighbor/photos/%d/neighbor?direction=next', $middle->getId()),
+        );
+        $this->assertResponseIsSuccessful();
+        $payload = json_decode((string) $client->getResponse()->getContent(), true);
+        $this->assertIsArray($payload);
+        $this->assertSame($later->getId(), $payload['id']);
+        $this->assertSame(
+            sprintf('/e/neighbor/p/%d/preview.jpg', $later->getId()),
+            $payload['previewUrl'],
+        );
+        $this->assertSame(
+            sprintf('/e/neighbor/p/%d/thumb.jpg', $later->getId()),
+            $payload['thumbUrl'],
+        );
+
+        $client->request(
+            Request::METHOD_GET,
+            sprintf('/e/neighbor/photos/%d/neighbor?direction=prev', $middle->getId()),
+        );
+        $this->assertResponseIsSuccessful();
+        $payload = json_decode((string) $client->getResponse()->getContent(), true);
+        $this->assertIsArray($payload);
+        $this->assertSame($earlier->getId(), $payload['id']);
+    }
+
+    public function testPhotoNeighborEndpointReturns204AtEndOfTimeline(): void
+    {
+        $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+
+        $owner = new User('nb-end@example.test', 'N');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+
+        $event = new Event(
+            'nb-end',
+            'NbEnd',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
+        $event->setTimezone('UTC');
+
+        $em->persist($event);
+
+        $only = new Photo($event, str_repeat('a', 64), 'a.jpg', 100);
+        $only->markReady(new DateTimeImmutable('2026-06-10 12:00:00', new DateTimeZone('UTC')), 100, 100, 1024);
+
+        $em->persist($only);
+        $em->flush();
+
+        foreach (['next', 'prev'] as $direction) {
+            $client->request(
+                Request::METHOD_GET,
+                sprintf('/e/nb-end/photos/%d/neighbor?direction=%s', $only->getId(), $direction),
+            );
+            $this->assertSame(
+                Response::HTTP_NO_CONTENT,
+                $client->getResponse()->getStatusCode(),
+                sprintf('Direction %s', $direction),
+            );
+            $this->assertSame('', (string) $client->getResponse()->getContent());
+        }
+    }
+
+    public function testPhotoNeighborEndpointRejectsCrossEventLookup(): void
+    {
+        $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+
+        $owner = new User('nb-cross@example.test', 'N');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+
+        $eventA = new Event(
+            'nb-cross-a',
+            'NbCrossA',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
+        $eventA->setTimezone('UTC');
+
+        $eventB = new Event(
+            'nb-cross-b',
+            'NbCrossB',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
+        $eventB->setTimezone('UTC');
+
+        $em->persist($eventA);
+        $em->persist($eventB);
+
+        $photoB = new Photo($eventB, str_repeat('a', 64), 'a.jpg', 100);
+        $photoB->markReady(new DateTimeImmutable('2026-06-10 12:00:00', new DateTimeZone('UTC')), 100, 100, 1024);
+
+        $em->persist($photoB);
+        $em->flush();
+
+        $client->request(
+            Request::METHOD_GET,
+            sprintf('/e/nb-cross-a/photos/%d/neighbor?direction=next', $photoB->getId()),
+        );
+        $this->assertSame(
+            Response::HTTP_NOT_FOUND,
+            $client->getResponse()->getStatusCode(),
+            (string) $client->getResponse()->getContent(),
+        );
+    }
+
+    public function testPhotoNeighborEndpointRejectsInvalidDirection(): void
+    {
+        $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+
+        $owner = new User('nb-bad@example.test', 'N');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+
+        $event = new Event(
+            'nb-bad',
+            'NbBad',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
+        $event->setTimezone('UTC');
+
+        $em->persist($event);
+
+        $photo = new Photo($event, str_repeat('a', 64), 'a.jpg', 100);
+        $photo->markReady(new DateTimeImmutable('2026-06-10 12:00:00', new DateTimeZone('UTC')), 100, 100, 1024);
+
+        $em->persist($photo);
+        $em->flush();
+
+        $client->request(
+            Request::METHOD_GET,
+            sprintf('/e/nb-bad/photos/%d/neighbor?direction=sideways', $photo->getId()),
+        );
+        $this->assertSame(
+            Response::HTTP_BAD_REQUEST,
+            $client->getResponse()->getStatusCode(),
+            (string) $client->getResponse()->getContent(),
+        );
     }
 
     /**

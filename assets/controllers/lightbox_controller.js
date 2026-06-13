@@ -17,6 +17,10 @@ export default class extends Controller {
         'counter',
     ];
 
+    static values = {
+        eventSlug: String,
+    };
+
     connect() {
         this.photos = this.triggerTargets.map((li) => ({
             id: li.dataset.photoId,
@@ -33,6 +37,11 @@ export default class extends Controller {
         this.spinnerTimer = null;
         this.swipe = null;
         this.didPushState = false;
+        // Per-photo memo: "no further Ready photo exists in this direction".
+        // Populated when the neighbor endpoint returns 204; lets us hide the
+        // arrow and short-circuit subsequent presses without refetching.
+        this.noNeighborFor = { next: new Set(), prev: new Set() };
+        this.neighborInFlight = new Map();
 
         this.onTriggerClick = this.onTriggerClick.bind(this);
         this.onKeyDown = this.onKeyDown.bind(this);
@@ -106,16 +115,73 @@ export default class extends Controller {
         }
     }
 
-    next() {
+    async next() {
         if (this.activeIndex === null) return;
-        if (this.activeIndex >= this.photos.length - 1) return;
-        this.goTo(this.activeIndex + 1);
+        if (this.activeIndex < this.photos.length - 1) {
+            this.goTo(this.activeIndex + 1);
+            return;
+        }
+        const neighbor = await this.fetchNeighborForActive('next');
+        if (!neighbor) {
+            this.updateArrows();
+            return;
+        }
+        this.photos.push(neighbor);
+        this.goTo(this.photos.length - 1);
     }
 
-    previous() {
+    async previous() {
         if (this.activeIndex === null) return;
-        if (this.activeIndex <= 0) return;
-        this.goTo(this.activeIndex - 1);
+        if (this.activeIndex > 0) {
+            this.goTo(this.activeIndex - 1);
+            return;
+        }
+        const neighbor = await this.fetchNeighborForActive('prev');
+        if (!neighbor) {
+            this.updateArrows();
+            return;
+        }
+        this.photos.unshift(neighbor);
+        this.activeIndex += 1;
+        this.goTo(0);
+    }
+
+    async fetchNeighborForActive(direction) {
+        const current = this.currentPhoto();
+        if (!current) return null;
+        if (this.noNeighborFor[direction].has(current.id)) return null;
+
+        const key = `${direction}:${current.id}`;
+        if (this.neighborInFlight.has(key)) {
+            return this.neighborInFlight.get(key);
+        }
+
+        const slug = this.hasEventSlugValue ? this.eventSlugValue : '';
+        if (!slug) return null;
+
+        const url = `/e/${encodeURIComponent(slug)}/photos/${encodeURIComponent(current.id)}/neighbor?direction=${direction}`;
+        const promise = fetch(url, { headers: { Accept: 'application/json' } })
+            .then(async (res) => {
+                if (res.status === 204) {
+                    this.noNeighborFor[direction].add(current.id);
+                    return null;
+                }
+                if (!res.ok) {
+                    return null;
+                }
+                const data = await res.json();
+                if (!data || typeof data.id === 'undefined' || typeof data.previewUrl !== 'string') {
+                    return null;
+                }
+                return { id: String(data.id), previewUrl: data.previewUrl, element: null };
+            })
+            .catch(() => null)
+            .finally(() => {
+                this.neighborInFlight.delete(key);
+            });
+
+        this.neighborInFlight.set(key, promise);
+        return promise;
     }
 
     close() {
@@ -315,13 +381,23 @@ export default class extends Controller {
 
     updateCounter() {
         if (!this.hasCounterTarget || this.activeIndex === null) return;
-        this.counterTarget.textContent = `${this.activeIndex + 1} / ${this.photos.length}`;
+        // Counter is unknown total now that the catalog grows lazily across
+        // window boundaries; show the current photo's position in the loaded
+        // list and a trailing ellipsis to signal "and possibly more".
+        const knownEnd = this.activeIndex === this.photos.length - 1
+            && this.noNeighborFor.next.has(this.currentPhoto()?.id);
+        const knownStart = this.activeIndex === 0
+            && this.noNeighborFor.prev.has(this.currentPhoto()?.id);
+        const totalLabel = (knownStart && knownEnd) ? String(this.photos.length) : `${this.photos.length}…`;
+        this.counterTarget.textContent = `${this.activeIndex + 1} / ${totalLabel}`;
     }
 
     updateArrows() {
         if (this.activeIndex === null) return;
-        const atStart = this.activeIndex === 0;
-        const atEnd = this.activeIndex === this.photos.length - 1;
+        const current = this.currentPhoto();
+        const atStart = this.activeIndex === 0 && (current ? this.noNeighborFor.prev.has(current.id) : true);
+        const atEnd = this.activeIndex === this.photos.length - 1
+            && (current ? this.noNeighborFor.next.has(current.id) : true);
         if (this.hasPrevButtonTarget) {
             this.prevButtonTarget.hidden = atStart;
         }
