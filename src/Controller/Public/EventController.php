@@ -49,12 +49,15 @@ final class EventController extends AbstractController
     {
         $event = $this->resolve($slug);
         $now   = $this->nowInEventTimezone($event);
+        $when  = $event->computeDisplayState($now) === EventDisplayState::Live
+            ? $now
+            : $this->startInEventTimezone($event);
 
         return $this->render('public/event/landing.html.twig', [
             'event'             => $event,
             'now'               => $now,
-            'photosUrl'         => $this->photosUrl->build($event, $now),
-            'photosUrlAbsolute' => $this->photosUrl->build($event, $now, absolute: true),
+            'photosUrl'         => $this->photosUrl->build($event, $when),
+            'photosUrlAbsolute' => $this->photosUrl->build($event, $when, absolute: true),
         ]);
     }
 
@@ -68,6 +71,13 @@ final class EventController extends AbstractController
         }
 
         $timestamp = $this->resolveTimestamp($request->query->get('t'), $event);
+
+        if (!$timestamp instanceof DateTimeImmutable) {
+            return $this->redirectToRoute('public_event_photos', [
+                'slug' => $event->getSlug(),
+                't'    => $this->startInEventTimezone($event)->format('H:i'),
+            ]);
+        }
 
         $start  = $timestamp->modify(sprintf('-%d minutes', Event::WINDOW_BEFORE_MINUTES));
         $end    = $timestamp->modify(sprintf('+%d minutes', Event::WINDOW_AFTER_MINUTES));
@@ -166,7 +176,13 @@ final class EventController extends AbstractController
         return $this->clock->now()->setTimezone(new DateTimeZone($event->getTimezone()));
     }
 
-    private function resolveTimestamp(mixed $raw, Event $event): DateTimeImmutable
+    /**
+     * Returns the in-window instant for $raw, or null when $raw is well-formed
+     * but composes to an instant outside [startsAt, endsAt] on either event day.
+     * Throws on missing/malformed input — only the outside-window case is a
+     * fallback signal; bad HH:mm is still a 400.
+     */
+    private function resolveTimestamp(mixed $raw, Event $event): ?DateTimeImmutable
     {
         if (!is_string($raw) || $raw === '') {
             return $this->nowInEventTimezone($event);
@@ -194,7 +210,12 @@ final class EventController extends AbstractController
             }
         }
 
-        throw new BadRequestHttpException('Time is outside the event window.');
+        return null;
+    }
+
+    private function startInEventTimezone(Event $event): DateTimeImmutable
+    {
+        return $event->getStartsAt()->setTimezone(new DateTimeZone($event->getTimezone()));
     }
 
     private function composeOnDay(string $day, string $time, DateTimeZone $tz): DateTimeImmutable
@@ -230,7 +251,7 @@ final class EventController extends AbstractController
         return match ($state) {
             EventDisplayState::Pre  => $this->photosUrl->build(
                 $event,
-                $event->getStartsAt()->setTimezone(new DateTimeZone($event->getTimezone())),
+                $this->startInEventTimezone($event),
                 absolute: true,
             ),
             EventDisplayState::Live => $this->photosUrl->build($event, $now, absolute: true),

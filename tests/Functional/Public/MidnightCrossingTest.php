@@ -56,13 +56,15 @@ final class MidnightCrossingTest extends WebTestCase
         $this->assertResponseIsSuccessful();
     }
 
-    public function testRejectsTimeOutsideBothDates(): void
+    public function testRedirectsTimeOutsideBothDatesToEventStart(): void
     {
         $client = self::createClient();
         $this->seedMidnightEvent();
 
-        // 10:00 maps to neither 22:00..23:59 on day 1 nor 00:00..02:00 on day 2.
+        // 10:00 maps to neither 22:00..23:59 on day 1 nor 00:00..02:00 on day 2;
+        // per issue #59 the route 302s to ?t={startsAt H:i} rather than rejecting.
         $client->request(Request::METHOD_GET, '/e/midnight/photos?t=10:00');
-        $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        $this->assertResponseStatusCodeSame(Response::HTTP_FOUND);
+        $this->assertResponseRedirects('/e/midnight/photos?t=22:00');
     }
 }
