@@ -47,6 +47,68 @@ final class PhotoRepository extends ServiceEntityRepository
         return $result;
     }
 
+    public function findFirstReadyTakenAt(Event $event): ?DateTimeImmutable
+    {
+        return $this->findReadyTakenAtOrdered($event, 'ASC');
+    }
+
+    public function findLastReadyTakenAt(Event $event): ?DateTimeImmutable
+    {
+        return $this->findReadyTakenAtOrdered($event, 'DESC');
+    }
+
+    /** @param 'ASC'|'DESC' $direction */
+    private function findReadyTakenAtOrdered(Event $event, string $direction): ?DateTimeImmutable
+    {
+        /** @var array{takenAt: ?DateTimeImmutable}|null $row */
+        $row = $this->createQueryBuilder('p')
+            ->select('p.takenAt')
+            ->andWhere('p.event = :event')
+            ->andWhere('p.status = :status')
+            ->setParameter('event', $event)
+            ->setParameter('status', PhotoStatus::Ready)
+            ->orderBy('p.takenAt', $direction)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $row['takenAt'] ?? null;
+    }
+
+    public function findPreviousReadyTakenAt(Event $event, DateTimeImmutable $cursor): ?DateTimeImmutable
+    {
+        return $this->findReadyTakenAtRelativeTo($event, $cursor, 'p.takenAt < :cursor', 'DESC');
+    }
+
+    public function findNextReadyTakenAt(Event $event, DateTimeImmutable $cursor): ?DateTimeImmutable
+    {
+        return $this->findReadyTakenAtRelativeTo($event, $cursor, 'p.takenAt > :cursor', 'ASC');
+    }
+
+    /** @param 'ASC'|'DESC' $direction */
+    private function findReadyTakenAtRelativeTo(
+        Event $event,
+        DateTimeImmutable $cursor,
+        string $predicate,
+        string $direction,
+    ): ?DateTimeImmutable {
+        /** @var array{takenAt: ?DateTimeImmutable}|null $row */
+        $row = $this->createQueryBuilder('p')
+            ->select('p.takenAt')
+            ->andWhere('p.event = :event')
+            ->andWhere('p.status = :status')
+            ->andWhere($predicate)
+            ->setParameter('event', $event)
+            ->setParameter('status', PhotoStatus::Ready)
+            ->setParameter('cursor', $cursor)
+            ->orderBy('p.takenAt', $direction)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $row['takenAt'] ?? null;
+    }
+
     /**
      * Returns total stored bytes per event id (derivative bytes if recorded,
      * else original upload size). Events with no photos are absent from the
