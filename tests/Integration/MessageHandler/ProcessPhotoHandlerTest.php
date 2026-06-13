@@ -114,6 +114,41 @@ final class ProcessPhotoHandlerTest extends KernelTestCase
         );
     }
 
+    public function testRejectsWhenExifTimestampOutsideEventWindow(): void
+    {
+        // The fixture's EXIF DateTimeOriginal is 2026-06-10 10:34:56 UTC; move the event
+        // two days later so the photo is unambiguously outside the ±30-minute grace.
+        $this->event->setStartsAt(new DateTimeImmutable('2026-06-12 10:00', new DateTimeZone('UTC')));
+        $this->event->setEndsAt(new DateTimeImmutable('2026-06-12 14:00', new DateTimeZone('UTC')));
+
+        $this->em->flush();
+
+        $photo = $this->seedPending('with-datetime-original.jpg', 'dd');
+
+        ($this->handler)(new ProcessPhoto($photo->getId() ?? 0));
+        $this->em->refresh($photo);
+
+        $this->assertSame(PhotoStatus::Failed, $photo->getStatus());
+        $this->assertNotNull($photo->getProcessingError());
+        $this->assertStringContainsString('outside the event window', $photo->getProcessingError());
+        $this->assertStringContainsString('2026-06-10 10:34:56', $photo->getProcessingError());
+        $this->assertStringContainsString('2026-06-12 10:00', $photo->getProcessingError());
+
+        $path = sprintf('event-%d/%d.jpg', $this->event->getId(), $photo->getId());
+        $this->assertFalse(
+            $this->originals->fileExists($path),
+            'Original should be deleted after window-rejection.',
+        );
+        $this->assertFalse(
+            $this->thumbs->fileExists($path),
+            'Thumb should not be generated when window-rejection happens before derivatives.',
+        );
+        $this->assertFalse(
+            $this->previews->fileExists($path),
+            'Preview should not be generated when window-rejection happens before derivatives.',
+        );
+    }
+
     public function testIdempotentWhenAlreadyReady(): void
     {
         $photo = $this->seedPending('with-datetime-original.jpg', 'cc');

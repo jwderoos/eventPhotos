@@ -10,6 +10,7 @@ use App\Message\ProcessPhoto;
 use App\Repository\PhotoRepository;
 use App\Service\Photo\DerivativeGenerator;
 use App\Service\Photo\ExifReader;
+use App\Service\Photo\IngestWindowGuard;
 use App\Service\Photo\PhotoRejected;
 use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
@@ -26,6 +27,7 @@ final readonly class ProcessPhotoHandler
         private PhotoRepository $photos,
         private EntityManagerInterface $em,
         private ExifReader $exifReader,
+        private IngestWindowGuard $windowGuard,
         private DerivativeGenerator $derivatives,
         #[Autowire(service: 'photo_originals_storage')]
         private FilesystemOperator $originals,
@@ -57,6 +59,8 @@ final readonly class ProcessPhotoHandler
             } finally {
                 @unlink($tmpFile);
             }
+
+            $this->windowGuard->assertWithinWindow($event, $takenAt);
 
             [$width, $height, $derivativeBytes] = $this->derivatives->generate($path);
             $photo->markReady($takenAt, $width, $height, $derivativeBytes);
