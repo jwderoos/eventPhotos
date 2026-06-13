@@ -8,6 +8,7 @@ use App\Entity\Event;
 use App\Entity\Photo;
 use App\Entity\PhotoStatus;
 use DateTimeImmutable;
+use DateTimeZone;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -37,8 +38,8 @@ final class PhotoRepository extends ServiceEntityRepository
             ->andWhere('p.takenAt BETWEEN :start AND :end')
             ->setParameter('event', $event)
             ->setParameter('status', PhotoStatus::Ready)
-            ->setParameter('start', $start)
-            ->setParameter('end', $end)
+            ->setParameter('start', $this->toUtc($start))
+            ->setParameter('end', $this->toUtc($end))
             ->orderBy('p.takenAt', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
@@ -100,7 +101,7 @@ final class PhotoRepository extends ServiceEntityRepository
             ->andWhere($predicate)
             ->setParameter('event', $event)
             ->setParameter('status', PhotoStatus::Ready)
-            ->setParameter('cursor', $cursor)
+            ->setParameter('cursor', $this->toUtc($cursor))
             ->orderBy('p.takenAt', $direction)
             ->setMaxResults(1)
             ->getQuery()
@@ -180,5 +181,17 @@ final class PhotoRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
 
         return ['photos' => $photos, 'total' => $total];
+    }
+
+    /**
+     * `Photo::$takenAt` is stored as a tz-less `timestamp` whose wall-clock is
+     * UTC (ExifReader normalises to UTC before persist). Doctrine binds the
+     * wall-clock of whatever tz the bound `DateTimeImmutable` carries, so a
+     * cursor in the event tz would shift the comparison by the event offset.
+     * Re-anchor to UTC at the boundary.
+     */
+    private function toUtc(DateTimeImmutable $value): DateTimeImmutable
+    {
+        return $value->setTimezone(new DateTimeZone('UTC'));
     }
 }

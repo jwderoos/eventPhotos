@@ -438,4 +438,68 @@ final class EventPhotosGalleryTest extends WebTestCase
         $this->assertStringContainsString('t=13:00', $nextHref);
         $this->assertStringContainsString('t=13:00', $lastHref);
     }
+
+    /**
+     * Regression — Photo::$takenAt is stored as tz-less wall-clock UTC. When the
+     * event tz has a non-zero offset, clicking nav-first or typing ?t= in event
+     * tz used to bind the wrong wall-clock to the BETWEEN query and the photo
+     * would not appear. PhotoRepository now re-anchors all DateTimeImmutable
+     * params to UTC at the boundary.
+     */
+    public function testNavRoundTripFindsPhotoInNonUtcEventTimezone(): void
+    {
+        $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+
+        $owner = new User('nav-tz@example.test', 'N');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+
+        // Event in Europe/Amsterdam (CEST = +02:00 on 2026-06-10).
+        $event = new Event(
+            'nav-tz',
+            'NavTz',
+            new DateTimeImmutable('2026-06-10 10:00:00', new DateTimeZone('Europe/Amsterdam')),
+            new DateTimeImmutable('2026-06-10 18:00:00', new DateTimeZone('Europe/Amsterdam')),
+            $owner,
+        );
+        $event->setTimezone('Europe/Amsterdam');
+
+        $em->persist($event);
+
+        // Photo's `takenAt` matches what ExifReader produces: a UTC-tagged
+        // instant whose Amsterdam wall-clock is 14:00 (so UTC wall-clock 12:00).
+        $photo = new Photo($event, str_repeat('a', 64), 'a.jpg', 100);
+        $photo->markReady(
+            new DateTimeImmutable('2026-06-10 14:00:00', new DateTimeZone('Europe/Amsterdam'))
+                ->setTimezone(new DateTimeZone('UTC')),
+            100,
+            100,
+            1024,
+        );
+        $em->persist($photo);
+        $em->flush();
+
+        // Land at 15:00 (one hour after the photo) — cursor is after the
+        // photo, so nav-first should be enabled and link to 14:00.
+        $crawler = $client->request(Request::METHOD_GET, '/e/nav-tz/photos?t=15:00');
+        $this->assertResponseIsSuccessful();
+
+        $firstHref = (string) $crawler->filter('[data-testid="nav-first"] a')->attr('href');
+        $this->assertStringContainsString('t=14:00', $firstHref);
+
+        // Following the link must show the photo (this was broken before the
+        // UTC normalisation fix — the BETWEEN window was bound in Amsterdam
+        // wall-clock and missed the UTC wall-clock stored on the row).
+        $client->request(Request::METHOD_GET, $firstHref);
+        $this->assertResponseIsSuccessful();
+        $body = (string) $client->getResponse()->getContent();
+        $this->assertStringContainsString(
+            sprintf('/p/%d/thumb.jpg', $photo->getId()),
+            $body,
+            'Photo should be visible after navigating via [« First] in a non-UTC event',
+        );
+    }
 }
