@@ -21,7 +21,9 @@ use Vich\UploaderBundle\Mapping\Attribute as Vich;
 #[Vich\Uploadable]
 class Event implements Stringable
 {
-    public const int DEFAULT_WINDOW_MINUTES = 30;
+    public const int WINDOW_BEFORE_MINUTES = 10;
+
+    public const int WINDOW_AFTER_MINUTES = 5;
 
     public const int MAX_WINDOW_MINUTES = 1440;
 
@@ -32,9 +34,6 @@ class Event implements Stringable
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
-
-    #[ORM\Column(type: Types::INTEGER, nullable: true)]
-    private ?int $defaultWindowMinutes = null;
 
     #[ORM\Column(type: Types::STRING, length: 64)]
     #[Assert\Timezone]
@@ -134,16 +133,6 @@ class Event implements Stringable
         $this->endsAt = $endsAt->setTimezone(new DateTimeZone('UTC'));
     }
 
-    public function getDefaultWindowMinutes(): ?int
-    {
-        return $this->defaultWindowMinutes;
-    }
-
-    public function setDefaultWindowMinutes(?int $minutes): void
-    {
-        $this->defaultWindowMinutes = $minutes;
-    }
-
     public function getTimezone(): string
     {
         return $this->timezone;
@@ -172,11 +161,6 @@ class Event implements Stringable
     public function setCollection(?EventCollection $collection): void
     {
         $this->collection = $collection;
-    }
-
-    public function resolveWindowMinutes(): int
-    {
-        return $this->defaultWindowMinutes ?? self::DEFAULT_WINDOW_MINUTES;
     }
 
     public function computeDisplayState(DateTimeImmutable $now): EventDisplayState

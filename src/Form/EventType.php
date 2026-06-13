@@ -16,7 +16,6 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
-use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -74,10 +73,6 @@ final class EventType extends AbstractType
                     'data-action'     => 'blur->time-input#format change->time-input#format',
                 ],
                 'constraints' => [new Assert\Regex(self::TIME_PATTERN, 'Expected HH:mm.')],
-            ])
-            ->add('defaultWindowMinutes', IntegerType::class, [
-                'required' => false,
-                'help'     => sprintf('Minutes around "now". Empty → default %d.', Event::DEFAULT_WINDOW_MINUTES),
             ])
             ->add('timezone', ChoiceType::class, [
                 'choices' => array_combine($timezones, $timezones),

@@ -23,7 +23,7 @@
             <p class="text-sm text-base-content/70">
                 Showing
                 <time data-testid="timestamp" datetime="{{ timestamp|date('c') }}">{{ timestamp|date('H:i', event.timezone) }}</time>
-                · Window: ±<span data-testid="window">{{ window }}</span> minutes
+                · Window: <span data-testid="window">−{{ windowBefore }} / +{{ windowAfter }}</span> min
                 · {{ photos|length }} photo{{ photos|length == 1 ? '' : 's' }}
             </p>
         </header>

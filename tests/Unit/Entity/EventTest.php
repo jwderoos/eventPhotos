@@ -33,39 +33,14 @@ final class EventTest extends TestCase
         $this->assertSame('UTC', $event->getEndsAt()->getTimezone()->getName());
         $this->assertSame($owner, $event->getOwner());
         $this->assertNotInstanceOf(EventCollection::class, $event->getCollection());
-        $this->assertNull($event->getDefaultWindowMinutes());
     }
 
-    public function testResolvedWindowMinutesFallsBackToEntityDefault(): void
+    public function testPhotoMatchWindowConstantsAreAsymmetric(): void
     {
-        $event = new Event(
-            'e',
-            'E',
-            new DateTimeImmutable('2026-07-15 10:00'),
-            new DateTimeImmutable('2026-07-15 14:00'),
-            new User('o@x', 'Owner'),
-        );
-
-        $this->assertSame(Event::DEFAULT_WINDOW_MINUTES, $event->resolveWindowMinutes());
-    }
-
-    public function testResolvedWindowMinutesPrefersEventOverride(): void
-    {
-        $event = new Event(
-            'e',
-            'E',
-            new DateTimeImmutable('2026-07-15 10:00'),
-            new DateTimeImmutable('2026-07-15 14:00'),
-            new User('o@x', 'Owner'),
-        );
-        $event->setDefaultWindowMinutes(15);
-
-        $this->assertSame(15, $event->resolveWindowMinutes());
-    }
-
-    public function testDefaultWindowMinutesConstantIsPositive(): void
-    {
-        $this->assertGreaterThan(0, Event::DEFAULT_WINDOW_MINUTES);
+        // The "before" window must be larger than the "after" window: guests scan
+        // the QR after the photo was taken, so the photo sits in the past.
+        $this->assertGreaterThan(Event::WINDOW_AFTER_MINUTES, Event::WINDOW_BEFORE_MINUTES);
+        $this->assertGreaterThan(0, Event::WINDOW_AFTER_MINUTES);
     }
 
     public function testTimezoneDefaultsToEuropeAmsterdam(): void

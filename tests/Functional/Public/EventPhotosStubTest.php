@@ -39,7 +39,7 @@ final class EventPhotosStubTest extends WebTestCase
         $this->assertSelectorTextContains('[data-testid="timestamp"]', '18:30');
         $this->assertSelectorTextContains(
             '[data-testid="window"]',
-            (string) Event::DEFAULT_WINDOW_MINUTES,
+            sprintf('−%d / +%d', Event::WINDOW_BEFORE_MINUTES, Event::WINDOW_AFTER_MINUTES),
         );
     }
 
@@ -67,7 +67,7 @@ final class EventPhotosStubTest extends WebTestCase
         $this->assertResponseIsSuccessful();
         $this->assertSelectorTextContains(
             '[data-testid="window"]',
-            (string) Event::DEFAULT_WINDOW_MINUTES,
+            sprintf('−%d / +%d', Event::WINDOW_BEFORE_MINUTES, Event::WINDOW_AFTER_MINUTES),
         );
     }
 

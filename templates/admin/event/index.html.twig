@@ -25,7 +25,6 @@
                         <th>Slug</th>
                         <th>Name</th>
                         <th>Date</th>
-                        <th>Window</th>
                         <th>Storage</th>
                         <th>Owner</th>
                         <th class="text-right">Actions</th>
@@ -37,7 +36,6 @@
                             <td><code class="text-xs">{{ event.slug }}</code></td>
                             <td class="font-medium">{{ event.name }}</td>
                             <td>{{ event|event_date_in_tz }}</td>
-                            <td>{{ event.resolveWindowMinutes }} min</td>
                             <td class="tabular-nums">{{ (storageByEvent[event.id] ?? 0)|format_bytes }}</td>
                             <td class="text-sm text-base-content/70">{{ event.owner.email }}</td>
                             <td class="text-right">

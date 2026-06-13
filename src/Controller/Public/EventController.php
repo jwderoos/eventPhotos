@@ -53,7 +53,6 @@ final class EventController extends AbstractController
         return $this->render('public/event/landing.html.twig', [
             'event'             => $event,
             'now'               => $now,
-            'windowMinutes'     => $event->resolveWindowMinutes(),
             'photosUrl'         => $this->photosUrl->build($event, $now),
             'photosUrlAbsolute' => $this->photosUrl->build($event, $now, absolute: true),
         ]);
@@ -69,18 +68,18 @@ final class EventController extends AbstractController
         }
 
         $timestamp = $this->resolveTimestamp($request->query->get('t'), $event);
-        $window    = $event->resolveWindowMinutes();
 
-        $start  = $timestamp->modify(sprintf('-%d minutes', $window));
-        $end    = $timestamp->modify(sprintf('+%d minutes', $window));
+        $start  = $timestamp->modify(sprintf('-%d minutes', Event::WINDOW_BEFORE_MINUTES));
+        $end    = $timestamp->modify(sprintf('+%d minutes', Event::WINDOW_AFTER_MINUTES));
         $photos = $this->photos->findReadyInWindow($event, $start, $end);
 
         return $this->render('public/event/photos.html.twig', [
-            'event'     => $event,
-            'timestamp' => $timestamp,
-            'window'    => $window,
-            'photos'    => $photos,
-            'capHit'    => count($photos) === self::HARD_CAP,
+            'event'        => $event,
+            'timestamp'    => $timestamp,
+            'windowBefore' => Event::WINDOW_BEFORE_MINUTES,
+            'windowAfter'  => Event::WINDOW_AFTER_MINUTES,
+            'photos'       => $photos,
+            'capHit'       => count($photos) === self::HARD_CAP,
         ]);
     }
 

@@ -14,8 +14,6 @@
             <p class="text-sm text-base-content/70">
                 Current time:
                 <time datetime="{{ now|date('c') }}">{{ now|date('H:i', event.timezone) }}</time>
-                <br>
-                Window: ±{{ windowMinutes }} minutes
             </p>
 
             <div class="card-actions justify-end">
