@@ -23,6 +23,11 @@ security:
                 default_target_path: /admin
             logout:
                 path: app_logout
+                # POST-only logout (route is methods=POST) with CSRF — prevents accidental sign-out
+                # from link prefetchers (Turbo Drive hover-prefetch, link scanners, <img src> XSS).
+                enable_csrf: true
+                csrf_parameter: _token
+                csrf_token_id: logout
 
     role_hierarchy:
         ROLE_ADMIN: [ROLE_ORGANIZER, ROLE_USER]

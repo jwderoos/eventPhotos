@@ -9,6 +9,9 @@
         You're signed in as <strong>{{ app.user.email }}</strong>.
         Sign out first if you want to redeem this invite for a new account.
     </p>
-    <a href="{{ path('app_logout') }}" class="btn btn-outline">Sign out</a>
+    <form method="post" action="{{ path('app_logout') }}" class="inline">
+        <input type="hidden" name="_token" value="{{ csrf_token('logout') }}">
+        <button type="submit" class="btn btn-outline">Sign out</button>
+    </form>
 </div>
 {% endblock %}
