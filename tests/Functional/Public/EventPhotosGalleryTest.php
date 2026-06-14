@@ -164,7 +164,11 @@ final class EventPhotosGalleryTest extends WebTestCase
         $this->assertSame((string)$photo->getId(), $trigger->attr('data-photo-id'));
         $this->assertSame(sprintf('/e/lb/p/%d/preview.jpg', $photo->getId()), $trigger->attr('data-preview-url'));
         $this->assertSame('1', $trigger->attr('data-photo-rank'), 'Tile must carry its absolute event-timeline rank');
-        $this->assertSame('1', $controllerNode->attr('data-lightbox-total-ready-value'), 'Controller must expose the event-wide Ready total');
+        $this->assertSame(
+            '1',
+            $controllerNode->attr('data-lightbox-total-ready-value'),
+            'Controller must expose the event-wide Ready total'
+        );
 
         $anchor = $trigger->filter('a');
         $this->assertSame(
