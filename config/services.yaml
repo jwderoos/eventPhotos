@@ -25,6 +25,15 @@ services:
     App\Service\Auth\GoogleOAuthClient:
         alias: App\Service\Auth\RealGoogleOAuthClient
 
+    App\Session\PdoSessionHandlerFactory:
+        arguments:
+            $connection: '@doctrine.dbal.default_connection'
+
+    session.handler.pdo:
+        class: Symfony\Component\HttpFoundation\Session\Storage\Handler\PdoSessionHandler
+        factory: ['@App\Session\PdoSessionHandlerFactory', 'create']
+        public: true
+
 when@test:
     services:
         _defaults:
