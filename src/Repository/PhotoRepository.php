@@ -48,6 +48,43 @@ final class PhotoRepository extends ServiceEntityRepository
         return $result;
     }
 
+    public function countReady(Event $event): int
+    {
+        return (int) $this->createQueryBuilder('p')
+            ->select('COUNT(p.id)')
+            ->andWhere('p.event = :event')
+            ->andWhere('p.status = :status')
+            ->setParameter('event', $event)
+            ->setParameter('status', PhotoStatus::Ready)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * Count of Ready photos in the event ordered strictly before `$photo` in
+     * the canonical `(takenAt ASC, id ASC)` timeline. Caller derives the
+     * photo's 1-based rank by adding 1.
+     */
+    public function countReadyBefore(Photo $photo): int
+    {
+        $takenAt = $photo->getTakenAt();
+        if (!$takenAt instanceof DateTimeImmutable) {
+            return 0;
+        }
+
+        return (int) $this->createQueryBuilder('p')
+            ->select('COUNT(p.id)')
+            ->andWhere('p.event = :event')
+            ->andWhere('p.status = :status')
+            ->andWhere('(p.takenAt < :takenAt OR (p.takenAt = :takenAt AND p.id < :id))')
+            ->setParameter('event', $photo->getEvent())
+            ->setParameter('status', PhotoStatus::Ready)
+            ->setParameter('takenAt', $this->toUtc($takenAt))
+            ->setParameter('id', $photo->getId())
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function findFirstReadyTakenAt(Event $event): ?DateTimeImmutable
     {
         return $this->findReadyTakenAtOrdered($event, 'ASC');

@@ -310,6 +310,31 @@ final class PhotoRepositoryTest extends KernelTestCase
         $this->assertSame($earlier->getId(), $this->repo->findReadyNeighbor($later, 'prev')?->getId());
     }
 
+    public function testCountReadyExcludesNonReady(): void
+    {
+        $this->createReady('2026-06-10 12:00:00');
+        $this->createReady('2026-06-10 12:05:00');
+        $this->createPending();
+        $this->em->flush();
+
+        $this->assertSame(2, $this->repo->countReady($this->event));
+    }
+
+    public function testCountReadyBeforeReturnsRankMinusOneAndBreaksTiesOnId(): void
+    {
+        $first  = $this->createReady('2026-06-10 11:00:00');
+        $tieA   = $this->createReady('2026-06-10 12:00:00');
+        $tieB   = $this->createReady('2026-06-10 12:00:00');
+        $last   = $this->createReady('2026-06-10 13:00:00');
+        $this->createPending();
+        $this->em->flush();
+
+        $this->assertSame(0, $this->repo->countReadyBefore($first));
+        $this->assertSame(1, $this->repo->countReadyBefore($tieA));
+        $this->assertSame(2, $this->repo->countReadyBefore($tieB));
+        $this->assertSame(3, $this->repo->countReadyBefore($last));
+    }
+
     public function testFindPreviousNextSkipPending(): void
     {
         // Note: Photo::markFailed forbids Ready→Failed. Only Pending→Failed is legal,

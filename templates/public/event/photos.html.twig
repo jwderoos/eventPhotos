@@ -61,7 +61,7 @@
                 Showing
                 <time data-testid="timestamp" datetime="{{ timestamp|date('c') }}">{{ timestamp|date('H:i', event.timezone) }}</time>
                 · Window: <span data-testid="window">−{{ windowBefore }} / +{{ windowAfter }}</span> min
-                · {{ photos|length }} photo{{ photos|length == 1 ? '' : 's' }}
+                · <span data-testid="photo-count">{{ photos|length }} of {{ totalReady }}</span> photo{{ totalReady == 1 ? '' : 's' }}
             </p>
         </header>
 
@@ -71,12 +71,14 @@
             </div>
         {% else %}
             <div data-controller="lightbox"
-                 data-lightbox-event-slug-value="{{ event.slug }}">
+                 data-lightbox-event-slug-value="{{ event.slug }}"
+                 data-lightbox-total-ready-value="{{ totalReady }}">
                 <ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                     {% for photo in photos %}
                         {% set previewUrl = path('photo_serve_preview', {slug: event.slug, id: photo.id}) %}
                         <li data-lightbox-target="trigger"
                             data-photo-id="{{ photo.id }}"
+                            data-photo-rank="{{ firstRank + loop.index0 }}"
                             data-preview-url="{{ previewUrl }}">
                             <a href="{{ previewUrl }}" rel="noopener">
                                 <img src="{{ path('photo_serve_thumb', {slug: event.slug, id: photo.id}) }}"

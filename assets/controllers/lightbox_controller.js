@@ -19,12 +19,14 @@ export default class extends Controller {
 
     static values = {
         eventSlug: String,
+        totalReady: Number,
     };
 
     connect() {
         this.photos = this.triggerTargets.map((li) => ({
             id: li.dataset.photoId,
             previewUrl: li.dataset.previewUrl,
+            rank: Number(li.dataset.photoRank),
             element: li,
         }));
 
@@ -126,6 +128,7 @@ export default class extends Controller {
             this.updateArrows();
             return;
         }
+        neighbor.rank = this.photos[this.photos.length - 1].rank + 1;
         this.photos.push(neighbor);
         this.goTo(this.photos.length - 1);
     }
@@ -141,6 +144,7 @@ export default class extends Controller {
             this.updateArrows();
             return;
         }
+        neighbor.rank = this.photos[0].rank - 1;
         this.photos.unshift(neighbor);
         this.activeIndex += 1;
         this.goTo(0);
@@ -381,15 +385,9 @@ export default class extends Controller {
 
     updateCounter() {
         if (!this.hasCounterTarget || this.activeIndex === null) return;
-        // Counter is unknown total now that the catalog grows lazily across
-        // window boundaries; show the current photo's position in the loaded
-        // list and a trailing ellipsis to signal "and possibly more".
-        const knownEnd = this.activeIndex === this.photos.length - 1
-            && this.noNeighborFor.next.has(this.currentPhoto()?.id);
-        const knownStart = this.activeIndex === 0
-            && this.noNeighborFor.prev.has(this.currentPhoto()?.id);
-        const totalLabel = (knownStart && knownEnd) ? String(this.photos.length) : `${this.photos.length}…`;
-        this.counterTarget.textContent = `${this.activeIndex + 1} / ${totalLabel}`;
+        const photo = this.currentPhoto();
+        if (!photo) return;
+        this.counterTarget.textContent = `${photo.rank} / ${this.totalReadyValue}`;
     }
 
     updateArrows() {

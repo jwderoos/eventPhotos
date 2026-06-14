@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Public;
 
-use Symfony\Component\HttpFoundation\Response;
 use App\Entity\Event;
 use App\Entity\Photo;
 use App\Entity\User;
@@ -13,6 +12,7 @@ use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 final class EventPhotosGalleryTest extends WebTestCase
 {
@@ -53,9 +53,14 @@ final class EventPhotosGalleryTest extends WebTestCase
         $client->request(Request::METHOD_GET, '/e/gallery/photos?t=12:00');
 
         $this->assertResponseIsSuccessful();
-        $content = (string) $client->getResponse()->getContent();
+        $content = (string)$client->getResponse()->getContent();
         $this->assertStringContainsString(sprintf('/p/%d/thumb.jpg', $inside->getId()), $content);
         $this->assertStringNotContainsString(sprintf('/p/%d/thumb.jpg', $outside->getId()), $content);
+        $this->assertStringContainsString(
+            '<span data-testid="photo-count">1 of 2</span>',
+            $content,
+            'Summary line must show window count + event-wide total',
+        );
     }
 
     public function testAsymmetricWindowIncludesTenMinutesBeforeAndFiveAfter(): void
@@ -91,16 +96,16 @@ final class EventPhotosGalleryTest extends WebTestCase
             return $photo;
         };
 
-        $tooEarly  = $makePhoto('a', '2026-06-10 11:49:59'); // 10:01 before 12:00 → excluded
+        $tooEarly = $makePhoto('a', '2026-06-10 11:49:59'); // 10:01 before 12:00 → excluded
         $lowerEdge = $makePhoto('b', '2026-06-10 11:50:00'); // exactly t - 10  → included
-        $inside    = $makePhoto('c', '2026-06-10 12:00:00');
+        $inside = $makePhoto('c', '2026-06-10 12:00:00');
         $upperEdge = $makePhoto('d', '2026-06-10 12:05:00'); // exactly t + 5   → included
-        $tooLate   = $makePhoto('e', '2026-06-10 12:05:01'); // 5:01 after      → excluded
+        $tooLate = $makePhoto('e', '2026-06-10 12:05:01'); // 5:01 after      → excluded
         $em->flush();
 
         $client->request(Request::METHOD_GET, '/e/asym/photos?t=12:00');
         $this->assertResponseIsSuccessful();
-        $content = (string) $client->getResponse()->getContent();
+        $content = (string)$client->getResponse()->getContent();
 
         foreach ([$lowerEdge, $inside, $upperEdge] as $included) {
             $this->assertStringContainsString(
@@ -156,8 +161,10 @@ final class EventPhotosGalleryTest extends WebTestCase
 
         $trigger = $crawler->filter('li[data-lightbox-target="trigger"]');
         $this->assertCount(1, $trigger, 'Each photo tile must declare itself as a lightbox trigger');
-        $this->assertSame((string) $photo->getId(), $trigger->attr('data-photo-id'));
+        $this->assertSame((string)$photo->getId(), $trigger->attr('data-photo-id'));
         $this->assertSame(sprintf('/e/lb/p/%d/preview.jpg', $photo->getId()), $trigger->attr('data-preview-url'));
+        $this->assertSame('1', $trigger->attr('data-photo-rank'), 'Tile must carry its absolute event-timeline rank');
+        $this->assertSame('1', $controllerNode->attr('data-lightbox-total-ready-value'), 'Controller must expose the event-wide Ready total');
 
         $anchor = $trigger->filter('a');
         $this->assertSame(
@@ -202,7 +209,7 @@ final class EventPhotosGalleryTest extends WebTestCase
         $this->assertResponseIsSuccessful();
         $this->assertStringNotContainsString(
             sprintf('/p/%d/thumb.jpg', $pending->getId()),
-            (string) $client->getResponse()->getContent(),
+            (string)$client->getResponse()->getContent(),
         );
     }
 
@@ -263,7 +270,12 @@ final class EventPhotosGalleryTest extends WebTestCase
         $em->persist($event);
 
         $only = new Photo($event, str_repeat('a', 64), 'a.jpg', 100);
-        $only->markReady(new DateTimeImmutable('2026-06-10 12:15:00', new DateTimeZone('UTC')), 100, 100, 1024);
+        $only->markReady(
+            new DateTimeImmutable('2026-06-10 12:15:00', new DateTimeZone('UTC')),
+            100,
+            100,
+            1024
+        );
 
         $em->persist($only);
         $em->flush();
@@ -328,8 +340,8 @@ final class EventPhotosGalleryTest extends WebTestCase
         $crawler = $client->request(Request::METHOD_GET, '/e/nav-skip/photos?t=12:10');
         $this->assertResponseIsSuccessful();
 
-        $prevHref = (string) $crawler->filter('[data-testid="nav-prev"] a')->attr('href');
-        $nextHref = (string) $crawler->filter('[data-testid="nav-next"] a')->attr('href');
+        $prevHref = (string)$crawler->filter('[data-testid="nav-prev"] a')->attr('href');
+        $nextHref = (string)$crawler->filter('[data-testid="nav-next"] a')->attr('href');
 
         $this->assertStringContainsString(
             't=11:00',
@@ -432,7 +444,7 @@ final class EventPhotosGalleryTest extends WebTestCase
         $this->assertSame('true', $crawler->filter('[data-testid="nav-last"]')->attr('aria-disabled'));
 
         $firstHref = $crawler->filter('[data-testid="nav-first"] a')->attr('href');
-        $prevHref  = $crawler->filter('[data-testid="nav-prev"] a')->attr('href');
+        $prevHref = $crawler->filter('[data-testid="nav-prev"] a')->attr('href');
         $this->assertNotNull($firstHref);
         $this->assertNotNull($prevHref);
         $this->assertStringContainsString('t=12:00', $firstHref);
@@ -483,10 +495,10 @@ final class EventPhotosGalleryTest extends WebTestCase
             );
         }
 
-        $firstHref = (string) $crawler->filter('[data-testid="nav-first"] a')->attr('href');
-        $prevHref  = (string) $crawler->filter('[data-testid="nav-prev"] a')->attr('href');
-        $nextHref  = (string) $crawler->filter('[data-testid="nav-next"] a')->attr('href');
-        $lastHref  = (string) $crawler->filter('[data-testid="nav-last"] a')->attr('href');
+        $firstHref = (string)$crawler->filter('[data-testid="nav-first"] a')->attr('href');
+        $prevHref = (string)$crawler->filter('[data-testid="nav-prev"] a')->attr('href');
+        $nextHref = (string)$crawler->filter('[data-testid="nav-next"] a')->attr('href');
+        $lastHref = (string)$crawler->filter('[data-testid="nav-last"] a')->attr('href');
         $this->assertStringContainsString('t=11:00', $firstHref);
         $this->assertStringContainsString('t=12:00', $prevHref);
         $this->assertStringContainsString('t=13:00', $nextHref);
@@ -535,7 +547,7 @@ final class EventPhotosGalleryTest extends WebTestCase
             sprintf('/e/neighbor/photos/%d/neighbor?direction=next', $middle->getId()),
         );
         $this->assertResponseIsSuccessful();
-        $payload = json_decode((string) $client->getResponse()->getContent(), true);
+        $payload = json_decode((string)$client->getResponse()->getContent(), true);
         $this->assertIsArray($payload);
         $this->assertSame($later->getId(), $payload['id']);
         $this->assertSame(
@@ -552,7 +564,7 @@ final class EventPhotosGalleryTest extends WebTestCase
             sprintf('/e/neighbor/photos/%d/neighbor?direction=prev', $middle->getId()),
         );
         $this->assertResponseIsSuccessful();
-        $payload = json_decode((string) $client->getResponse()->getContent(), true);
+        $payload = json_decode((string)$client->getResponse()->getContent(), true);
         $this->assertIsArray($payload);
         $this->assertSame($earlier->getId(), $payload['id']);
     }
@@ -595,7 +607,7 @@ final class EventPhotosGalleryTest extends WebTestCase
                 $client->getResponse()->getStatusCode(),
                 sprintf('Direction %s', $direction),
             );
-            $this->assertSame('', (string) $client->getResponse()->getContent());
+            $this->assertSame('', (string)$client->getResponse()->getContent());
         }
     }
 
@@ -644,7 +656,7 @@ final class EventPhotosGalleryTest extends WebTestCase
         $this->assertSame(
             Response::HTTP_NOT_FOUND,
             $client->getResponse()->getStatusCode(),
-            (string) $client->getResponse()->getContent(),
+            (string)$client->getResponse()->getContent(),
         );
     }
 
@@ -683,7 +695,7 @@ final class EventPhotosGalleryTest extends WebTestCase
         $this->assertSame(
             Response::HTTP_BAD_REQUEST,
             $client->getResponse()->getStatusCode(),
-            (string) $client->getResponse()->getContent(),
+            (string)$client->getResponse()->getContent(),
         );
     }
 
@@ -735,7 +747,7 @@ final class EventPhotosGalleryTest extends WebTestCase
         $crawler = $client->request(Request::METHOD_GET, '/e/nav-tz/photos?t=15:00');
         $this->assertResponseIsSuccessful();
 
-        $firstHref = (string) $crawler->filter('[data-testid="nav-first"] a')->attr('href');
+        $firstHref = (string)$crawler->filter('[data-testid="nav-first"] a')->attr('href');
         $this->assertStringContainsString('t=14:00', $firstHref);
 
         // Following the link must show the photo (this was broken before the
@@ -743,7 +755,7 @@ final class EventPhotosGalleryTest extends WebTestCase
         // wall-clock and missed the UTC wall-clock stored on the row).
         $client->request(Request::METHOD_GET, $firstHref);
         $this->assertResponseIsSuccessful();
-        $body = (string) $client->getResponse()->getContent();
+        $body = (string)$client->getResponse()->getContent();
         $this->assertStringContainsString(
             sprintf('/p/%d/thumb.jpg', $photo->getId()),
             $body,

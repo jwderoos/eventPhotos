@@ -106,6 +106,11 @@ final class EventController extends AbstractController
         $prevAt        = $this->photos->findPreviousReadyTakenAt($event, $start);
         $nextAt        = $this->photos->findNextReadyTakenAt($event, $end);
 
+        $totalReady = $this->photos->countReady($event);
+        // Visible photos are a contiguous slice of the (takenAt, id) timeline,
+        // so we only need the rank of the first one — the rest follow by index.
+        $firstRank = $photos === [] ? null : $this->photos->countReadyBefore($photos[0]) + 1;
+
         return $this->render('public/event/photos.html.twig', [
             'event'        => $event,
             'timestamp'    => $timestamp,
@@ -117,6 +122,8 @@ final class EventController extends AbstractController
             'lastAt'       => $lastAt,
             'prevAt'       => $prevAt,
             'nextAt'       => $nextAt,
+            'totalReady'   => $totalReady,
+            'firstRank'    => $firstRank,
         ]);
     }
 
