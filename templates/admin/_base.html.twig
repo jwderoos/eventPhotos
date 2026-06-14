@@ -35,7 +35,7 @@
                                 </ul>
                                 {# External form so the button is a direct <li> child and inherits daisyUI menu styling. #}
                                 <form id="admin-logout-form" method="post" action="{{ path('app_logout') }}" class="hidden">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('logout') }}">
+                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
                                 </form>
                             </div>
                         </div>

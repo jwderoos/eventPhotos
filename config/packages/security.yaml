@@ -25,8 +25,12 @@ security:
                 path: app_logout
                 # POST-only logout (route is methods=POST) with CSRF — prevents accidental sign-out
                 # from link prefetchers (Turbo Drive hover-prefetch, link scanners, <img src> XSS).
+                # csrf_parameter intentionally left at the default `_csrf_token`: the
+                # csrf_protection_controller.js Stimulus controller matches inputs by that name
+                # to set up the SameOrigin double-submit cookie. Renaming the input breaks the
+                # JS double-submit and forces validation to fall back to the Origin/Referer
+                # check, which is fragile behind reverse proxies (e.g. TrueNAS NPM).
                 enable_csrf: true
-                csrf_parameter: _token
                 csrf_token_id: logout
 
     role_hierarchy:
