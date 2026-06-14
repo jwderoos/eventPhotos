@@ -55,7 +55,7 @@ final class OutsideWindowFallbackTest extends WebTestCase
 
         $this->assertResponseIsSuccessful();
         $this->assertSame(
-            '/e/summer-fest/photos?t=10:00',
+            '/e/summer-fest/photos?t=10:10',
             $this->firstAttr($crawler, 'a.btn-primary', 'href'),
         );
     }
@@ -74,20 +74,22 @@ final class OutsideWindowFallbackTest extends WebTestCase
 
         $this->assertResponseIsSuccessful();
         $this->assertSame(
-            '/e/summer-fest/photos?t=10:00',
+            '/e/summer-fest/photos?t=10:10',
             $this->firstAttr($crawler, 'a.btn-primary', 'href'),
         );
     }
 
-    public function testPhotosWithOutsideWindowTimeRedirectsToEventStart(): void
+    public function testPhotosWithOutsideWindowTimeRedirectsToStartPlusFilterBefore(): void
     {
         $client = self::createClient();
         $this->seedSummerFest('redirect-owner@example.test');
 
         $client->request(Request::METHOD_GET, '/e/summer-fest/photos?t=09:00');
 
+        // Anchor the fallback so the rendered window's leading edge sits on the
+        // event start (10:00) instead of WINDOW_BEFORE_MINUTES before it.
         $this->assertResponseStatusCodeSame(Response::HTTP_FOUND);
-        $this->assertResponseRedirects('/e/summer-fest/photos?t=10:00');
+        $this->assertResponseRedirects('/e/summer-fest/photos?t=10:10');
     }
 
     public function testPhotosWithInsideWindowTimeStillRenders(): void

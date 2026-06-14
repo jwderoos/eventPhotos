@@ -175,7 +175,7 @@ final class EventDisplayTest extends WebTestCase
         $this->assertStringContainsString('Pre Night', $html);
         $this->assertStringContainsString('data-qr-refresh-state-value="pre"', $html);
         $this->assertMatchesRegularExpression(
-            '#href="https?://[^"]+/e/pre-night/photos\?t=19:00"#',
+            '#href="https?://[^"]+/e/pre-night/photos\?t=19:10"#',
             $html,
         );
         $this->assertStringContainsString('<svg', $html);
@@ -331,7 +331,7 @@ final class EventDisplayTest extends WebTestCase
         $this->assertResponseHeaderSame('X-Display-State', 'pre');
         $photosUrl = $client->getResponse()->headers->get('X-Photos-Url') ?? '';
         $this->assertMatchesRegularExpression(
-            '#^https?://[^/]+/e/refresh-pre/photos\?t=19:00$#',
+            '#^https?://[^/]+/e/refresh-pre/photos\?t=19:10$#',
             $photosUrl,
         );
         $this->assertStringContainsString('<svg', (string) $client->getResponse()->getContent());

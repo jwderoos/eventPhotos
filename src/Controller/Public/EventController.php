@@ -54,7 +54,7 @@ final class EventController extends AbstractController
         $now   = $this->nowInEventTimezone($event);
         $when  = $event->computeDisplayState($now) === EventDisplayState::Live
             ? $now
-            : $this->startInEventTimezone($event);
+            : $this->startCursorInEventTimezone($event);
 
         return $this->render('public/event/landing.html.twig', [
             'event'             => $event,
@@ -78,7 +78,7 @@ final class EventController extends AbstractController
         if (!$timestamp instanceof DateTimeImmutable) {
             return $this->redirectToRoute('public_event_photos', [
                 'slug' => $event->getSlug(),
-                't'    => $this->startInEventTimezone($event)->format('H:i'),
+                't'    => $this->startCursorInEventTimezone($event)->format('H:i'),
             ]);
         }
 
@@ -280,6 +280,17 @@ final class EventController extends AbstractController
         return $event->getStartsAt()->setTimezone(new DateTimeZone($event->getTimezone()));
     }
 
+    /**
+     * Cursor used whenever we want to point a freshly-arriving viewer at "the
+     * beginning" of the event: shifted forward by WINDOW_BEFORE_MINUTES so the
+     * rendered window's leading edge sits on startsAt instead of before it.
+     */
+    private function startCursorInEventTimezone(Event $event): DateTimeImmutable
+    {
+        return $this->startInEventTimezone($event)
+            ->modify(sprintf('+%d minutes', Event::WINDOW_BEFORE_MINUTES));
+    }
+
     private function composeOnDay(string $day, string $time, DateTimeZone $tz): DateTimeImmutable
     {
         $resolved = DateTimeImmutable::createFromFormat(
@@ -313,7 +324,7 @@ final class EventController extends AbstractController
         return match ($state) {
             EventDisplayState::Pre  => $this->photosUrl->build(
                 $event,
-                $this->startInEventTimezone($event),
+                $this->startCursorInEventTimezone($event),
                 absolute: true,
             ),
             EventDisplayState::Live => $this->photosUrl->build($event, $now, absolute: true),

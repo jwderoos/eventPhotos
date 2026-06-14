@@ -56,15 +56,17 @@ final class MidnightCrossingTest extends WebTestCase
         $this->assertResponseIsSuccessful();
     }
 
-    public function testRedirectsTimeOutsideBothDatesToEventStart(): void
+    public function testRedirectsTimeOutsideBothDatesToStartPlusFilterBefore(): void
     {
         $client = self::createClient();
         $this->seedMidnightEvent();
 
         // 10:00 maps to neither 22:00..23:59 on day 1 nor 00:00..02:00 on day 2;
-        // per issue #59 the route 302s to ?t={startsAt H:i} rather than rejecting.
+        // per issue #59 the route 302s rather than rejecting. The fallback is
+        // anchored at startsAt + WINDOW_BEFORE_MINUTES so the rendered window's
+        // leading edge sits on the event start.
         $client->request(Request::METHOD_GET, '/e/midnight/photos?t=10:00');
         $this->assertResponseStatusCodeSame(Response::HTTP_FOUND);
-        $this->assertResponseRedirects('/e/midnight/photos?t=22:00');
+        $this->assertResponseRedirects('/e/midnight/photos?t=22:10');
     }
 }
