@@ -1,7 +1,12 @@
 import { Controller } from '@hotwired/stimulus';
 
-const SWIPE_THRESHOLD = 50;
-const VERTICAL_RELEASE = 10;
+const AXIS_LOCK = 8;            // px before we commit to horizontal
+const VERTICAL_RELEASE = 10;    // |dy| at which we abandon to vertical scroll
+const COMMIT_RATIO = 0.25;      // fraction of viewport width
+const FLICK_VELOCITY = 0.5;     // px / ms
+const VELOCITY_WINDOW_MS = 80;
+const RUBBER_BAND = 0.4;
+const SNAP_MS = 250;
 const SPINNER_DELAY_MS = 200;
 const HASH_PATTERN = /^#p=(\d+)$/;
 
@@ -9,7 +14,10 @@ export default class extends Controller {
     static targets = [
         'trigger',
         'dialog',
-        'image',
+        'track',
+        'slotPrev',
+        'slotCurr',
+        'slotNext',
         'spinner',
         'error',
         'prevButton',
@@ -38,6 +46,8 @@ export default class extends Controller {
         this.preloadState = new Map();
         this.spinnerTimer = null;
         this.swipe = null;
+        this.committing = false;
+        this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         this.didPushState = false;
         // Per-photo memo: "no further Ready photo exists in this direction".
         // Populated when the neighbor endpoint returns 204; lets us hide the
@@ -61,12 +71,12 @@ export default class extends Controller {
         this.dialogTarget.addEventListener('close', this.onDialogClose);
         window.addEventListener('popstate', this.onPopState);
 
-        this.imageTarget.addEventListener('load', this.onImageLoad);
-        this.imageTarget.addEventListener('error', this.onImageError);
-        this.imageTarget.addEventListener('pointerdown', this.onPointerDown);
-        this.imageTarget.addEventListener('pointermove', this.onPointerMove);
-        this.imageTarget.addEventListener('pointerup', this.onPointerUp);
-        this.imageTarget.addEventListener('pointercancel', this.onPointerCancel);
+        this.slotCurrTarget.addEventListener('load', this.onImageLoad);
+        this.slotCurrTarget.addEventListener('error', this.onImageError);
+        this.trackTarget.addEventListener('pointerdown', this.onPointerDown);
+        this.trackTarget.addEventListener('pointermove', this.onPointerMove);
+        this.trackTarget.addEventListener('pointerup', this.onPointerUp);
+        this.trackTarget.addEventListener('pointercancel', this.onPointerCancel);
 
         this.openFromHashIfPresent();
     }
@@ -79,13 +89,15 @@ export default class extends Controller {
         }
         window.removeEventListener('popstate', this.onPopState);
 
-        if (this.hasImageTarget) {
-            this.imageTarget.removeEventListener('load', this.onImageLoad);
-            this.imageTarget.removeEventListener('error', this.onImageError);
-            this.imageTarget.removeEventListener('pointerdown', this.onPointerDown);
-            this.imageTarget.removeEventListener('pointermove', this.onPointerMove);
-            this.imageTarget.removeEventListener('pointerup', this.onPointerUp);
-            this.imageTarget.removeEventListener('pointercancel', this.onPointerCancel);
+        if (this.hasSlotCurrTarget) {
+            this.slotCurrTarget.removeEventListener('load', this.onImageLoad);
+            this.slotCurrTarget.removeEventListener('error', this.onImageError);
+        }
+        if (this.hasTrackTarget) {
+            this.trackTarget.removeEventListener('pointerdown', this.onPointerDown);
+            this.trackTarget.removeEventListener('pointermove', this.onPointerMove);
+            this.trackTarget.removeEventListener('pointerup', this.onPointerUp);
+            this.trackTarget.removeEventListener('pointercancel', this.onPointerCancel);
         }
 
         this.clearSpinnerTimer();
@@ -117,7 +129,7 @@ export default class extends Controller {
         }
     }
 
-    async next() {
+    async nextImmediate() {
         if (this.activeIndex === null) return;
         if (this.activeIndex < this.photos.length - 1) {
             this.goTo(this.activeIndex + 1);
@@ -133,7 +145,18 @@ export default class extends Controller {
         this.goTo(this.photos.length - 1);
     }
 
-    async previous() {
+    next() {
+        if (this.activeIndex === null || this.committing) return;
+        if (this.reducedMotion) return this.nextImmediate();
+        if (!this.hasInMemoryNeighbor('next')) {
+            // Fetch first; arrow click at boundary is the same code path as before.
+            return this.nextImmediate();
+        }
+        const w = this.trackTarget.clientWidth;
+        this.animateTo(-w, () => this.nextImmediate());
+    }
+
+    async previousImmediate() {
         if (this.activeIndex === null) return;
         if (this.activeIndex > 0) {
             this.goTo(this.activeIndex - 1);
@@ -148,6 +171,16 @@ export default class extends Controller {
         this.photos.unshift(neighbor);
         this.activeIndex += 1;
         this.goTo(0);
+    }
+
+    previous() {
+        if (this.activeIndex === null || this.committing) return;
+        if (this.reducedMotion) return this.previousImmediate();
+        if (!this.hasInMemoryNeighbor('prev')) {
+            return this.previousImmediate();
+        }
+        const w = this.trackTarget.clientWidth;
+        this.animateTo(w, () => this.previousImmediate());
     }
 
     async fetchNeighborForActive(direction) {
@@ -199,6 +232,7 @@ export default class extends Controller {
         this.clearSpinnerTimer();
         this.hideSpinner();
         this.hideError();
+        this.clearSlots();
 
         if (this.didPushState) {
             this.didPushState = false;
@@ -219,7 +253,7 @@ export default class extends Controller {
         const photo = this.photos[index];
 
         this.hideError();
-        this.swapImage(photo);
+        this.renderSlots();
         this.updateCounter();
         this.updateArrows();
 
@@ -252,7 +286,7 @@ export default class extends Controller {
         const photo = this.photos[index];
 
         this.hideError();
-        this.swapImage(photo);
+        this.renderSlots();
         this.updateCounter();
         this.updateArrows();
 
@@ -264,17 +298,41 @@ export default class extends Controller {
         this.preload(index + 1);
     }
 
-    swapImage(photo) {
-        this.clearSpinnerTimer();
-        const state = this.preloadState.get(photo.id);
+    renderSlots() {
+        if (this.activeIndex === null) return;
+        const curr = this.photos[this.activeIndex] ?? null;
+        const prev = this.photos[this.activeIndex - 1] ?? null;
+        const next = this.photos[this.activeIndex + 1] ?? null;
 
+        this.clearSpinnerTimer();
+        const state = curr ? this.preloadState.get(curr.id) : null;
         if (state === 'loaded') {
             this.hideSpinner();
         } else {
             this.spinnerTimer = setTimeout(() => this.showSpinner(), SPINNER_DELAY_MS);
         }
 
-        this.imageTarget.src = photo.previewUrl;
+        this.assignSlot(this.slotPrevTarget, prev);
+        this.assignSlot(this.slotCurrTarget, curr);
+        this.assignSlot(this.slotNextTarget, next);
+    }
+
+    assignSlot(img, photo) {
+        const desiredId = photo ? String(photo.id) : '';
+        if (img.dataset.photoId === desiredId) return;
+        img.dataset.photoId = desiredId;
+        if (photo) {
+            img.src = photo.previewUrl;
+        } else {
+            img.removeAttribute('src');
+        }
+    }
+
+    clearSlots() {
+        [this.slotPrevTarget, this.slotCurrTarget, this.slotNextTarget].forEach((img) => {
+            img.removeAttribute('src');
+            img.dataset.photoId = '';
+        });
     }
 
     onImageLoad() {
@@ -309,43 +367,154 @@ export default class extends Controller {
     }
 
     onPointerDown(event) {
-        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        if (this.committing) return;
+        if (this.reducedMotion) return;
+        if (this.swipe) return;
+        if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
+        if (event.button !== 0) return;
         this.swipe = {
             pointerId: event.pointerId,
             startX: event.clientX,
             startY: event.clientY,
-            currentX: event.clientX,
+            samples: [{ x: event.clientX, t: event.timeStamp }],
+            tracking: false,
+            axisLocked: false,
             abandoned: false,
         };
+
+        if (this.activeIndex !== null) {
+            if (this.activeIndex === this.photos.length - 1) {
+                this.fetchNeighborForActive('next').then((n) => this.onBoundaryNeighborResolved('next', n));
+            }
+            if (this.activeIndex === 0) {
+                this.fetchNeighborForActive('prev').then((n) => this.onBoundaryNeighborResolved('prev', n));
+            }
+        }
+    }
+
+    onBoundaryNeighborResolved(direction, neighbor) {
+        if (this.activeIndex === null) return;
+        if (!neighbor) {
+            this.updateArrows();
+            return;
+        }
+        if (direction === 'next') {
+            if (this.activeIndex !== this.photos.length - 1) return;
+            neighbor.rank = this.photos[this.photos.length - 1].rank + 1;
+            this.photos.push(neighbor);
+        } else {
+            if (this.activeIndex !== 0) return;
+            neighbor.rank = this.photos[0].rank - 1;
+            this.photos.unshift(neighbor);
+            this.activeIndex += 1;
+        }
+        this.renderSlots();
+        this.updateArrows();
     }
 
     onPointerMove(event) {
         if (!this.swipe || event.pointerId !== this.swipe.pointerId || this.swipe.abandoned) return;
         const dx = event.clientX - this.swipe.startX;
         const dy = event.clientY - this.swipe.startY;
-        if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > VERTICAL_RELEASE) {
-            this.swipe.abandoned = true;
-            return;
+
+        if (!this.swipe.axisLocked) {
+            if (Math.abs(dy) > VERTICAL_RELEASE && Math.abs(dy) > Math.abs(dx)) {
+                this.swipe.abandoned = true;
+                return;
+            }
+            if (Math.abs(dx) > AXIS_LOCK) {
+                this.swipe.axisLocked = true;
+                this.swipe.tracking = true;
+                // Safari can throw on detached elements / already-captured pointers; safe to ignore.
+                try { this.trackTarget.setPointerCapture(this.swipe.pointerId); } catch (_) {}
+            } else {
+                return;
+            }
         }
-        this.swipe.currentX = event.clientX;
+
+        event.preventDefault();
+        this.swipe.samples.push({ x: event.clientX, t: event.timeStamp });
+        const cutoff = event.timeStamp - VELOCITY_WINDOW_MS;
+        while (this.swipe.samples.length > 1 && this.swipe.samples[0].t < cutoff) {
+            this.swipe.samples.shift();
+        }
+        this.applyDrag(event.clientX - this.swipe.startX);
+    }
+
+    applyDrag(dx) {
+        const direction = dx < 0 ? 'next' : 'prev';
+        const damped = this.hasInMemoryNeighbor(direction) ? dx : dx * RUBBER_BAND;
+        this.trackTarget.style.transform = `translate3d(${damped}px, 0, 0)`;
+    }
+
+    animateTo(targetPx, onDone) {
+        this.committing = true;
+        let finished = false;
+        const finish = () => {
+            if (finished) return;
+            finished = true;
+            this.trackTarget.removeEventListener('transitionend', onEnd);
+            clearTimeout(safety);
+            this.trackTarget.classList.remove('is-animating');
+            this.trackTarget.style.transform = 'translate3d(0, 0, 0)';
+            this.committing = false;
+            onDone();
+        };
+        const onEnd = (e) => { if (e.target === this.trackTarget) finish(); };
+        this.trackTarget.addEventListener('transitionend', onEnd);
+        const safety = setTimeout(finish, SNAP_MS + 50);
+        // Force a layout flush so the transition picks up the new transform.
+        this.trackTarget.classList.add('is-animating');
+        // eslint-disable-next-line no-unused-expressions
+        this.trackTarget.offsetWidth;
+        this.trackTarget.style.transform = `translate3d(${targetPx}px, 0, 0)`;
     }
 
     onPointerUp(event) {
         if (!this.swipe || event.pointerId !== this.swipe.pointerId) return;
         const swipe = this.swipe;
         this.swipe = null;
-        if (swipe.abandoned) return;
+        if (!swipe.tracking) return;
+
         const dx = event.clientX - swipe.startX;
-        if (Math.abs(dx) < SWIPE_THRESHOLD) return;
-        if (dx < 0) {
-            this.next();
+        swipe.samples.push({ x: event.clientX, t: event.timeStamp });
+        const cutoff = event.timeStamp - VELOCITY_WINDOW_MS;
+        while (swipe.samples.length > 1 && swipe.samples[0].t < cutoff) {
+            swipe.samples.shift();
+        }
+        const oldest = swipe.samples[0];
+        const latest = swipe.samples[swipe.samples.length - 1];
+        const dt = Math.max(1, latest.t - oldest.t);
+        const v = (latest.x - oldest.x) / dt;
+        const direction = dx < 0 ? 'next' : 'prev';
+
+        const w = this.trackTarget.clientWidth;
+        const distanceCommit = Math.abs(dx) > w * COMMIT_RATIO;
+        const velocityCommit = Math.abs(v) > FLICK_VELOCITY && Math.sign(v) === Math.sign(dx);
+        const commit = (distanceCommit || velocityCommit) && this.hasInMemoryNeighbor(direction);
+
+        if (commit) {
+            this.animateTo(direction === 'next' ? -w : w, () => {
+                if (direction === 'next') this.nextImmediate();
+                else this.previousImmediate();
+            });
         } else {
-            this.previous();
+            this.animateTo(0, () => {});
         }
     }
 
-    onPointerCancel() {
+    onPointerCancel(event) {
+        if (!this.swipe || event.pointerId !== this.swipe.pointerId) return;
+        const wasTracking = this.swipe.tracking;
         this.swipe = null;
+        if (wasTracking) this.animateTo(0, () => {});
+    }
+
+    hasInMemoryNeighbor(direction) {
+        if (this.activeIndex === null) return false;
+        return direction === 'next'
+            ? this.photos[this.activeIndex + 1] !== undefined
+            : this.photos[this.activeIndex - 1] !== undefined;
     }
 
     onPopState() {
