@@ -48,6 +48,29 @@ final class PhotoRepository extends ServiceEntityRepository
         return $result;
     }
 
+    /**
+     * Latest `updatedAt` across Ready photos for the event, or null when none
+     * are Ready. Drives the gallery HTML ETag (§3.3) — any transition into
+     * Ready or post-Ready mutation bumps `updatedAt` via the PreUpdate hook,
+     * so the ETag invalidates exactly when the gallery's output could change.
+     */
+    public function lastReadyUpdatedAtForEvent(Event $event): ?DateTimeImmutable
+    {
+        /** @var array{updatedAt: ?DateTimeImmutable}|null $row */
+        $row = $this->createQueryBuilder('p')
+            ->select('p.updatedAt')
+            ->andWhere('p.event = :event')
+            ->andWhere('p.status = :status')
+            ->setParameter('event', $event)
+            ->setParameter('status', PhotoStatus::Ready)
+            ->orderBy('p.updatedAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $row['updatedAt'] ?? null;
+    }
+
     public function countReady(Event $event): int
     {
         return (int) $this->createQueryBuilder('p')

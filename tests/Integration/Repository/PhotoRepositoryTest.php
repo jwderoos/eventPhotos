@@ -362,4 +362,104 @@ final class PhotoRepositoryTest extends KernelTestCase
         $this->assertSame('2026-06-10 13:00:00', $next->format('Y-m-d H:i:s'));
         $this->assertSame('2026-06-10 11:00:00', $previous->format('Y-m-d H:i:s'));
     }
+
+    public function testLastReadyUpdatedAtForEventReturnsNullWhenNoReadyPhotos(): void
+    {
+        $this->createPending();
+        $this->em->flush();
+
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $this->repo->lastReadyUpdatedAtForEvent($this->event));
+    }
+
+    public function testLastReadyUpdatedAtForEventReturnsMaxAcrossReadyPhotos(): void
+    {
+        $earlier = $this->createReady('2026-06-10 11:00:00');
+        $later   = $this->createReady('2026-06-10 13:00:00');
+        $this->createPending();
+        $this->em->flush();
+
+        $value = $this->repo->lastReadyUpdatedAtForEvent($this->event);
+
+        $this->assertInstanceOf(DateTimeImmutable::class, $value);
+        // Both rows were inserted in the same flush, so updatedAt is initialised
+        // by the constructor; the later one isn't guaranteed to be newer. The
+        // contract is "max of updatedAt across Ready", so check it matches one
+        // of the inserted rows' updatedAt values (the database-side max).
+        $candidates = [
+            $earlier->getUpdatedAt()->format('Y-m-d H:i:s'),
+            $later->getUpdatedAt()->format('Y-m-d H:i:s'),
+        ];
+        $this->assertContains($value->format('Y-m-d H:i:s'), $candidates);
+    }
+
+    public function testLastReadyUpdatedAtForEventIsNullForPendingOnlyEvent(): void
+    {
+        $this->createPending();
+        $this->em->flush();
+
+        // Pending photos must not influence the value.
+        $this->assertNotInstanceOf(
+            DateTimeImmutable::class,
+            $this->repo->lastReadyUpdatedAtForEvent($this->event),
+        );
+    }
+
+    public function testLastReadyUpdatedAtForEventBumpsAfterPostFlushTransition(): void
+    {
+        $pending = $this->createPending();
+        $this->em->flush();
+
+        $pending->markReady(
+            new DateTimeImmutable('2026-06-10 12:00:00', new DateTimeZone('UTC')),
+            100,
+            100,
+            1024,
+        );
+        $this->em->flush();
+
+        $value = $this->repo->lastReadyUpdatedAtForEvent($this->event);
+        $this->assertInstanceOf(DateTimeImmutable::class, $value);
+        $this->assertSame(
+            $pending->getUpdatedAt()->format('Y-m-d H:i:s'),
+            $value->format('Y-m-d H:i:s'),
+        );
+    }
+
+    public function testLastReadyUpdatedAtForEventScopesToTheEvent(): void
+    {
+        $owner2 = new User('owner2@example.test', 'Owner 2');
+        $owner2->setPassword('x');
+
+        $this->em->persist($owner2);
+
+        $other = new Event(
+            'demo-other',
+            'Demo Other',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner2,
+        );
+        $other->setTimezone('UTC');
+
+        $this->em->persist($other);
+
+        $otherPhoto = new Photo(
+            event: $other,
+            contentHash: bin2hex(random_bytes(32)),
+            originalFilename: 'x.jpg',
+            byteSize: 100,
+        );
+        $otherPhoto->markReady(
+            new DateTimeImmutable('2026-06-10 12:00:00', new DateTimeZone('UTC')),
+            100,
+            100,
+            1024,
+        );
+        $this->em->persist($otherPhoto);
+
+        $this->em->flush();
+
+        // $this->event has no photos yet — returns null even though sibling event has one.
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $this->repo->lastReadyUpdatedAtForEvent($this->event));
+    }
 }

@@ -50,6 +50,10 @@ services:
     image: nginx:1.27-alpine
     volumes:
       - ./public:/app/public:ro
+      # Read-only mounts for X-Accel-Redirect — PhotoServeController authorises,
+      # nginx serves the bytes from these aliases. Originals are NOT mounted.
+      - ./var/uploads/photos/thumbs:/srv/photos/thumbs:ro
+      - ./var/uploads/photos/previews:/srv/photos/previews:ro
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "8080:80"

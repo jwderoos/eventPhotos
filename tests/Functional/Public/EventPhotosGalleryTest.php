@@ -766,4 +766,130 @@ final class EventPhotosGalleryTest extends WebTestCase
             'Photo should be visible after navigating via [« First] in a non-UTC event',
         );
     }
+
+    public function testGalleryEmitsEtagWithCacheValidationHeaders(): void
+    {
+        $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+
+        $owner = new User('etag@example.test', 'G');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+
+        $event = new Event(
+            'etag-event',
+            'ETag Event',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
+        $event->setTimezone('UTC');
+
+        $em->persist($event);
+
+        $photo = new Photo($event, str_repeat('a', 64), 'a.jpg', 100);
+        $photo->markReady(new DateTimeImmutable('2026-06-10 12:00:00', new DateTimeZone('UTC')), 100, 100, 1024);
+
+        $em->persist($photo);
+        $em->flush();
+
+        $client->request(Request::METHOD_GET, '/e/etag-event/photos?t=12:00');
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        $this->assertNotNull($response->getEtag(), 'gallery must emit an ETag for cache validation');
+        $cacheControl = $response->headers->get('Cache-Control', '');
+        $this->assertStringContainsString('must-revalidate', (string) $cacheControl);
+        $this->assertStringContainsString('max-age=0', (string) $cacheControl);
+    }
+
+    public function testGalleryReturns304WhenIfNoneMatchMatches(): void
+    {
+        $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+
+        $owner = new User('304@example.test', 'G');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+
+        $event = new Event(
+            'gallery-304',
+            'Gallery 304',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
+        $event->setTimezone('UTC');
+
+        $em->persist($event);
+
+        $photo = new Photo($event, str_repeat('a', 64), 'a.jpg', 100);
+        $photo->markReady(new DateTimeImmutable('2026-06-10 12:00:00', new DateTimeZone('UTC')), 100, 100, 1024);
+
+        $em->persist($photo);
+        $em->flush();
+
+        $url = '/e/gallery-304/photos?t=12:00';
+        $client->request(Request::METHOD_GET, $url);
+        $this->assertResponseIsSuccessful();
+        $etag = $client->getResponse()->getEtag();
+        $this->assertNotNull($etag);
+
+        $client->request(Request::METHOD_GET, $url, [], [], ['HTTP_IF_NONE_MATCH' => $etag]);
+        $this->assertResponseStatusCodeSame(Response::HTTP_NOT_MODIFIED);
+        // 304 bodies must be empty so the browser keeps using its cached copy.
+        $this->assertSame('', (string) $client->getResponse()->getContent());
+    }
+
+    public function testGalleryEtagChangesWhenNewPhotoBecomesReady(): void
+    {
+        $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+
+        $owner = new User('invalid-etag@example.test', 'G');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+
+        $event = new Event(
+            'gallery-inval',
+            'Gallery Inval',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
+        $event->setTimezone('UTC');
+
+        $em->persist($event);
+
+        $first = new Photo($event, str_repeat('a', 64), 'a.jpg', 100);
+        $first->markReady(new DateTimeImmutable('2026-06-10 12:00:00', new DateTimeZone('UTC')), 100, 100, 1024);
+
+        $em->persist($first);
+        $em->flush();
+
+        $url = '/e/gallery-inval/photos?t=12:00';
+        $client->request(Request::METHOD_GET, $url);
+        $this->assertResponseIsSuccessful();
+        $firstEtag = $client->getResponse()->getEtag();
+        $this->assertNotNull($firstEtag);
+
+        // A new Ready photo lands. ETag must change so revalidating clients re-render.
+        $second = new Photo($event, str_repeat('b', 64), 'b.jpg', 100);
+        $second->markReady(new DateTimeImmutable('2026-06-10 12:05:00', new DateTimeZone('UTC')), 100, 100, 1024);
+
+        $em->persist($second);
+        $em->flush();
+
+        $client->request(Request::METHOD_GET, $url, [], [], ['HTTP_IF_NONE_MATCH' => $firstEtag]);
+        $this->assertResponseIsSuccessful();
+        $secondEtag = $client->getResponse()->getEtag();
+        $this->assertNotNull($secondEtag);
+        $this->assertNotSame($firstEtag, $secondEtag);
+    }
 }

@@ -7,13 +7,8 @@ namespace App\Controller\Public;
 use App\Entity\Photo;
 use App\Entity\PhotoStatus;
 use App\Repository\PhotoRepository;
-use League\Flysystem\FilesystemException;
-use League\Flysystem\FilesystemOperator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 final class PhotoServeController extends AbstractController
@@ -22,12 +17,12 @@ final class PhotoServeController extends AbstractController
 
     private const string CACHE_CONTROL = 'public, max-age=' . self::MAX_AGE . ', immutable';
 
+    private const string INTERNAL_THUMB_PREFIX = '/_protected/thumbs/';
+
+    private const string INTERNAL_PREVIEW_PREFIX = '/_protected/previews/';
+
     public function __construct(
         private readonly PhotoRepository $photos,
-        #[Autowire(service: 'photo_thumbs_storage')]
-        private readonly FilesystemOperator $thumbs,
-        #[Autowire(service: 'photo_previews_storage')]
-        private readonly FilesystemOperator $previews,
     ) {
     }
 
@@ -37,9 +32,9 @@ final class PhotoServeController extends AbstractController
         requirements: ['slug' => '[a-z0-9-]+', 'id' => '\d+'],
         methods: ['GET'],
     )]
-    public function thumb(string $slug, int $id, Request $request): StreamedResponse
+    public function thumb(string $slug, int $id): Response
     {
-        return $this->serve($slug, $id, $this->thumbs, $request);
+        return $this->serve($slug, $id, self::INTERNAL_THUMB_PREFIX);
     }
 
     #[Route(
@@ -48,12 +43,17 @@ final class PhotoServeController extends AbstractController
         requirements: ['slug' => '[a-z0-9-]+', 'id' => '\d+'],
         methods: ['GET'],
     )]
-    public function preview(string $slug, int $id, Request $request): StreamedResponse
+    public function preview(string $slug, int $id): Response
     {
-        return $this->serve($slug, $id, $this->previews, $request);
+        return $this->serve($slug, $id, self::INTERNAL_PREVIEW_PREFIX);
     }
 
-    private function serve(string $slug, int $id, FilesystemOperator $storage, Request $request): StreamedResponse
+    // Cache strategy: PHP emits `Cache-Control: immutable` so browsers cache for a year
+    // without revalidating. Rare revalidates (Cmd-Shift-R, dev tools) hit PHP for the auth
+    // check, then go through nginx's static module which handles If-Modified-Since/If-None-Match
+    // against the file mtime/auto-ETag. We deliberately don't set an ETag in PHP — X-Accel
+    // strips upstream ETag in nginx 1.27, so it would never reach the client anyway.
+    private function serve(string $slug, int $id, string $internalPrefix): Response
     {
         $photo = $this->photos->find($id);
         if (!$photo instanceof Photo || $photo->getStatus() !== PhotoStatus::Ready) {
@@ -64,31 +64,15 @@ final class PhotoServeController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        $path = sprintf('event-%d/%d.jpg', (int) $photo->getEvent()->getId(), $id);
-
-        $etag         = sha1($id . '|' . $photo->getUpdatedAt()->format('U'));
-        $quotedEtag   = '"' . $etag . '"';
-        $response     = new StreamedResponse();
+        $response = new Response();
         $response->headers->set('Content-Type', 'image/jpeg');
         $response->headers->set('Cache-Control', self::CACHE_CONTROL);
-        $response->headers->set('ETag', $quotedEtag);
-
-        if ($request->headers->get('If-None-Match') === $quotedEtag) {
-            return $response->setStatusCode(Response::HTTP_NOT_MODIFIED);
-        }
-
-        $response->setCallback(static function () use ($storage, $path): void {
-            try {
-                $stream = $storage->readStream($path);
-            } catch (FilesystemException) {
-                return;
-            }
-
-            if (is_resource($stream)) {
-                fpassthru($stream);
-                fclose($stream);
-            }
-        });
+        // Hand bytes to nginx via X-Accel-Redirect. The internal location is `internal;`
+        // so it cannot be hit directly from outside — PHP must authorise first (above).
+        $response->headers->set(
+            'X-Accel-Redirect',
+            $internalPrefix . sprintf('event-%d/%d.jpg', (int) $photo->getEvent()->getId(), $id),
+        );
 
         return $response;
     }

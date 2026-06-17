@@ -21,10 +21,18 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    # §3.6 resource caps — prevents a runaway PHP process from saturating the
+    # shared TrueNAS box. 24 FPM children × ~80 MB ≈ 2 GB nominal; 3 GB leaves
+    # ~1 GB headroom for opcache + transient image work.
+    mem_limit: 3g
+    cpus: 4
 
   worker:
     image: eventfotos-php:latest
-    command: php bin/console messenger:consume async failed -vv --time-limit=3600 --memory-limit=128M
+    # §3.4 memory-limit bump 128M → 256M. GD decoding a 25 MB JPEG into a
+    # ~5760×3840 truecolor image transiently resident ≈ 67 MB; 128 MB had no
+    # headroom for large-megapixel uploads.
+    command: php bin/console messenger:consume async failed -vv --time-limit=3600 --memory-limit=256M
     env_file:
       - .env.prod
     environment:
@@ -41,6 +49,9 @@ services:
     restart: unless-stopped
     stop_signal: SIGTERM
     stop_grace_period: 30s
+    # Caps are per-replica. With §3.4 scaling worker to 3, total is 3 × 512 MB.
+    mem_limit: 512m
+    cpus: 2
 
   migrate:
     image: eventfotos-php:latest
@@ -63,13 +74,37 @@ services:
     image: eventfotos-nginx:latest
     ports:
       - "${HOST_HTTP_PORT:-8081}:80"
+    volumes:
+      # Read-only mounts for X-Accel-Redirect — PhotoServeController authorises,
+      # nginx serves the bytes from these aliases. Originals are NOT mounted.
+      - ${DATA_DIR}/uploads/photos/thumbs:/srv/photos/thumbs:ro
+      - ${DATA_DIR}/uploads/photos/previews:/srv/photos/previews:ro
     depends_on:
       php:
         condition: service_started
     restart: unless-stopped
+    mem_limit: 256m
+    cpus: 2
 
   database:
     image: postgres:16-alpine
+    # §3.5 Postgres tuning. Defaults assume embedded use; we have headroom.
+    #   shared_buffers=1GB        — default 128 MB is tiny for a multi-GB working set.
+    #   effective_cache_size=4GB  — planner hint; we have the RAM.
+    #   work_mem=16MB             — per-sort/hash; safe at our query shapes.
+    #   maintenance_work_mem=256MB— faster VACUUM/CREATE INDEX.
+    #   max_connections=200       — 24 FPM + 3 workers + headroom for --scale + migrate.
+    #   random_page_cost=1.1      — SSD; default 4 assumes spinning disk.
+    #   checkpoint_completion_target=0.9 — smoother write spikes.
+    command: >
+      postgres
+      -c shared_buffers=1GB
+      -c effective_cache_size=4GB
+      -c work_mem=16MB
+      -c maintenance_work_mem=256MB
+      -c max_connections=200
+      -c random_page_cost=1.1
+      -c checkpoint_completion_target=0.9
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -82,3 +117,5 @@ services:
       retries: 5
       start_period: 60s
     restart: unless-stopped
+    mem_limit: 6g
+    cpus: 4
