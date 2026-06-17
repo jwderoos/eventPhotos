@@ -40,7 +40,15 @@ echo ">>> docker compose build"
 
 echo ">>> docker compose up -d"
 # migrate runs to completion first; php/worker/nginx start after.
-"${COMPOSE[@]}" up -d --remove-orphans
+# --scale worker=3 (§3.4) runs three concurrent Messenger consumers. Doctrine
+# messenger uses SKIP LOCKED on PostgreSQL (verified in
+# vendor/symfony/doctrine-messenger/Transport/Connection.php), so concurrent
+# workers can drain the queue without duplicating work. The handler itself
+# (ProcessPhotoHandler) is also idempotent — no-ops unless status === Pending.
+# Anyone running `docker compose up` directly (outside this script) will get
+# only 1 worker; that's intentional for ad-hoc maintenance but means deploys
+# MUST go through this script to keep the 3-worker fleet active.
+"${COMPOSE[@]}" up -d --remove-orphans --scale worker=3
 
 echo ">>> done"
 "${COMPOSE[@]}" ps

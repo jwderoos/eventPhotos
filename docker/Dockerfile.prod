@@ -63,7 +63,8 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-COPY docker/php/php-prod.ini /usr/local/etc/php/conf.d/zz-app.ini
+COPY --chmod=0644 docker/php/php-prod.ini /usr/local/etc/php/conf.d/zz-app.ini
+COPY --chmod=0644 docker/php/fpm-pool.conf /usr/local/etc/php-fpm.d/zz-www.conf
 
 WORKDIR /app
 

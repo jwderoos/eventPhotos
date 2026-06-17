@@ -82,6 +82,35 @@ final class EventController extends AbstractController
             ]);
         }
 
+        // HTTP cache validation (§3.3). Two cheap aggregate queries short-circuit
+        // 6+ expensive queries below when the browser already has an up-to-date copy.
+        // The cache key combines max(updatedAt) AND count(Ready): updatedAt catches
+        // metadata mutations, count catches new/deleted/status-changed photos that
+        // could land within the same second-precision timestamp tick (Postgres stores
+        // `datetime_immutable` as timestamp(0) → seconds; a same-second batch ingest
+        // wouldn't bump max alone).
+        $lastUpdatedAt = $this->photos->lastReadyUpdatedAtForEvent($event);
+        $readyCount    = $this->photos->countReady($event);
+        $etag          = sha1(sprintf(
+            '%d|%s|%d|%d|%s|%d',
+            (int) $event->getId(),
+            $timestamp->format('U'),
+            Event::WINDOW_BEFORE_MINUTES,
+            Event::WINDOW_AFTER_MINUTES,
+            $lastUpdatedAt instanceof DateTimeImmutable ? $lastUpdatedAt->format('U.u') : '-',
+            $readyCount,
+        ));
+
+        $response = new Response();
+        $response->setEtag($etag);
+        $response->setPublic();
+        $response->setMaxAge(0);
+        $response->headers->addCacheControlDirective('must-revalidate');
+
+        if ($response->isNotModified($request)) {
+            return $response;
+        }
+
         $start  = $timestamp->modify(sprintf('-%d minutes', Event::WINDOW_BEFORE_MINUTES));
         $end    = $timestamp->modify(sprintf('+%d minutes', Event::WINDOW_AFTER_MINUTES));
         $photos = $this->photos->findReadyInWindow($event, $start, $end);
@@ -106,7 +135,7 @@ final class EventController extends AbstractController
         $prevAt        = $this->photos->findPreviousReadyTakenAt($event, $start);
         $nextAt        = $this->photos->findNextReadyTakenAt($event, $end);
 
-        $totalReady = $this->photos->countReady($event);
+        $totalReady = $readyCount;
         // Visible photos are a contiguous slice of the (takenAt, id) timeline,
         // so we only need the rank of the first one — the rest follow by index.
         $firstRank = $photos === [] ? null : $this->photos->countReadyBefore($photos[0]) + 1;
@@ -124,7 +153,7 @@ final class EventController extends AbstractController
             'nextAt'       => $nextAt,
             'totalReady'   => $totalReady,
             'firstRank'    => $firstRank,
-        ]);
+        ], $response);
     }
 
     #[Route(
