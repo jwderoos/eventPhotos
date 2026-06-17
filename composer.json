@@ -57,7 +57,10 @@
         "symfonycasts/reset-password-bundle": "^1.25",
         "knpuniversity/oauth2-client-bundle": "^2.20",
         "league/oauth2-google": "^5.0",
-        "symfony/expression-language": "^8.1"
+        "symfony/expression-language": "^8.1",
+        "whichbrowser/parser": "^2.1",
+        "geoip2/geoip2": "^3.0",
+        "symfony/http-client": "^8.1"
     },
     "require-dev": {
         "phpunit/phpunit": "^13.2",

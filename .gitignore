@@ -8,6 +8,10 @@
 /var/
 /var/uploads/photos/
 /public/bundles/
+
+# GeoIP MMDB is fetched on deploy via bin/console app:geoip:update; never committed.
+/var/geoip/*
+!/var/geoip/.gitkeep
 /public/assets/
 .phpunit.result.cache
 

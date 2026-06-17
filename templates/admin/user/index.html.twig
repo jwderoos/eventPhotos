@@ -49,6 +49,8 @@
                             <div class="inline-flex items-center gap-1">
                                 <a href="{{ path('admin_user_edit', {id: user.id}) }}"
                                    class="btn btn-ghost btn-xs">Edit</a>
+                                <a href="{{ path('admin_user_sessions_index', {id: user.id}) }}"
+                                   class="btn btn-ghost btn-xs">Sessions</a>
                                 {% if user.id != app.user.id %}
                                     <form method="post"
                                           action="{{ path('admin_user_delete', {id: user.id}) }}"

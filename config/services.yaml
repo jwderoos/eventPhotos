@@ -62,3 +62,9 @@ when@test:
         App\Service\Auth\GoogleOAuthClient:
             alias: App\Tests\Fake\FakeGoogleOAuthClient
             public: true
+
+        App\Service\Session\UserSessionCreator:
+            public: true
+
+        App\EventListener\UserSessionLoginListener:
+            public: true

@@ -1,0 +1,103 @@
+{% extends 'admin/_base.html.twig' %}
+
+{% block title %}Your sessions{% endblock %}
+
+{% block admin_breadcrumb %}
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li>Admin</li>
+            <li><a href="{{ path('account_show') }}">My account</a></li>
+            <li>Sessions</li>
+        </ul>
+    </div>
+{% endblock %}
+
+{% block admin_main %}
+<div class="mx-auto max-w-4xl space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">Sessions</h1>
+        <form method="post" action="{{ path('account_sessions_revoke_others') }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('user_session_revoke_others') }}">
+            <button type="submit"
+                    class="btn btn-sm btn-ghost"
+                    onclick="return confirm('Sign out of all other sessions?')">
+                Sign out everywhere else
+            </button>
+        </form>
+    </div>
+
+    <p class="text-sm text-base-content/60">
+        Sessions older than 30 days are automatically removed.
+    </p>
+
+    <div class="overflow-x-auto border border-base-300 rounded-box">
+        <table class="table table-sm">
+            <thead>
+            <tr>
+                <th></th>
+                <th>Device</th>
+                <th>IP / Country</th>
+                <th>Last active</th>
+                <th>Label</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for s in sessions %}
+                {% set is_current = (s.sessId == current_sess_id) %}
+                <tr class="{{ is_current ? 'bg-success/10' : '' }}">
+                    <td>
+                        {% if is_current %}
+                            <span class="badge badge-success badge-sm">Current</span>
+                        {% endif %}
+                    </td>
+                    <td title="{{ s.userAgent }}">
+                        {{ s.userAgentDisplay ?? s.userAgent|slice(0, 60) }}
+                    </td>
+                    <td>
+                        {{ s.ip }}{% if s.countryCode %} · {{ s.countryCode }}{% endif %}
+                    </td>
+                    <td title="{{ s.lastSeenAt|date('Y-m-d H:i:s') }}">
+                        {{ s.lastSeenAt|date('Y-m-d H:i') }}
+                    </td>
+                    <td>
+                        <form method="post" action="{{ path('account_sessions_label', {sessId: s.sessId}) }}" class="flex gap-1">
+                            <input type="hidden" name="_token" value="{{ csrf_token('user_session_label') }}">
+                            <input type="text"
+                                   name="label"
+                                   value="{{ s.label ?? '' }}"
+                                   maxlength="64"
+                                   class="input input-bordered input-xs w-32"
+                                   placeholder="—">
+                            <button type="submit" class="btn btn-xs btn-ghost">Save</button>
+                        </form>
+                    </td>
+                    <td>
+                        {% if is_current %}
+                            <button type="button" disabled
+                                    class="btn btn-xs btn-disabled"
+                                    title="Use 'Sign out' in the header to end this session">
+                                Revoke
+                            </button>
+                        {% else %}
+                            <form method="post" action="{{ path('account_sessions_revoke', {sessId: s.sessId}) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('user_session_revoke') }}">
+                                <button type="submit"
+                                        class="btn btn-xs btn-error btn-outline"
+                                        onclick="return confirm('Revoke this session?')">
+                                    Revoke
+                                </button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="6" class="py-6 text-center text-base-content/50">No active sessions.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <p class="text-xs text-base-content/40">IP geolocation by MaxMind GeoLite2.</p>
+</div>
+{% endblock %}
