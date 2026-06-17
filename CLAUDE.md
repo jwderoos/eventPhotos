@@ -97,3 +97,7 @@ Split into `App\Controller\Admin\*` (behind `/admin`, organizer-gated) and `App\
 ### Tests
 
 Organized as `tests/Unit/`, `tests/Integration/`, `tests/Functional/`. PHPUnit 13 is configured with `failOnDeprecation`, `failOnNotice`, `failOnWarning` all `true` and `restrictWarnings/Notices` on the source — a single deprecation in the code path will fail the test. `dama/doctrine-test-bundle` is available for transactional integration tests. Test DB name gets a `_test` suffix via `dbname_suffix` in `when@test`.
+
+### Commits
+
+Claude will not do commits. After finishing work, always propose a single line commit message
