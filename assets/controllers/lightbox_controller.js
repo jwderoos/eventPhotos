@@ -28,6 +28,7 @@ export default class extends Controller {
     static values = {
         eventSlug: String,
         totalReady: Number,
+        preloadWindow: { type: Number, default: 3 },
     };
 
     connect() {
@@ -271,8 +272,7 @@ export default class extends Controller {
             }
         }
 
-        this.preload(index - 1);
-        this.preload(index + 1);
+        this.preloadNeighbors(index);
     }
 
     goTo(index, { fromHistory = false } = {}) {
@@ -294,8 +294,15 @@ export default class extends Controller {
             history.replaceState({ lightbox: true, id: photo.id }, '', `#p=${photo.id}`);
         }
 
-        this.preload(index - 1);
-        this.preload(index + 1);
+        this.preloadNeighbors(index);
+    }
+
+    preloadNeighbors(index) {
+        const window = Math.max(1, this.preloadWindowValue);
+        for (let offset = 1; offset <= window; offset += 1) {
+            this.preload(index - offset);
+            this.preload(index + offset);
+        }
     }
 
     renderSlots() {
