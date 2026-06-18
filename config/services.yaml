@@ -25,6 +25,9 @@ services:
     App\Service\Auth\GoogleOAuthClient:
         alias: App\Service\Auth\RealGoogleOAuthClient
 
+    App\Service\Mail\DnsResolver:
+        alias: App\Service\Mail\SystemDnsResolver
+
     App\Session\PdoSessionHandlerFactory:
         arguments:
             $connection: '@doctrine.dbal.default_connection'
@@ -68,3 +71,19 @@ when@test:
 
         App\EventListener\UserSessionLoginListener:
             public: true
+
+        App\Service\Mail\OrganizerMailerResolver:
+            public: true
+
+        App\Tests\Mail\InMemoryTransportFactory:
+            tags:
+                - { name: 'mailer.transport_factory', priority: 100 }
+
+        App\Tests\Mail\CapturedMail:
+            public: true
+
+        App\Tests\Fake\PrebakedDnsResolver:
+            public: true
+
+        App\Service\Mail\DnsResolver:
+            alias: App\Tests\Fake\PrebakedDnsResolver

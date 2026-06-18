@@ -40,6 +40,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     )]
     private Collection $identities;
 
+    #[ORM\OneToOne(mappedBy: 'user', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private ?UserMailConfig $mailConfig = null;
+
     public function __construct(
         #[ORM\Column(type: Types::STRING, length: 180)]
         private string $email,
@@ -150,6 +153,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         }
 
         return null;
+    }
+
+    public function getMailConfig(): ?UserMailConfig
+    {
+        return $this->mailConfig;
+    }
+
+    public function setMailConfig(?UserMailConfig $mailConfig): void
+    {
+        $this->mailConfig = $mailConfig;
     }
 
     public function eraseCredentials(): void
