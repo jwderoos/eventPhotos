@@ -15,5 +15,9 @@ framework:
         #app: cache.adapter.apcu
 
         # Namespaced pools use the above "app" backend by default
-        #pools:
-            #my.dedicated.cache: null
+        pools:
+            # Dedicated pool for the public-route rate limiter (#23) so its state
+            # can be cleared in isolation by functional tests, and so limiter
+            # churn never evicts unrelated application cache entries.
+            rate_limiter.cache_pool:
+                adapter: cache.adapter.filesystem

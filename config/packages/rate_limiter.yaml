@@ -1,0 +1,11 @@
+framework:
+    rate_limiter:
+        # Coarse per-client-IP cap on the public event HTML/JSON routes (#23).
+        # Blunts slug enumeration + request floods. 120/min ≈ 2 req/s — generous
+        # for a human browsing a gallery, brutal for a sprayer. Photo-serve and
+        # the lightbox neighbor route are NOT limited (see the listener allowlist).
+        public_event:
+            policy: 'sliding_window'
+            limit: 120
+            interval: '1 minute'
+            cache_pool: 'rate_limiter.cache_pool'
