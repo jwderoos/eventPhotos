@@ -117,6 +117,11 @@ final class UserMailController extends AbstractController
         try {
             $this->sendVerification($config, $dsn);
             $this->addFlash('success', sprintf('Verification email sent to %s.', $fromAddr));
+        } catch (DsnRejected $dsnRejected) {
+            $this->addFlash('warning', sprintf(
+                'Mail configuration saved but verification email could not be sent: %s',
+                $dsnRejected->getMessage(),
+            ));
         } catch (TransportExceptionInterface $transportException) {
             $this->addFlash('warning', sprintf(
                 'Mail configuration saved but verification email could not be delivered: %s',

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
+use App\Service\Mail\DsnVault;
+use App\Service\Mail\OrganizerMailerResolver;
+use App\Service\Mail\DsnRejected;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\HttpFoundation\Request;
 use App\Entity\UserMailConfig;
@@ -13,6 +16,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Security\Csrf\TokenStorage\SessionTokenStorage;
 
 final class AccountMailFlowTest extends WebTestCase
 {
@@ -48,7 +52,7 @@ final class AccountMailFlowTest extends WebTestCase
         self::assertResponseRedirects('/admin/account/mail');
 
         // 3) Verification email captured by the custom transport.
-        $messages = CapturedMail::messagesForHost('smtp.example-organizer.test');
+        $messages = CapturedMail::messagesForHost('93.184.216.34');
         $this->assertCount(1, $messages);
 
         // 4) Platform null transport NOT hit.
@@ -208,13 +212,33 @@ final class AccountMailFlowTest extends WebTestCase
         return $token;
     }
 
+    /**
+     * Issues a benign GET so the test client has an active session, then writes
+     * a known CSRF token into that session under the fallback session-token namespace.
+     */
+    private function primeCsrfToken(string $tokenId): string
+    {
+        $this->client->request(Request::METHOD_GET, '/admin/account/mail');
+
+        $session = $this->client->getRequest()->getSession();
+        if (!$session->isStarted()) {
+            $session->start();
+        }
+
+        $token = bin2hex(random_bytes(16));
+        $session->set(SessionTokenStorage::SESSION_NAMESPACE . '/' . $tokenId, $token);
+        $session->save();
+
+        return $token;
+    }
+
     public function testVerificationEmailFailureKeepsConfigUnverified(): void
     {
         $user = $this->createOrganizer('fail@example.com', 'secret');
         $this->client->loginUser($user);
 
         CapturedMail::throwOnHost(
-            'smtp.fail.example-organizer.test',
+            '93.184.216.35',
             new TransportException(
                 'Authentication failed: 535 5.7.8 Username and Password not accepted',
             ),
@@ -238,5 +262,86 @@ final class AccountMailFlowTest extends WebTestCase
         $this->client->followRedirect();
         $body = (string) $this->client->getResponse()->getContent();
         $this->assertStringContainsString('Authentication failed', $body);
+    }
+
+    public function testLiveSendRefusesRebindToInternalHostAndAutoUnverifies(): void
+    {
+        /** @var DsnVault $vault */
+        $vault = self::getContainer()->get(DsnVault::class);
+        /** @var OrganizerMailerResolver $resolver */
+        $resolver = self::getContainer()->get(OrganizerMailerResolver::class);
+
+        $user = $this->createOrganizer('rebind-fn@example.com', 'secret');
+        $config = new UserMailConfig(
+            $user,
+            $vault->encrypt('smtp://u:p@box.loopback.rebind.example-organizer.test:25'),
+            'rebind-fn@example.com',
+            null,
+        );
+        $config->markVerified();
+
+        $this->em->persist($config);
+        $this->em->flush();
+
+        $threw = false;
+        try {
+            $resolver->forUser($user);
+        } catch (DsnRejected $dsnRejected) {
+            $threw = true;
+            $this->assertSame(DsnRejected::REASON_HOST, $dsnRejected->reason);
+        }
+
+        $this->assertTrue($threw, 'live send to a rebound internal host must be refused');
+        $this->assertSame([], CapturedMail::messagesForHost('127.0.0.1'));
+
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(User::class)->find($user->getId());
+        $this->assertInstanceOf(User::class, $reloaded);
+        $reloadedConfig = $reloaded->getMailConfig();
+        $this->assertInstanceOf(UserMailConfig::class, $reloadedConfig);
+        $this->assertFalse($reloadedConfig->isVerified());
+    }
+
+    public function testResendVerificationWithRebindHostIsGraceful(): void
+    {
+        /** @var DsnVault $vault */
+        $vault = self::getContainer()->get(DsnVault::class);
+
+        // 1) Create an organizer and save a valid config so a UserMailConfig row exists.
+        $user = $this->createOrganizer('resend-rebind@example.com', 'secret');
+        $this->client->loginUser($user);
+        $this->saveValidConfig($user);
+
+        // 2) Mutate the stored DSN to a rebind host that resolves to 127.0.0.1.
+        //    The domain box.loopback.rebind.example-organizer.test resolves to 127.0.0.1
+        //    via the same DNS stub used by other tests in this suite.
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(User::class)->find($user->getId());
+        $this->assertInstanceOf(User::class, $reloaded);
+        $config = $reloaded->getMailConfig();
+        $this->assertInstanceOf(UserMailConfig::class, $config);
+
+        $rebindEnvelope = $vault->encrypt('smtp://u:p@box.loopback.rebind.example-organizer.test:25');
+        $config->applyConfig($rebindEnvelope, $reloaded->getEmail(), null);
+        $this->em->flush();
+
+        // 3) POST to resend-verification with a valid CSRF token.
+        $csrfToken = $this->primeCsrfToken('mail_config_resend');
+        $this->client->request(
+            Request::METHOD_POST,
+            '/admin/account/mail/resend',
+            ['_token' => $csrfToken],
+        );
+
+        // 4) Must be a graceful redirect (302), NOT a 500.
+        self::assertResponseRedirects('/admin/account/mail', 302, 'DsnRejected at resend must not produce HTTP 500');
+
+        // 5) No mail sent to the internal host.
+        $this->assertSame([], CapturedMail::messagesForHost('127.0.0.1'));
+
+        // 6) Follow redirect and assert a warning flash is present.
+        $this->client->followRedirect();
+        $body = (string) $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('Could not send verification email', $body);
     }
 }

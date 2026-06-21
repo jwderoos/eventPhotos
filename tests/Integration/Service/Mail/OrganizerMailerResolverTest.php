@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Service\Mail;
 use App\Entity\Event;
 use App\Entity\User;
 use App\Entity\UserMailConfig;
+use App\Service\Mail\DsnRejected;
 use App\Service\Mail\DsnVault;
 use App\Service\Mail\OrganizerMailerResolver;
 use DateTimeImmutable;
@@ -70,7 +71,7 @@ final class OrganizerMailerResolverTest extends KernelTestCase
         $user = $this->persistUser('verified@example.com');
         $config = new UserMailConfig(
             $user,
-            $this->vault->encrypt('smtp://x@smtp.example.test:25'),
+            $this->vault->encrypt('smtp://x@smtp.example-organizer.test:25'),
             'verified@example.com',
             null,
         );
@@ -90,7 +91,7 @@ final class OrganizerMailerResolverTest extends KernelTestCase
         $owner = $this->persistUser('event-owner@example.com');
         $config = new UserMailConfig(
             $owner,
-            $this->vault->encrypt('smtp://x@smtp.example.test:25'),
+            $this->vault->encrypt('smtp://x@smtp.example-organizer.test:25'),
             'event-owner@example.com',
             null,
         );
@@ -117,7 +118,7 @@ final class OrganizerMailerResolverTest extends KernelTestCase
         $u2 = $this->persistUser('b@example.com');
         $config = new UserMailConfig(
             $u2,
-            $this->vault->encrypt('smtp://x@smtp.example.test:25'),
+            $this->vault->encrypt('smtp://x@smtp.example-organizer.test:25'),
             'b@example.com',
             null,
         );
@@ -128,6 +129,33 @@ final class OrganizerMailerResolverTest extends KernelTestCase
 
         $this->assertFalse($this->resolver->isCustomActive($u1));
         $this->assertTrue($this->resolver->isCustomActive($u2));
+    }
+
+    public function testRebindToInternalIpIsRefusedAndAutoUnverifiesAtSendTime(): void
+    {
+        $user = $this->persistUser('rebind@example.com');
+        $config = new UserMailConfig(
+            $user,
+            $this->vault->encrypt('smtp://u:p@box.loopback.rebind.example-organizer.test:25'),
+            'rebind@example.com',
+            null,
+        );
+        $config->markVerified();
+
+        $this->em->persist($config);
+        $this->em->flush();
+
+        $this->expectException(DsnRejected::class);
+        try {
+            $this->resolver->forUser($user);
+        } finally {
+            $this->em->clear();
+            $reloaded = $this->em->getRepository(User::class)->find($user->getId());
+            $this->assertInstanceOf(User::class, $reloaded);
+            $reloadedConfig = $reloaded->getMailConfig();
+            $this->assertInstanceOf(UserMailConfig::class, $reloadedConfig);
+            $this->assertFalse($reloadedConfig->isVerified(), 'config must be auto-unverified after rebind refusal');
+        }
     }
 
     private function persistUser(string $email): User

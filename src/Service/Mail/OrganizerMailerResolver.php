@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace App\Service\Mail;
 
-use App\Entity\UserMailConfig;
 use App\Entity\Event;
 use App\Entity\User;
+use App\Entity\UserMailConfig;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use SodiumException;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mailer\Transport;
 
 final readonly class OrganizerMailerResolver
 {
@@ -20,8 +19,8 @@ final readonly class OrganizerMailerResolver
         private DsnVault $vault,
         private MailerInterface $platformMailer,
         private LoggerInterface $logger,
-        #[Autowire(service: 'mailer.transport_factory')]
-        private Transport $transports,
+        private PinnedTransportFactory $pinnedTransports,
+        private EntityManagerInterface $em,
     ) {
     }
 
@@ -44,15 +43,30 @@ final readonly class OrganizerMailerResolver
                 'Falling back to platform mailer: cannot decrypt mail config DSN for user.',
                 ['user_id' => $user->getId(), 'exception' => $sodiumException->getMessage()],
             );
+
             return $this->platformMailer;
         }
 
-        return new Mailer($this->transports->fromString($dsn));
+        try {
+            return new Mailer($this->pinnedTransports->create($dsn));
+        } catch (DsnRejected $dsnRejected) {
+            if ($dsnRejected->reason === DsnRejected::REASON_HOST) {
+                $this->logger->error(
+                    'Auto-unverifying mail config: verified transport now resolves to a non-public address.',
+                    ['user_id' => $user->getId(), 'reason' => $dsnRejected->getMessage()],
+                );
+                $config->revokeVerification();
+                $this->em->flush();
+            }
+
+            throw $dsnRejected;
+        }
     }
 
     public function isCustomActive(User $user): bool
     {
         $config = $user->getMailConfig();
+
         return $config instanceof UserMailConfig && $config->isVerified();
     }
 }

@@ -154,4 +154,49 @@ final class UserMailConfigTest extends TestCase
         $this->assertSame("binary\x00\xff", $envelope->ciphertext);
         $this->assertSame("nonce\x01", $envelope->nonce);
     }
+
+    public function testRevokeVerificationClearsVerifiedState(): void
+    {
+        $config = $this->newConfig();
+        $config->markVerified();
+        $this->assertTrue($config->isVerified());
+
+        $config->revokeVerification();
+
+        $this->assertFalse($config->isVerified());
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $config->getVerifiedAt());
+        // markVerified() cleared the token; revokeVerification() must NOT restore or regenerate it —
+        // that is the caller's responsibility via regenerateVerificationToken().
+        $this->assertNull(
+            $config->getVerificationToken(),
+            'revokeVerification() must not restore the verification token',
+        );
+    }
+
+    public function testRevokeVerificationPreservesExistingToken(): void
+    {
+        // A pending (unverified) config always has a non-null token.
+        // revokeVerification() must be a no-op on the token field in all paths.
+        $config = $this->newConfig();
+        $tokenBefore = $config->getVerificationToken();
+        $this->assertNotNull($tokenBefore, 'new config must have a pending token');
+
+        // revokeVerification() is idempotent when not verified — returns early.
+        $config->revokeVerification();
+
+        $this->assertSame(
+            $tokenBefore,
+            $config->getVerificationToken(),
+            'revokeVerification() must not touch verificationToken',
+        );
+    }
+
+    public function testRevokeVerificationIsIdempotent(): void
+    {
+        $config = $this->newConfig();
+
+        $config->revokeVerification();
+
+        $this->assertFalse($config->isVerified());
+    }
 }

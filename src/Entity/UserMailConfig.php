@@ -139,6 +139,16 @@ class UserMailConfig
         $this->updatedAt = $this->verifiedAt;
     }
 
+    public function revokeVerification(): void
+    {
+        if (!$this->verifiedAt instanceof DateTimeImmutable) {
+            return;
+        }
+
+        $this->verifiedAt = null;
+        $this->updatedAt = new DateTimeImmutable();
+    }
+
     public function regenerateVerificationToken(): void
     {
         $this->verificationToken = $this->generateToken();

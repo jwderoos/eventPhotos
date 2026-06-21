@@ -45,7 +45,7 @@ final class UserMailFlowTest extends WebTestCase
         $this->client->submit($form);
         self::assertResponseRedirects('/admin/users/' . $target->getId() . '/mail');
 
-        $this->assertCount(1, CapturedMail::messagesForHost('smtp.example-organizer.test'));
+        $this->assertCount(1, CapturedMail::messagesForHost('93.184.216.34'));
 
         $this->em->clear();
         $audits = $this->em->getRepository(UserMailConfigAudit::class)->findAll();

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Mail;
 
 use App\Service\Mail\DsnRejected;
 use App\Service\Mail\DsnValidator;
+use App\Service\Mail\PublicIpInspector;
 use App\Tests\Fake\FakeDnsResolver;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -17,7 +18,7 @@ final class DsnValidatorTest extends TestCase
         $dns = new FakeDnsResolver();
         $dns->setMapping('smtp.example.com', ['93.184.216.34']);
 
-        $validator = new DsnValidator($dns);
+        $validator = new DsnValidator($dns, new PublicIpInspector());
 
         $validator->validate('smtp://user:pass@smtp.example.com:25');
 
@@ -29,7 +30,7 @@ final class DsnValidatorTest extends TestCase
         $dns = new FakeDnsResolver();
         $dns->setMapping('smtp.example.com', ['93.184.216.34']);
 
-        $validator = new DsnValidator($dns);
+        $validator = new DsnValidator($dns, new PublicIpInspector());
 
         $validator->validate('smtps://user:pass@smtp.example.com:465');
 
@@ -49,7 +50,7 @@ final class DsnValidatorTest extends TestCase
     #[DataProvider('rejectedSchemes')]
     public function testRejectsNonSmtpSchemes(string $dsn): void
     {
-        $validator = new DsnValidator(new FakeDnsResolver());
+        $validator = new DsnValidator(new FakeDnsResolver(), new PublicIpInspector());
 
         $this->expectException(DsnRejected::class);
         try {
@@ -73,6 +74,9 @@ final class DsnValidatorTest extends TestCase
         yield 'loopback v6' => ['::1', '::1'];
         yield 'ula v6' => ['fc00::1', 'fc00::1'];
         yield 'link-local v6' => ['fe80::1', 'fe80::1'];
+        yield 'cgnat v4' => ['100.64.0.1', '100.64.0.1'];
+        yield 'mapped metadata v6' => ['::ffff:169.254.169.254', '::ffff:169.254.169.254'];
+        yield 'mapped rfc1918 v6' => ['::ffff:10.0.0.1', '::ffff:10.0.0.1'];
     }
 
     #[DataProvider('rejectedHosts')]
@@ -81,7 +85,7 @@ final class DsnValidatorTest extends TestCase
         $dns = new FakeDnsResolver();
         $dns->setMapping('attacker.example', [$ip]);
 
-        $validator = new DsnValidator($dns);
+        $validator = new DsnValidator($dns, new PublicIpInspector());
 
         $this->expectException(DsnRejected::class);
         try {
@@ -98,7 +102,7 @@ final class DsnValidatorTest extends TestCase
         $dns = new FakeDnsResolver();
         $dns->setMapping('split-horizon.example', ['93.184.216.34', '10.0.0.1']);
 
-        $validator = new DsnValidator($dns);
+        $validator = new DsnValidator($dns, new PublicIpInspector());
 
         $this->expectException(DsnRejected::class);
         $validator->validate('smtp://x@split-horizon.example:25');
@@ -107,7 +111,7 @@ final class DsnValidatorTest extends TestCase
     public function testRejectsUnresolvable(): void
     {
         $dns = new FakeDnsResolver();
-        $validator = new DsnValidator($dns);
+        $validator = new DsnValidator($dns, new PublicIpInspector());
 
         $this->expectException(DsnRejected::class);
         try {
@@ -120,7 +124,7 @@ final class DsnValidatorTest extends TestCase
 
     public function testRejectsHostlessDsn(): void
     {
-        $validator = new DsnValidator(new FakeDnsResolver());
+        $validator = new DsnValidator(new FakeDnsResolver(), new PublicIpInspector());
 
         $this->expectException(DsnRejected::class);
         $validator->validate('smtp://');

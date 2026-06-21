@@ -114,6 +114,12 @@ final class AccountMailController extends AbstractController
                 'Verification email sent to %s. Click the link within 24 hours.',
                 $fromAddr,
             ));
+        } catch (DsnRejected $dsnRejected) {
+            $this->addFlash('warning', sprintf(
+                'Mail configuration saved but verification email could not be sent: %s.'
+                . ' Click "Resend verification" to retry.',
+                $dsnRejected->getMessage(),
+            ));
         } catch (TransportExceptionInterface $transportException) {
             $this->addFlash('warning', sprintf(
                 'Mail configuration saved but verification email could not be delivered: %s.'
@@ -223,6 +229,11 @@ final class AccountMailController extends AbstractController
             $dsn = $this->vault->decrypt($config->getEncryptedDsn());
             $this->sendVerification($config, $dsn);
             $this->addFlash('success', sprintf('Verification email resent to %s.', $config->getFromAddr()));
+        } catch (DsnRejected $dsnRejected) {
+            $this->addFlash('warning', sprintf(
+                'Could not send verification email: %s',
+                $dsnRejected->getMessage(),
+            ));
         } catch (TransportExceptionInterface $transportException) {
             $this->addFlash('warning', sprintf(
                 'Could not deliver verification email: %s',

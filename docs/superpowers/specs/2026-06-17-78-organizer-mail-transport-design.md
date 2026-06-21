@@ -342,3 +342,12 @@ self::assertEmailCount(0);  // global platform null://null collector — NOT hit
 - [ ] All locked decisions enforced in code (scheme allow-list, host allow-list, hard-fail at send, raw-error UX, DB-first save ordering).
 - [ ] Unit + integration + functional tests pass per the test plan above.
 - [ ] PHPStan level 10 clean, `phpcs` PSR-12, GrumPHP green.
+
+## Addendum (#87) — rebinding caveat
+
+`DsnValidator` resolves and validates the host at config-save time only; the SMTP socket
+re-resolves the hostname at connect time. **Hostname-validate-then-reconnect-by-name is DNS
+rebinding-vulnerable by construction** — a stored "validated at save" / `verified` flag does
+not hold at send time. The control is `PinnedTransportFactory`: resolve → validate every IP
+→ connect to the literal validated IP with the hostname carried as TLS `peer_name`, applied
+on every transport build. See `docs/superpowers/specs/2026-06-20-87-mail-ssrf-pinning-design.md`.
