@@ -38,6 +38,20 @@
                     Show my photos
                 </a>
             </div>
+
+            {% if notificationsOpen %}
+                <form method="post" action="{{ path('public_event_notify_subscribe', {slug: event.slug}) }}" class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <label class="form-control w-full">
+                        <span class="label-text">Email me when photos are live</span>
+                        <input type="email" name="email" required class="input input-bordered w-full" placeholder="you@example.com">
+                    </label>
+                    {# honeypot: must stay in the DOM but hidden from humans #}
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" class="hidden" style="position:absolute;left:-9999px" aria-hidden="true">
+                    <button type="submit" class="btn btn-secondary">Notify me</button>
+                </form>
+            {% elseif notificationsPublished %}
+                <p class="mt-4 text-sm text-base-content/60">Notifications already sent for this event.</p>
+            {% endif %}
         </div>
     </article>
 {% endblock %}

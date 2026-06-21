@@ -10,16 +10,14 @@ use App\Entity\UserMailConfig;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use SodiumException;
-use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\MailerInterface;
 
 final readonly class OrganizerMailerResolver
 {
     public function __construct(
         private DsnVault $vault,
-        private MailerInterface $platformMailer,
         private LoggerInterface $logger,
-        private PinnedTransportFactory $pinnedTransports,
+        private TransportBuilder $transportBuilder,
         private EntityManagerInterface $em,
     ) {
     }
@@ -33,22 +31,28 @@ final readonly class OrganizerMailerResolver
     {
         $config = $user->getMailConfig();
         if (!$config instanceof UserMailConfig || !$config->isVerified()) {
-            return $this->platformMailer;
+            throw new OrganizerMailNotConfiguredException(
+                'Organizer has no verified mail transport.',
+            );
         }
 
         try {
             $dsn = $this->vault->decrypt($config->getEncryptedDsn());
         } catch (SodiumException $sodiumException) {
             $this->logger->error(
-                'Falling back to platform mailer: cannot decrypt mail config DSN for user.',
+                'Cannot decrypt mail config DSN for user; refusing to fall back to platform mail.',
                 ['user_id' => $user->getId(), 'exception' => $sodiumException->getMessage()],
             );
 
-            return $this->platformMailer;
+            throw new OrganizerMailNotConfiguredException(
+                'Stored mail transport ciphertext is corrupted.',
+                0,
+                $sodiumException,
+            );
         }
 
         try {
-            return new Mailer($this->pinnedTransports->create($dsn));
+            return $this->transportBuilder->fromDsn($dsn);
         } catch (DsnRejected $dsnRejected) {
             if ($dsnRejected->reason === DsnRejected::REASON_HOST) {
                 $this->logger->error(

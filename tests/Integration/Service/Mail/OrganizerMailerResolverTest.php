@@ -9,11 +9,13 @@ use App\Entity\User;
 use App\Entity\UserMailConfig;
 use App\Service\Mail\DsnRejected;
 use App\Service\Mail\DsnVault;
+use App\Service\Mail\EncryptedDsn;
 use App\Service\Mail\OrganizerMailerResolver;
+use App\Service\Mail\OrganizerMailNotConfiguredException;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
+use App\Service\Mail\RenderingMailer;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
-use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\MailerInterface;
 
 final class OrganizerMailerResolverTest extends KernelTestCase
@@ -44,14 +46,15 @@ final class OrganizerMailerResolverTest extends KernelTestCase
         $this->platformMailer = $platformMailer;
     }
 
-    public function testReturnsPlatformMailerWhenUserHasNoConfig(): void
+    public function testThrowsWhenUserHasNoConfig(): void
     {
         $user = $this->persistUser('no-config@example.com');
 
-        $this->assertSame($this->platformMailer, $this->resolver->forUser($user));
+        $this->expectException(OrganizerMailNotConfiguredException::class);
+        $this->resolver->forUser($user);
     }
 
-    public function testReturnsPlatformMailerWhenConfigIsUnverified(): void
+    public function testThrowsWhenConfigIsUnverified(): void
     {
         $user = $this->persistUser('pending@example.com');
         $config = new UserMailConfig(
@@ -63,7 +66,26 @@ final class OrganizerMailerResolverTest extends KernelTestCase
         $this->em->persist($config);
         $this->em->flush();
 
-        $this->assertSame($this->platformMailer, $this->resolver->forUser($user));
+        $this->expectException(OrganizerMailNotConfiguredException::class);
+        $this->resolver->forUser($user);
+    }
+
+    public function testThrowsOnCorruptedCiphertextInsteadOfFallingBack(): void
+    {
+        $user = $this->persistUser('corrupt@example.com');
+        $config = new UserMailConfig(
+            $user,
+            new EncryptedDsn('not-valid-ciphertext', 'not-a-valid-nonce'),
+            'corrupt@example.com',
+            null,
+        );
+        $config->markVerified();
+
+        $this->em->persist($config);
+        $this->em->flush();
+
+        $this->expectException(OrganizerMailNotConfiguredException::class);
+        $this->resolver->forUser($user);
     }
 
     public function testReturnsCustomMailerWhenConfigIsVerified(): void
@@ -83,7 +105,7 @@ final class OrganizerMailerResolverTest extends KernelTestCase
         $resolved = $this->resolver->forUser($user);
 
         $this->assertNotSame($this->platformMailer, $resolved);
-        $this->assertInstanceOf(Mailer::class, $resolved);
+        $this->assertInstanceOf(RenderingMailer::class, $resolved);
     }
 
     public function testForEventDelegatesToOwner(): void

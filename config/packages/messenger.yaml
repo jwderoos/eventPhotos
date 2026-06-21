@@ -12,3 +12,11 @@ framework:
             failed: 'doctrine://default?queue_name=failed'
         routing:
             'App\Message\ProcessPhoto': async
+            'App\Message\SendEventLiveNotifications': async
+            'App\Message\SendEventLiveEmail': async
+
+when@test:
+    framework:
+        messenger:
+            transports:
+                async: 'in-memory://'

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use DomainException;
 use Stringable;
 use App\Repository\EventRepository;
 use DateTimeImmutable;
@@ -48,6 +49,12 @@ class Event implements Stringable
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?DateTimeImmutable $logoUpdatedAt = null;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?DateTimeImmutable $publishedAt = null;
+
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
+    private bool $notificationsEnabled = false;
 
     #[Vich\UploadableField(mapping: 'event_logo', fileNameProperty: 'logoFilename')]
     #[Assert\File(
@@ -195,6 +202,40 @@ class Event implements Stringable
                 ->atPath('endsAt')
                 ->addViolation();
         }
+    }
+
+    public function markPublished(DateTimeImmutable $now): void
+    {
+        if ($this->publishedAt instanceof DateTimeImmutable) {
+            throw new DomainException('Event is already published.');
+        }
+
+        $this->publishedAt = $now;
+    }
+
+    public function isPublished(): bool
+    {
+        return $this->publishedAt instanceof DateTimeImmutable;
+    }
+
+    public function getPublishedAt(): ?DateTimeImmutable
+    {
+        return $this->publishedAt;
+    }
+
+    public function enableNotifications(): void
+    {
+        $this->notificationsEnabled = true;
+    }
+
+    public function disableNotifications(): void
+    {
+        $this->notificationsEnabled = false;
+    }
+
+    public function areNotificationsEnabled(): bool
+    {
+        return $this->notificationsEnabled;
     }
 
     public function getLogoFilename(): ?string

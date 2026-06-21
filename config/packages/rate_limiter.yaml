@@ -9,3 +9,17 @@ framework:
             limit: 120
             interval: '1 minute'
             cache_pool: 'rate_limiter.cache_pool'
+        # Per-client-IP cap on visitor "notify me" signups (#77). Blunts mass
+        # signup floods from a single source.
+        visitor_email_signup:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '1 hour'
+            cache_pool: 'rate_limiter.cache_pool'
+        # Per-email cap on confirmation-email resends (#77). Closes the mail-bomb
+        # vector where an attacker re-submits a victim's address repeatedly.
+        confirm_email_resend:
+            policy: 'sliding_window'
+            limit: 1
+            interval: '10 minutes'
+            cache_pool: 'rate_limiter.cache_pool'

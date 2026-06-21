@@ -11,6 +11,7 @@ use App\Entity\PhotoStatus;
 use App\Repository\EventRepository;
 use App\Repository\PhotoRepository;
 use App\Service\Event\PhotosUrlBuilder;
+use App\Service\Mail\OrganizerMailerResolver;
 use App\Service\QrCodeRenderer;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -44,6 +45,7 @@ final class EventController extends AbstractController
         #[Autowire(service: 'event_logos_storage')]
         private readonly FilesystemOperator $eventLogosStorage,
         private readonly LoggerInterface $logger,
+        private readonly OrganizerMailerResolver $mailerResolver,
     ) {
     }
 
@@ -56,11 +58,15 @@ final class EventController extends AbstractController
             ? $now
             : $this->startCursorInEventTimezone($event);
 
+        $mailActive = $this->mailerResolver->isCustomActive($event->getOwner());
+
         return $this->render('public/event/landing.html.twig', [
-            'event'             => $event,
-            'now'               => $now,
-            'photosUrl'         => $this->photosUrl->build($event, $when),
-            'photosUrlAbsolute' => $this->photosUrl->build($event, $when, absolute: true),
+            'event'                 => $event,
+            'now'                   => $now,
+            'photosUrl'             => $this->photosUrl->build($event, $when),
+            'photosUrlAbsolute'     => $this->photosUrl->build($event, $when, absolute: true),
+            'notificationsOpen'     => $event->areNotificationsEnabled() && !$event->isPublished() && $mailActive,
+            'notificationsPublished' => $event->isPublished(),
         ]);
     }
 

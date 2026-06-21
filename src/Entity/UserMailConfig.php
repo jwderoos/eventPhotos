@@ -12,6 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 use DomainException;
 use InvalidArgumentException;
 use RuntimeException;
+use Symfony\Component\Mime\Address;
 
 #[ORM\Entity(repositoryClass: UserMailConfigRepository::class)]
 #[ORM\Table(name: 'user_mail_configs')]
@@ -102,6 +103,13 @@ class UserMailConfig
     public function getFromName(): ?string
     {
         return $this->fromName;
+    }
+
+    public function getSenderAddress(): Address
+    {
+        return $this->fromName !== null && $this->fromName !== ''
+            ? new Address($this->fromAddr, $this->fromName)
+            : new Address($this->fromAddr);
     }
 
     public function getVerifiedAt(): ?DateTimeImmutable

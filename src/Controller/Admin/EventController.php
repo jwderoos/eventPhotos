@@ -7,11 +7,15 @@ namespace App\Controller\Admin;
 use App\Entity\Event;
 use App\Entity\User;
 use App\Form\EventType;
+use App\Message\SendEventLiveNotifications;
+use App\Repository\EventNotificationSubscriptionRepository;
 use App\Repository\EventRepository;
 use App\Repository\PhotoRepository;
 use App\Security\Voter\EventVoter;
+use App\Service\Mail\OrganizerMailerResolver;
 use App\Service\QrCodeRenderer;
 use DateTimeImmutable;
+use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\FilesystemOperator;
@@ -21,6 +25,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
@@ -35,6 +40,11 @@ final class EventController extends AbstractController
         #[Autowire(service: 'event_logos_storage')]
         private readonly FilesystemOperator $eventLogosStorage,
         private readonly LoggerInterface $logger,
+        private readonly OrganizerMailerResolver $mailerResolver,
+        private readonly MessageBusInterface $bus,
+        private readonly EventNotificationSubscriptionRepository $subscriptions,
+        #[Autowire('%env(int:EVENT_LIVE_NOTIFICATION_RATE_PER_MIN)%')]
+        private readonly int $notificationRatePerMinute,
     ) {
     }
 
@@ -113,10 +123,17 @@ final class EventController extends AbstractController
             return $this->redirectToRoute('admin_event_index');
         }
 
+        $rate = max(1, $this->notificationRatePerMinute);
+        $confirmedCount = count($this->subscriptions->findConfirmedByEvent($event));
+
         return $this->render('admin/event/form.html.twig', [
             'form'  => $form,
             'event' => $event,
             'mode'  => 'edit',
+            'subscriberCount'  => $this->subscriptions->countByEvent($event),
+            'mailActive'       => $this->mailerResolver->isCustomActive($event->getOwner()),
+            'readyPhotoCount'  => $this->photos->countReady($event),
+            'projectedMinutes' => (int) ceil($confirmedCount / $rate),
         ]);
     }
 
@@ -137,6 +154,69 @@ final class EventController extends AbstractController
         $this->addFlash('success', 'Event deleted.');
 
         return $this->redirectToRoute('admin_event_index');
+    }
+
+    #[Route(
+        '/admin/events/{id}/publish',
+        name: 'admin_event_publish',
+        requirements: ['id' => '\d+'],
+        methods: ['POST'],
+    )]
+    public function publish(Event $event, Request $request): Response
+    {
+        $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
+
+        $token = $request->request->get('_token');
+        if (!is_string($token) || !$this->isCsrfTokenValid('publish' . $event->getId(), $token)) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
+        if (
+            $event->isPublished()
+            || $this->photos->countReady($event) < 1
+            || !$this->mailerResolver->isCustomActive($event->getOwner())
+        ) {
+            return new Response('Cannot publish this event.', Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $event->markPublished(new DateTimeImmutable('now', new DateTimeZone('UTC')));
+        $this->em->flush();
+
+        $this->bus->dispatch(new SendEventLiveNotifications((int) $event->getId()));
+
+        $this->addFlash('success', 'Event published. Notifying confirmed subscribers.');
+
+        return $this->redirectToRoute('admin_event_edit', ['id' => $event->getId()]);
+    }
+
+    #[Route(
+        '/admin/events/{id}/notifications',
+        name: 'admin_event_toggle_notifications',
+        requirements: ['id' => '\d+'],
+        methods: ['POST'],
+    )]
+    public function toggleNotifications(Event $event, Request $request): Response
+    {
+        $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
+
+        $token = $request->request->get('_token');
+        if (!is_string($token) || !$this->isCsrfTokenValid('notifications' . $event->getId(), $token)) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
+        if (!$this->mailerResolver->isCustomActive($event->getOwner())) {
+            return new Response('Mail transport not configured.', Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if ($request->request->getBoolean('enabled')) {
+            $event->enableNotifications();
+        } else {
+            $event->disableNotifications();
+        }
+
+        $this->em->flush();
+
+        return $this->redirectToRoute('admin_event_edit', ['id' => $event->getId()]);
     }
 
     #[Route(
