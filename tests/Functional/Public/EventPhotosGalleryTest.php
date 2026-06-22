@@ -182,6 +182,66 @@ final class EventPhotosGalleryTest extends WebTestCase
         $this->assertCount(1, $dialog, 'Lightbox dialog element must be rendered');
     }
 
+    /**
+     * Regression for #89. Slots must be centered by a flex wrapper, NOT by
+     * margin-auto on the <img> itself: margin-auto centering only resolves once
+     * the image's intrinsic dimensions are known (after decode), so on every
+     * navigation the freshly re-sourced slot briefly renders left/top-aligned
+     * before snapping to centre. A flex wrapper keeps the slot centred even
+     * while the <img> has no intrinsic size yet.
+     */
+    public function testLightboxSlotsAreFlexCenteredNotMarginAuto(): void
+    {
+        $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+
+        $owner = new User('center@example.test', 'C');
+        $owner->setPassword('x');
+
+        $em->persist($owner);
+
+        $event = new Event(
+            'center',
+            'Center',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 14:00'),
+            $owner,
+        );
+        $event->setTimezone('UTC');
+
+        $em->persist($event);
+
+        $photo = new Photo($event, str_repeat('a', 64), 'a.jpg', 100);
+        $photo->markReady(new DateTimeImmutable('2026-06-10 12:00:00', new DateTimeZone('UTC')), 100, 100, 1024);
+
+        $em->persist($photo);
+        $em->flush();
+
+        $crawler = $client->request(Request::METHOD_GET, '/e/center/photos?t=12:00');
+        $this->assertResponseIsSuccessful();
+
+        foreach (['slotPrev', 'slotCurr', 'slotNext'] as $slot) {
+            $img = $crawler->filter(sprintf('img[data-lightbox-target="%s"]', $slot));
+            $this->assertCount(1, $img, sprintf('%s image must render', $slot));
+
+            $this->assertStringNotContainsString(
+                'm-auto',
+                (string)$img->attr('class'),
+                sprintf('%s must not rely on margin-auto centering (#89 left-align flash)', $slot),
+            );
+
+            $wrapperClass = (string)$img->ancestors()->first()->attr('class');
+            foreach (['flex', 'items-center', 'justify-center'] as $cls) {
+                $this->assertStringContainsString(
+                    $cls,
+                    $wrapperClass,
+                    sprintf('%s must be centred by a flex wrapper (missing "%s")', $slot, $cls),
+                );
+            }
+        }
+    }
+
     public function testHidesPendingPhotos(): void
     {
         $client = self::createClient();

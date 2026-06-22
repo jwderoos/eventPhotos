@@ -2,7 +2,7 @@ import { Controller } from '@hotwired/stimulus';
 
 const AXIS_LOCK = 8;            // px before we commit to horizontal
 const VERTICAL_RELEASE = 10;    // |dy| at which we abandon to vertical scroll
-const COMMIT_RATIO = 0.25;      // fraction of viewport width
+const COMMIT_RATIO = 0.10;      // fraction of viewport width a slow drag must cross to commit (flick/velocity commits separately)
 const FLICK_VELOCITY = 0.5;     // px / ms
 const VELOCITY_WINDOW_MS = 80;
 const RUBBER_BAND = 0.4;

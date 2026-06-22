@@ -109,20 +109,26 @@
 
                         <div data-lightbox-target="track"
                              class="lightbox-track absolute inset-0 will-change-transform touch-pan-y">
-                            <img data-lightbox-target="slotPrev"
-                                 alt=""
-                                 aria-hidden="true"
-                                 class="lightbox-slot absolute inset-0 m-auto max-w-full max-h-full object-contain select-none pointer-events-none"
+                            <div class="lightbox-slot absolute inset-0 flex items-center justify-center"
                                  style="transform: translate3d(-100%, 0, 0);">
-                            <img data-lightbox-target="slotCurr"
-                                 alt="{{ event.name }}"
-                                 class="lightbox-slot absolute inset-0 m-auto max-w-full max-h-full object-contain select-none"
+                                <img data-lightbox-target="slotPrev"
+                                     alt=""
+                                     aria-hidden="true"
+                                     class="max-w-full max-h-full object-contain select-none pointer-events-none">
+                            </div>
+                            <div class="lightbox-slot absolute inset-0 flex items-center justify-center"
                                  style="transform: translate3d(0, 0, 0);">
-                            <img data-lightbox-target="slotNext"
-                                 alt=""
-                                 aria-hidden="true"
-                                 class="lightbox-slot absolute inset-0 m-auto max-w-full max-h-full object-contain select-none pointer-events-none"
+                                <img data-lightbox-target="slotCurr"
+                                     alt="{{ event.name }}"
+                                     class="max-w-full max-h-full object-contain select-none">
+                            </div>
+                            <div class="lightbox-slot absolute inset-0 flex items-center justify-center"
                                  style="transform: translate3d(100%, 0, 0);">
+                                <img data-lightbox-target="slotNext"
+                                     alt=""
+                                     aria-hidden="true"
+                                     class="max-w-full max-h-full object-contain select-none pointer-events-none">
+                            </div>
                         </div>
 
                         <div data-lightbox-target="spinner"
