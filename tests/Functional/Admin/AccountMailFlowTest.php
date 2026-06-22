@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
+use App\Enum\MailProvider;
 use App\Service\Mail\DsnVault;
 use App\Service\Mail\OrganizerMailerResolver;
 use App\Service\Mail\DsnRejected;
@@ -78,6 +79,65 @@ final class AccountMailFlowTest extends WebTestCase
         $config = $reloaded->getMailConfig();
         $this->assertInstanceOf(UserMailConfig::class, $config);
         $this->assertTrue($config->isVerified());
+    }
+
+    public function testGmailModeAssemblesDsnAndDefaultsFromAddr(): void
+    {
+        $user = $this->createOrganizer('gmail-mode@example.com', 'secret');
+        $this->client->loginUser($user);
+
+        $crawler = $this->client->request(Request::METHOD_GET, '/admin/account/mail');
+        $form = $crawler->selectButton('Save and send verification')->form([
+            'user_mail_config[provider]' => 'gmail',
+            'user_mail_config[gmailEmail]' => 'organizer@gmail.com',
+            'user_mail_config[gmailAppPassword]' => 'abcd efgh ijkl mnop',
+            'user_mail_config[fromAddr]' => '',
+            'user_mail_config[fromName]' => '',
+        ]);
+        $this->client->submit($form);
+        self::assertResponseRedirects('/admin/account/mail');
+
+        // Verification email went through the Gmail-shaped transport (stub IP for smtp.gmail.com).
+        $this->assertCount(1, CapturedMail::messagesForHost('93.184.216.40'));
+
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(User::class)->find($user->getId());
+        $config = $reloaded?->getMailConfig();
+        $this->assertInstanceOf(UserMailConfig::class, $config);
+        $this->assertSame(MailProvider::Gmail, $config->getProvider());
+        $this->assertSame('organizer@gmail.com', $config->getFromAddr());
+
+        /** @var DsnVault $vault */
+        $vault = self::getContainer()->get(DsnVault::class);
+        $dsn = $vault->decrypt($config->getEncryptedDsn());
+        $this->assertSame(
+            'smtps://organizer%40gmail.com:abcdefghijklmnop@smtp.gmail.com:465',
+            $dsn,
+        );
+    }
+
+    public function testCustomModeStillWorks(): void
+    {
+        $user = $this->createOrganizer('still-custom@example.com', 'secret');
+        $this->client->loginUser($user);
+
+        $crawler = $this->client->request(Request::METHOD_GET, '/admin/account/mail');
+        $form = $crawler->selectButton('Save and send verification')->form([
+            'user_mail_config[provider]' => 'custom',
+            'user_mail_config[dsn]' => 'smtp://user:pass@smtp.example-organizer.test:25',
+            'user_mail_config[fromAddr]' => 'press@example-organizer.test',
+            'user_mail_config[fromName]' => '',
+        ]);
+        $this->client->submit($form);
+        self::assertResponseRedirects('/admin/account/mail');
+
+        $this->assertCount(1, CapturedMail::messagesForHost('93.184.216.34'));
+
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(User::class)->find($user->getId());
+        $config = $reloaded?->getMailConfig();
+        $this->assertInstanceOf(UserMailConfig::class, $config);
+        $this->assertSame(MailProvider::Custom, $config->getProvider());
     }
 
     private function createOrganizer(string $email, string $password): User
@@ -185,6 +245,17 @@ final class AccountMailFlowTest extends WebTestCase
         $config = $reloaded?->getMailConfig();
         $this->assertInstanceOf(UserMailConfig::class, $config);
         $this->assertFalse($config->isVerified());
+    }
+
+    public function testFormRendersGmailFields(): void
+    {
+        $user = $this->createOrganizer('render@example.com', 'secret');
+        $this->client->loginUser($user);
+
+        $crawler = $this->client->request(Request::METHOD_GET, '/admin/account/mail');
+        self::assertResponseIsSuccessful();
+        $this->assertGreaterThan(0, $crawler->filter('[data-controller="mail-provider"]')->count());
+        $this->assertGreaterThan(0, $crawler->filter('input[name="user_mail_config[gmailAppPassword]"]')->count());
     }
 
     private function saveValidConfig(User $user): void

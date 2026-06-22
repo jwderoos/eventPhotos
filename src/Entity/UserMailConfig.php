@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\Enum\MailProvider;
 use App\Repository\UserMailConfigRepository;
 use App\Service\Mail\EncryptedDsn;
 use DateTimeImmutable;
@@ -59,6 +60,8 @@ class UserMailConfig
         string $fromAddr,
         #[ORM\Column(type: Types::STRING, length: 120, nullable: true)]
         private ?string $fromName,
+        #[ORM\Column(type: Types::STRING, length: 16, enumType: MailProvider::class, options: ['default' => 'custom'])]
+        private MailProvider $provider = MailProvider::Custom,
     ) {
         if ($fromAddr === '') {
             throw new InvalidArgumentException('UserMailConfig from_addr cannot be empty.');
@@ -103,6 +106,11 @@ class UserMailConfig
     public function getFromName(): ?string
     {
         return $this->fromName;
+    }
+
+    public function getProvider(): MailProvider
+    {
+        return $this->provider;
     }
 
     public function getSenderAddress(): Address
@@ -172,8 +180,12 @@ class UserMailConfig
      * Returns true when re-verification is required (DSN or from_addr changed), false when only
      * the cosmetic from_name differs.
      */
-    public function applyConfig(EncryptedDsn $envelope, string $fromAddr, ?string $fromName): bool
-    {
+    public function applyConfig(
+        EncryptedDsn $envelope,
+        string $fromAddr,
+        ?string $fromName,
+        MailProvider $provider = MailProvider::Custom,
+    ): bool {
         if ($fromAddr === '') {
             throw new InvalidArgumentException('UserMailConfig from_addr cannot be empty.');
         }
@@ -188,6 +200,7 @@ class UserMailConfig
         $this->dsnNonce = $incomingNonce;
         $this->fromAddr = $fromAddr;
         $this->fromName = $fromName;
+        $this->provider = $provider;
         $this->updatedAt = new DateTimeImmutable();
 
         if ($dsnChanged || $fromAddrChanged) {

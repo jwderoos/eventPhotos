@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Admin;
 
 use App\Entity\User;
+use App\Entity\UserMailConfig;
 use App\Entity\UserMailConfigAudit;
+use App\Enum\MailProvider;
 use App\Tests\Mail\CapturedMail;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -55,6 +57,35 @@ final class UserMailFlowTest extends WebTestCase
         $this->assertInstanceOf(User::class, $audit->getActor());
         $this->assertSame($admin->getEmail(), $audit->getActor()->getEmail());
         $this->assertSame($admin->getEmail(), $audit->getActorEmailSnapshot());
+    }
+
+    public function testAdminCanConfigureGmailForOtherUser(): void
+    {
+        $admin = $this->createUser('admin-gmail@example.com', 'ROLE_ADMIN');
+        $target = $this->createUser('target-gmail@example.com', 'ROLE_ORGANIZER');
+        $this->client->loginUser($admin);
+
+        $crawler = $this->client->request(Request::METHOD_GET, '/admin/users/' . $target->getId() . '/mail');
+        self::assertResponseIsSuccessful();
+
+        $form = $crawler->selectButton('Save and send verification')->form([
+            'user_mail_config[provider]' => 'gmail',
+            'user_mail_config[gmailEmail]' => 'target@gmail.com',
+            'user_mail_config[gmailAppPassword]' => 'wxyz efgh ijkl mnop',
+            'user_mail_config[fromAddr]' => '',
+            'user_mail_config[fromName]' => '',
+        ]);
+        $this->client->submit($form);
+        self::assertResponseRedirects('/admin/users/' . $target->getId() . '/mail');
+
+        $this->assertCount(1, CapturedMail::messagesForHost('93.184.216.40'));
+
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(User::class)->find($target->getId());
+        $config = $reloaded?->getMailConfig();
+        $this->assertInstanceOf(UserMailConfig::class, $config);
+        $this->assertSame(MailProvider::Gmail, $config->getProvider());
+        $this->assertSame('target@gmail.com', $config->getFromAddr());
     }
 
     public function testOrganizerCannotEditOtherUsersMail(): void

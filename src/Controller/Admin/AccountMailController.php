@@ -9,11 +9,13 @@ use App\Entity\User;
 use App\Entity\UserMailConfig;
 use App\Entity\UserMailConfigAudit;
 use App\Enum\MailConfigAuditAction;
+use App\Enum\MailProvider;
 use App\Form\UserMailConfigType;
 use App\Repository\UserMailConfigRepository;
 use App\Service\Mail\DsnRejected;
 use App\Service\Mail\DsnValidator;
 use App\Service\Mail\DsnVault;
+use App\Service\Mail\GmailDsnFactory;
 use App\Service\Mail\TransportBuilder;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
@@ -39,6 +41,7 @@ final class AccountMailController extends AbstractController
         private readonly DsnValidator $validator,
         private readonly DsnVault $vault,
         private readonly TransportBuilder $transports,
+        private readonly GmailDsnFactory $gmailDsn,
     ) {
     }
 
@@ -47,13 +50,15 @@ final class AccountMailController extends AbstractController
     {
         /** @var User $user */
         $user = $this->getUser();
+        $config = $user->getMailConfig();
         $form = $this->createForm(UserMailConfigType::class, null, [
             'action' => $this->generateUrl('admin_account_mail_update'),
+            'provider' => $config?->getProvider()->value ?? MailProvider::Custom->value,
         ]);
 
         return $this->render('admin/account/mail/edit.html.twig', [
             'form' => $form->createView(),
-            'config' => $user->getMailConfig(),
+            'config' => $config,
         ]);
     }
 
@@ -72,17 +77,31 @@ final class AccountMailController extends AbstractController
             ], new Response('', Response::HTTP_UNPROCESSABLE_ENTITY));
         }
 
-        $dsnRaw = $form->get('dsn')->getData();
-        $fromAddrRaw = $form->get('fromAddr')->getData();
+        $providerRaw = $form->get('provider')->getData();
+        $provider = $providerRaw === MailProvider::Gmail->value ? MailProvider::Gmail : MailProvider::Custom;
         $fromNameRaw = $form->get('fromName')->getData();
-        $dsn = is_string($dsnRaw) ? $dsnRaw : '';
-        $fromAddr = is_string($fromAddrRaw) ? $fromAddrRaw : '';
         $fromName = is_string($fromNameRaw) && $fromNameRaw !== '' ? $fromNameRaw : null;
+
+        if ($provider === MailProvider::Gmail) {
+            $emailRaw = $form->get('gmailEmail')->getData();
+            $appPwRaw = $form->get('gmailAppPassword')->getData();
+            $email = is_string($emailRaw) ? $emailRaw : '';
+            $appPw = is_string($appPwRaw) ? $appPwRaw : '';
+            $dsn = $this->gmailDsn->build($email, $appPw);
+            $fromAddrRaw = $form->get('fromAddr')->getData();
+            $fromAddr = is_string($fromAddrRaw) && $fromAddrRaw !== '' ? $fromAddrRaw : $email;
+        } else {
+            $dsnRaw = $form->get('dsn')->getData();
+            $fromAddrRaw = $form->get('fromAddr')->getData();
+            $dsn = is_string($dsnRaw) ? $dsnRaw : '';
+            $fromAddr = is_string($fromAddrRaw) ? $fromAddrRaw : '';
+        }
 
         try {
             $this->validator->validate($dsn);
         } catch (DsnRejected $dsnRejected) {
-            $form->get('dsn')->addError(new FormError($dsnRejected->getMessage()));
+            $errorField = $provider === MailProvider::Gmail ? 'gmailAppPassword' : 'dsn';
+            $form->get($errorField)->addError(new FormError($dsnRejected->getMessage()));
 
             return $this->render('admin/account/mail/edit.html.twig', [
                 'form' => $form->createView(),
@@ -93,10 +112,10 @@ final class AccountMailController extends AbstractController
         $envelope = $this->vault->encrypt($dsn);
         $config = $user->getMailConfig();
         if ($config === null) {
-            $config = new UserMailConfig($user, $envelope, $fromAddr, $fromName);
+            $config = new UserMailConfig($user, $envelope, $fromAddr, $fromName, $provider);
             $this->em->persist($config);
         } else {
-            $config->applyConfig($envelope, $fromAddr, $fromName);
+            $config->applyConfig($envelope, $fromAddr, $fromName, $provider);
         }
 
         $this->em->persist(new UserMailConfigAudit(
@@ -273,7 +292,7 @@ final class AccountMailController extends AbstractController
 
         $this->addFlash(
             'success',
-            'Mail configuration cleared. Event emails will be sent from the platform default.',
+            'Mail configuration cleared. Without a verified configuration, event mail cannot be sent.',
         );
 
         return $this->redirectToRoute('admin_account_mail_edit');
