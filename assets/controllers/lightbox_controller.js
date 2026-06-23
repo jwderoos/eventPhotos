@@ -184,12 +184,11 @@ export default class extends Controller {
         this.animateTo(w, () => this.previousImmediate());
     }
 
-    async fetchNeighborForActive(direction) {
-        const current = this.currentPhoto();
-        if (!current) return null;
-        if (this.noNeighborFor[direction].has(current.id)) return null;
+    async fetchNeighborOf(photoId, direction) {
+        if (!photoId) return null;
+        if (this.noNeighborFor[direction].has(photoId)) return null;
 
-        const key = `${direction}:${current.id}`;
+        const key = `${direction}:${photoId}`;
         if (this.neighborInFlight.has(key)) {
             return this.neighborInFlight.get(key);
         }
@@ -197,11 +196,11 @@ export default class extends Controller {
         const slug = this.hasEventSlugValue ? this.eventSlugValue : '';
         if (!slug) return null;
 
-        const url = `/e/${encodeURIComponent(slug)}/photos/${encodeURIComponent(current.id)}/neighbor?direction=${direction}`;
+        const url = `/e/${encodeURIComponent(slug)}/photos/${encodeURIComponent(photoId)}/neighbor?direction=${direction}`;
         const promise = fetch(url, { headers: { Accept: 'application/json' } })
             .then(async (res) => {
                 if (res.status === 204) {
-                    this.noNeighborFor[direction].add(current.id);
+                    this.noNeighborFor[direction].add(photoId);
                     return null;
                 }
                 if (!res.ok) {
@@ -220,6 +219,41 @@ export default class extends Controller {
 
         this.neighborInFlight.set(key, promise);
         return promise;
+    }
+
+    async fetchNeighborForActive(direction) {
+        const current = this.currentPhoto();
+        if (!current) return null;
+        return this.fetchNeighborOf(current.id, direction);
+    }
+
+    async prefetchBeyondBoundary(direction, count = 2) {
+        for (let i = 0; i < count; i++) {
+            if (this.activeIndex === null) return;
+            const boundary = direction === 'next'
+                ? this.photos[this.photos.length - 1]
+                : this.photos[0];
+            if (!boundary) return;
+
+            const neighbor = await this.fetchNeighborOf(boundary.id, direction);
+            if (!neighbor) return;
+
+            if (this.activeIndex === null) return;
+            if (this.indexOfPhotoId(neighbor.id) >= 0) continue;
+
+            if (direction === 'next') {
+                neighbor.rank = this.photos[this.photos.length - 1].rank + 1;
+                this.photos.push(neighbor);
+                this.preload(this.photos.length - 1);
+                this.assignSlot(this.slotNextTarget, this.photos[this.activeIndex + 1]);
+            } else {
+                neighbor.rank = this.photos[0].rank - 1;
+                this.photos.unshift(neighbor);
+                this.activeIndex += 1;
+                this.assignSlot(this.slotPrevTarget, this.photos[this.activeIndex - 1]);
+            }
+            this.updateArrows();
+        }
     }
 
     close() {
@@ -302,6 +336,12 @@ export default class extends Controller {
         for (let offset = 1; offset <= window; offset += 1) {
             this.preload(index - offset);
             this.preload(index + offset);
+        }
+        if (index + window >= this.photos.length) {
+            this.prefetchBeyondBoundary('next');
+        }
+        if (index - window < 0) {
+            this.prefetchBeyondBoundary('prev');
         }
     }
 
