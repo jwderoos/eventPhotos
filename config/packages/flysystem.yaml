@@ -12,7 +12,9 @@ flysystem:
             adapter: 'local'
             options:
                 directory: '%kernel.project_dir%/var/uploads/photos/thumbs'
+            directory_visibility: public
         photo_previews_storage:
             adapter: 'local'
             options:
                 directory: '%kernel.project_dir%/var/uploads/photos/previews'
+            directory_visibility: public
