@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controller\OAuth;
 
+use App\Audit\AuditAction;
+use App\Audit\Attribute\Audited;
 use App\Entity\User;
 use App\Entity\Invitation;
 use App\Service\Auth\GoogleOAuthClient;
@@ -59,6 +61,7 @@ final class GoogleInviteController extends AbstractController
         methods: ['GET'],
         condition: self::FLAG_CONDITION,
     )]
+    #[Audited(AuditAction::InviteRedeem)]
     public function callback(Request $request): Response
     {
         $rawToken = $request->getSession()->get(self::SESSION_KEY, '');

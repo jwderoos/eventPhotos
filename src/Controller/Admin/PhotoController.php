@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
-use Throwable;
-use DateTimeImmutable;
+use App\Audit\AuditAction;
+use App\Audit\AuditContext;
+use App\Audit\Attribute\AuditIgnore;
+use App\Audit\Attribute\Audited;
 use App\Entity\Event;
 use App\Entity\Photo;
 use App\Entity\PhotoStatus;
@@ -13,6 +15,7 @@ use App\Message\ProcessPhoto;
 use App\Repository\PhotoRepository;
 use App\Security\Voter\EventVoter;
 use App\Security\Voter\PhotoVoter;
+use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\FilesystemOperator;
@@ -25,6 +28,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Throwable;
 
 final class PhotoController extends AbstractController
 {
@@ -44,6 +48,7 @@ final class PhotoController extends AbstractController
         private readonly FilesystemOperator $thumbs,
         #[Autowire(service: 'photo_previews_storage')]
         private readonly FilesystemOperator $previews,
+        private readonly AuditContext $audit,
     ) {
     }
 
@@ -68,6 +73,7 @@ final class PhotoController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['POST'],
     )]
+    #[AuditIgnore]
     public function upload(Event $event, Request $request): JsonResponse
     {
         $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
@@ -194,13 +200,15 @@ final class PhotoController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['POST'],
     )]
+    #[Audited(AuditAction::PhotoDeleteAll, targetParam: 'id', targetType: 'Event')]
     public function deleteAll(Event $event, Request $request): RedirectResponse
     {
         $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
         $this->assertCsrf($request, 'delete_all_photos_' . $event->getId());
 
         $eventId = (int) $event->getId();
-        $this->photos->deleteAllForEvent($event);
+        $deletedCount = $this->photos->deleteAllForEvent($event);
+        $this->audit->set('deleted_count', $deletedCount);
 
         $dir = sprintf('event-%d', $eventId);
         foreach ([$this->originals, $this->thumbs, $this->previews] as $fs) {
@@ -220,6 +228,7 @@ final class PhotoController extends AbstractController
         requirements: ['eventId' => '\d+', 'photoId' => '\d+'],
         methods: ['POST'],
     )]
+    #[Audited(AuditAction::PhotoDelete, targetParam: 'photoId', targetType: 'Photo')]
     public function delete(int $eventId, int $photoId, Request $request): RedirectResponse
     {
         $photo = $this->loadOrThrow($eventId, $photoId);

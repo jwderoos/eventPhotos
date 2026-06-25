@@ -75,6 +75,7 @@ final class EventController extends AbstractController
     }
 
     #[Route('/admin/events/new', name: 'admin_event_new', methods: ['GET', 'POST'])]
+    #[Audited(AuditAction::EventCreate, targetParam: null)]
     public function new(Request $request): Response
     {
         $user = $this->getUser();
@@ -95,6 +96,9 @@ final class EventController extends AbstractController
             $this->em->persist($event);
             $this->em->flush();
 
+            $this->audit->set('created_id', $event->getId());
+            $this->audit->targetLabel($event->getName() . ' (' . $event->getSlug() . ')');
+
             $this->addFlash('success', 'Event created.');
 
             return $this->redirectToRoute('admin_event_index');
@@ -113,6 +117,7 @@ final class EventController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['GET', 'POST'],
     )]
+    #[Audited(AuditAction::EventEdit, targetParam: 'id', targetType: 'Event')]
     public function edit(Event $event, Request $request): Response
     {
         $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
@@ -121,6 +126,7 @@ final class EventController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $this->audit->targetLabel($event->getName() . ' (' . $event->getSlug() . ')');
             $this->em->flush();
             $this->addFlash('success', 'Event updated.');
 
@@ -171,6 +177,7 @@ final class EventController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['POST'],
     )]
+    #[Audited(AuditAction::EventPublish, targetParam: 'id', targetType: 'Event')]
     public function publish(Event $event, Request $request): Response
     {
         $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
@@ -204,6 +211,7 @@ final class EventController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['POST'],
     )]
+    #[Audited(AuditAction::EventNotificationsToggle, targetParam: 'id', targetType: 'Event')]
     public function toggleNotifications(Event $event, Request $request): Response
     {
         $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);

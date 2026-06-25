@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
+use App\Audit\AuditAction;
+use App\Audit\AuditContext;
+use App\Audit\Attribute\Audited;
 use App\Entity\UserSession;
 use App\Repository\UserRepository;
 use App\Repository\UserSessionRepository;
@@ -23,6 +26,7 @@ final class UserSessionController extends AbstractController
         private readonly UserRepository $users,
         private readonly UserSessionRepository $sessions,
         private readonly Connection $connection,
+        private readonly AuditContext $audit,
     ) {
     }
 
@@ -41,6 +45,7 @@ final class UserSessionController extends AbstractController
     }
 
     #[Route('/admin/users/{id}/sessions/{sessId}/revoke', name: 'admin_user_sessions_revoke', methods: ['POST'])]
+    #[Audited(AuditAction::SessionRevoke, targetParam: 'id', targetType: 'User')]
     public function revoke(int $id, string $sessId, Request $request): RedirectResponse
     {
         $user = $this->users->find($id);
@@ -58,6 +63,8 @@ final class UserSessionController extends AbstractController
         }
 
         $this->connection->executeStatement('DELETE FROM sessions WHERE sess_id = :id', ['id' => $sessId]);
+
+        $this->audit->set('sess_id', $sessId);
 
         $this->addFlash('success', 'Session revoked.');
         return $this->redirectToRoute('admin_user_sessions_index', ['id' => $id]);

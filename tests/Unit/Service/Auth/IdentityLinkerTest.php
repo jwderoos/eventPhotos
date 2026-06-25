@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Entity\UserIdentity;
 use App\Enum\AuthProvider;
 use App\Enum\OAuthRefusalReason;
+use App\Audit\AuditContext;
 use App\Repository\UserIdentityRepository;
 use App\Repository\UserRepository;
 use App\Service\Auth\GoogleUserData;
@@ -16,9 +17,15 @@ use App\Service\Auth\LinkRefused;
 use App\Service\Auth\LoginRefused;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 final class IdentityLinkerTest extends TestCase
 {
+    private function noopAudit(): AuditContext
+    {
+        return new AuditContext(new RequestStack());
+    }
+
     private function makeData(
         bool $verified = true,
         string $email = 'jane@example.com',
@@ -33,6 +40,7 @@ final class IdentityLinkerTest extends TestCase
             $this->createStub(UserIdentityRepository::class),
             $this->createStub(UserRepository::class),
             $this->createStub(EntityManagerInterface::class),
+            $this->noopAudit(),
         );
 
         try {
@@ -60,6 +68,7 @@ final class IdentityLinkerTest extends TestCase
             $identRepo,
             $this->createStub(UserRepository::class),
             $this->createStub(EntityManagerInterface::class),
+            $this->noopAudit(),
         );
 
         $result = $linker->resolveLogin($this->makeData());
@@ -79,6 +88,7 @@ final class IdentityLinkerTest extends TestCase
             $identRepo,
             $userRepo,
             $this->createStub(EntityManagerInterface::class),
+            $this->noopAudit(),
         );
 
         try {
@@ -104,6 +114,7 @@ final class IdentityLinkerTest extends TestCase
             $identRepo,
             $userRepo,
             $this->createStub(EntityManagerInterface::class),
+            $this->noopAudit(),
         );
 
         try {
@@ -127,7 +138,7 @@ final class IdentityLinkerTest extends TestCase
         $em->expects($this->once())->method('persist')->with(self::isInstanceOf(UserIdentity::class));
         $em->expects($this->once())->method('flush');
 
-        $linker = new IdentityLinker($identRepo, $userRepo, $em);
+        $linker = new IdentityLinker($identRepo, $userRepo, $em, $this->noopAudit());
 
         $result = $linker->resolveLogin($this->makeData());
         $this->assertSame($user, $result->user);
@@ -142,6 +153,7 @@ final class IdentityLinkerTest extends TestCase
             $this->createStub(UserIdentityRepository::class),
             $this->createStub(UserRepository::class),
             $this->createStub(EntityManagerInterface::class),
+            $this->noopAudit(),
         );
 
         try {
@@ -161,6 +173,7 @@ final class IdentityLinkerTest extends TestCase
             $this->createStub(UserIdentityRepository::class),
             $this->createStub(UserRepository::class),
             $this->createStub(EntityManagerInterface::class),
+            $this->noopAudit(),
         );
 
         try {
@@ -184,6 +197,7 @@ final class IdentityLinkerTest extends TestCase
             $identRepo,
             $this->createStub(UserRepository::class),
             $this->createStub(EntityManagerInterface::class),
+            $this->noopAudit(),
         );
 
         try {
@@ -209,6 +223,7 @@ final class IdentityLinkerTest extends TestCase
             $identRepo,
             $this->createStub(UserRepository::class),
             $em,
+            $this->noopAudit(),
         );
 
         $identity = $linker->linkToCurrentUser($user, $this->makeData());

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
+use App\Audit\AuditAction;
+use App\Audit\AuditContext;
+use App\Audit\Attribute\Audited;
 use App\Entity\User;
 use App\Form\UserCreateType;
 use App\Form\UserEditType;
@@ -37,6 +40,7 @@ final class UserController extends AbstractController
         private readonly MailerInterface $mailer,
         private readonly EventRepository $events,
         private readonly EventCollectionRepository $collections,
+        private readonly AuditContext $audit,
     ) {
     }
 
@@ -51,6 +55,7 @@ final class UserController extends AbstractController
     }
 
     #[Route('/admin/users/new', name: 'admin_user_new', methods: ['GET', 'POST'])]
+    #[Audited(AuditAction::UserCreate, targetParam: null)]
     public function new(Request $request): Response
     {
         $this->denyAccessUnlessGranted('ROLE_ADMIN');
@@ -72,6 +77,9 @@ final class UserController extends AbstractController
                 );
                 $this->em->persist($user);
                 $this->em->flush();
+
+                $this->audit->set('created_id', $user->getId());
+                $this->audit->targetLabel($user->getEmail());
 
                 $this->sendInviteEmail($user);
 
@@ -96,6 +104,7 @@ final class UserController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['GET', 'POST'],
     )]
+    #[Audited(AuditAction::UserEdit, targetParam: 'id', targetType: 'User')]
     public function edit(User $target, Request $request): Response
     {
         $this->denyAccessUnlessGranted(UserVoter::EDIT, $target);
@@ -121,8 +130,10 @@ final class UserController extends AbstractController
                 }
 
                 $target->addRole($data['role']);
+                $this->audit->changed('role', $currentTopRole, $data['role']);
             }
 
+            $this->audit->targetLabel($target->getEmail());
             $this->em->flush();
             $this->addFlash('success', 'User updated.');
             return new RedirectResponse('/admin/users');
@@ -143,6 +154,7 @@ final class UserController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['POST'],
     )]
+    #[Audited(AuditAction::UserDelete, targetParam: 'id', targetType: 'User')]
     public function delete(User $target, Request $request): RedirectResponse
     {
         $this->denyAccessUnlessGranted(UserVoter::DELETE, $target);
@@ -164,6 +176,9 @@ final class UserController extends AbstractController
             return new RedirectResponse('/admin/users/' . $target->getId() . '/edit');
         }
 
+        $this->audit->snapshot(['email' => $target->getEmail()]);
+        $this->audit->targetLabel($target->getEmail());
+
         $this->em->remove($target);
         $this->em->flush();
         $this->addFlash('success', 'User deleted.');
@@ -177,6 +192,7 @@ final class UserController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['POST'],
     )]
+    #[Audited(AuditAction::UserSendReset, targetParam: 'id', targetType: 'User')]
     public function sendReset(User $target, Request $request): RedirectResponse
     {
         $this->denyAccessUnlessGranted(UserVoter::EDIT, $target);
@@ -186,6 +202,7 @@ final class UserController extends AbstractController
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
+        $this->audit->targetLabel($target->getEmail());
         $this->sendInviteEmail($target);
         $this->addFlash('success', sprintf('Reset email sent to %s.', $target->getEmail()));
 

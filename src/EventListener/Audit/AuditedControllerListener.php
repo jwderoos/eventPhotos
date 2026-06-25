@@ -21,6 +21,11 @@ final class AuditedControllerListener
     {
         $controller = $event->getController();
 
+        // Handles method controllers only (array callables [$object, 'method']).
+        // Invokable controllers (bare class with __invoke) produce a plain callable, not an array
+        // callable, so they would silently bypass this listener and never write an audit row.
+        // AuditCoverageTest::testNoAdminControllerIsInvokable() enforces that no admin controller
+        // is invokable, making this array-only assumption safe.
         if (!is_array($controller) || count($controller) !== self::CALLABLE_ARRAY_LENGTH) {
             return;
         }

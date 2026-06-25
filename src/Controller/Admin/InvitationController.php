@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
+use App\Audit\AuditAction;
+use App\Audit\AuditContext;
+use App\Audit\Attribute\Audited;
 use App\Entity\Invitation;
 use App\Entity\User;
 use App\Form\InvitationCreateType;
@@ -27,6 +30,7 @@ final class InvitationController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly InvitationTokenService $tokens,
         private readonly LoggerInterface $logger,
+        private readonly AuditContext $audit,
     ) {
     }
 
@@ -50,6 +54,7 @@ final class InvitationController extends AbstractController
     }
 
     #[Route('/admin/invites/new', name: 'admin_invite_new', methods: ['GET', 'POST'])]
+    #[Audited(AuditAction::InviteCreate, targetParam: null)]
     public function new(Request $request): Response
     {
         $this->denyAccessUnlessGranted('ROLE_ADMIN');
@@ -72,6 +77,10 @@ final class InvitationController extends AbstractController
 
             $this->em->persist($invite);
             $this->em->flush();
+
+            $this->audit->set('created_id', $invite->getId());
+            $this->audit->set('role', $invite->getRole());
+            $this->audit->targetLabel('invite#' . $invite->getId() . ' (' . $invite->getRole() . ')');
 
             $url = $this->generateUrl(
                 'public_invite_redeem',
@@ -106,6 +115,7 @@ final class InvitationController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['POST'],
     )]
+    #[Audited(AuditAction::InviteRevoke, targetParam: 'id', targetType: 'Invitation')]
     public function revoke(Invitation $invite, Request $request): RedirectResponse
     {
         $this->denyAccessUnlessGranted('ROLE_ADMIN');
@@ -123,6 +133,7 @@ final class InvitationController extends AbstractController
             return new RedirectResponse($this->generateUrl('admin_invite_index'));
         }
 
+        $this->audit->targetLabel('invite#' . $invite->getId() . ' (' . $invite->getRole() . ')');
         $invite->revoke($this->getCurrentAdmin());
         $this->em->flush();
 

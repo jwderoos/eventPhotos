@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
-use Symfony\Component\HttpFoundation\RedirectResponse;
+use App\Audit\AuditAction;
+use App\Audit\AuditContext;
+use App\Audit\Attribute\Audited;
 use App\Entity\User;
 use App\Entity\UserMailConfig;
 use App\Entity\UserMailConfigAudit;
@@ -22,6 +24,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
@@ -42,6 +45,7 @@ final class AccountMailController extends AbstractController
         private readonly DsnVault $vault,
         private readonly TransportBuilder $transports,
         private readonly GmailDsnFactory $gmailDsn,
+        private readonly AuditContext $audit,
     ) {
     }
 
@@ -63,6 +67,7 @@ final class AccountMailController extends AbstractController
     }
 
     #[Route('/admin/account/mail', name: 'admin_account_mail_update', methods: ['POST'])]
+    #[Audited(AuditAction::MailConfigUpdate, targetParam: null)]
     public function update(Request $request): Response
     {
         /** @var User $user */
@@ -127,6 +132,9 @@ final class AccountMailController extends AbstractController
         ));
         $this->em->flush();
 
+        $this->audit->set('from_addr', $fromAddr);
+        $this->audit->targetLabel($user->getEmail());
+
         try {
             $this->sendVerification($config, $dsn);
             $this->addFlash('success', sprintf(
@@ -156,6 +164,7 @@ final class AccountMailController extends AbstractController
         requirements: ['token' => '[A-Za-z0-9_\-]{16,128}'],
         methods: ['GET'],
     )]
+    #[Audited(AuditAction::MailConfigVerify, targetParam: null)]
     public function verify(string $token): RedirectResponse
     {
         /** @var User $user */
@@ -186,6 +195,9 @@ final class AccountMailController extends AbstractController
             fromAddrSnapshot: $config->getFromAddr(),
         ));
         $this->em->flush();
+
+        $this->audit->set('from_addr', $config->getFromAddr());
+        $this->audit->targetLabel($user->getEmail());
 
         $this->addFlash(
             'success',
@@ -220,6 +232,7 @@ final class AccountMailController extends AbstractController
     }
 
     #[Route('/admin/account/mail/resend', name: 'admin_account_mail_resend', methods: ['POST'])]
+    #[Audited(AuditAction::MailConfigResend, targetParam: null)]
     public function resendVerification(Request $request): RedirectResponse
     {
         $token = $request->request->get('_token');
@@ -244,6 +257,9 @@ final class AccountMailController extends AbstractController
         ));
         $this->em->flush();
 
+        $this->audit->set('from_addr', $config->getFromAddr());
+        $this->audit->targetLabel($user->getEmail());
+
         try {
             $dsn = $this->vault->decrypt($config->getEncryptedDsn());
             $this->sendVerification($config, $dsn);
@@ -264,6 +280,7 @@ final class AccountMailController extends AbstractController
     }
 
     #[Route('/admin/account/mail/clear', name: 'admin_account_mail_clear', methods: ['POST'])]
+    #[Audited(AuditAction::MailConfigClear, targetParam: null)]
     public function clear(Request $request): RedirectResponse
     {
         $token = $request->request->get('_token');
@@ -289,6 +306,9 @@ final class AccountMailController extends AbstractController
             fromAddrSnapshot: $fromAddrSnapshot,
         ));
         $this->em->flush();
+
+        $this->audit->set('from_addr', $fromAddrSnapshot);
+        $this->audit->targetLabel($user->getEmail());
 
         $this->addFlash(
             'success',

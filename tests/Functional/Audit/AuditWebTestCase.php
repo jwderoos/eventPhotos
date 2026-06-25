@@ -15,6 +15,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Security\Csrf\TokenStorage\SessionTokenStorage;
 
 abstract class AuditWebTestCase extends WebTestCase
@@ -29,6 +30,21 @@ abstract class AuditWebTestCase extends WebTestCase
         /** @var EntityManagerInterface $em */
         $em = self::getContainer()->get(EntityManagerInterface::class);
         $this->em = $em;
+    }
+
+    protected function createUserWithPassword(string $email, string $plain): User
+    {
+        /** @var UserPasswordHasherInterface $hasher */
+        $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
+
+        $user = new User($email, ucfirst(strtok($email, '@') ?: 'User'));
+        $user->addRole('ROLE_ORGANIZER');
+        $user->setPassword($hasher->hashPassword($user, $plain));
+
+        $this->em->persist($user);
+        $this->em->flush();
+
+        return $user;
     }
 
     protected function makeUser(string $email, string $role): User

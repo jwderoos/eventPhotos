@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controller\OAuth;
 
+use App\Audit\AuditAction;
+use App\Audit\Attribute\Audited;
 use App\Entity\User;
 use App\Service\Auth\GoogleOAuthClient;
 use App\Service\Auth\IdentityLinker;
@@ -46,6 +48,7 @@ final class GoogleLinkController extends AbstractController
         methods: ['GET'],
         condition: self::FLAG_CONDITION,
     )]
+    #[Audited(AuditAction::OAuthLink, targetType: 'User')]
     public function callback(Request $request): RedirectResponse
     {
         /** @var User $current */
