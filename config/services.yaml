@@ -87,3 +87,6 @@ when@test:
 
         App\Service\Mail\DnsResolver:
             alias: App\Tests\Fake\PrebakedDnsResolver
+
+        App\Audit\AuditLogger:
+            public: true

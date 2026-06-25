@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
+use App\Audit\AuditAction;
+use App\Audit\AuditContext;
+use App\Audit\Attribute\Audited;
 use App\Entity\Event;
 use App\Entity\User;
 use App\Form\EventType;
@@ -45,6 +48,7 @@ final class EventController extends AbstractController
         private readonly EventNotificationSubscriptionRepository $subscriptions,
         #[Autowire('%env(int:EVENT_LIVE_NOTIFICATION_RATE_PER_MIN)%')]
         private readonly int $notificationRatePerMinute,
+        private readonly AuditContext $audit,
     ) {
     }
 
@@ -138,6 +142,7 @@ final class EventController extends AbstractController
     }
 
     #[Route('/admin/events/{id}/delete', name: 'admin_event_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Audited(AuditAction::EventDelete, targetParam: 'id', targetType: 'Event')]
     public function delete(Event $event, Request $request): RedirectResponse
     {
         $this->denyAccessUnlessGranted(EventVoter::DELETE, $event);
@@ -147,6 +152,10 @@ final class EventController extends AbstractController
         if (!is_string($token) || !$this->isCsrfTokenValid('delete_event_' . $event->getId(), $token)) {
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
+
+        // Snapshot key fields BEFORE the row is gone (terminate runs after the delete is flushed).
+        $this->audit->snapshot(['name' => $event->getName(), 'slug' => $event->getSlug()]);
+        $this->audit->targetLabel($event->getName() . ' (' . $event->getSlug() . ')');
 
         $this->em->remove($event);
         $this->em->flush();
