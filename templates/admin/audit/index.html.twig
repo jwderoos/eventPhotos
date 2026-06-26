@@ -1,0 +1,83 @@
+{% extends 'admin/_base.html.twig' %}
+
+{% block title %}Admin — Audit log{% endblock %}
+
+{% block admin_breadcrumb %}
+    <div class="breadcrumbs text-sm"><ul><li>Admin</li><li>Audit log</li></ul></div>
+{% endblock %}
+
+{% block admin_main %}
+    <header class="mb-6 flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">Audit log</h1>
+        <span class="text-sm text-base-content/60">{{ total }} entries</span>
+    </header>
+
+    <form method="get" class="mb-4 flex flex-wrap items-end gap-2">
+        <label class="form-control">
+            <span class="label-text text-xs">Action</span>
+            <select name="action" class="select select-bordered select-sm">
+                <option value="">All</option>
+                {% for action in actions %}
+                    <option value="{{ action.value }}"
+                        {{ filters.action is defined and filters.action == action.value ? 'selected' : '' }}>
+                        {{ action.value }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="form-control">
+            <span class="label-text text-xs">Target type</span>
+            <input type="text" name="targetType" value="{{ filters.targetType|default('') }}"
+                   class="input input-bordered input-sm" placeholder="Event, User…">
+        </label>
+        <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+        <a href="{{ path('admin_audit_index') }}" class="btn btn-ghost btn-sm">Reset</a>
+    </form>
+
+    <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+        <table class="table table-zebra table-sm">
+            <thead>
+                <tr>
+                    <th>Time (UTC)</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>Context</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in entries %}
+                    <tr>
+                        <td class="whitespace-nowrap">{{ entry.createdAt|date('Y-m-d H:i:s') }}</td>
+                        <td>{{ entry.actorLabel ?? '—' }}</td>
+                        <td><span class="badge badge-ghost">{{ entry.action.value }}</span></td>
+                        <td>
+                            {%- if entry.targetType -%}
+                                {{ entry.targetType }}{% if entry.targetId %} #{{ entry.targetId }}{% endif %}
+                                {%- if entry.targetLabel %}<br><span class="text-xs text-base-content/60">{{ entry.targetLabel }}</span>{% endif -%}
+                            {%- else -%}—{%- endif -%}
+                        </td>
+                        <td><code class="text-xs">{{ entry.context ? entry.context|json_encode : '' }}</code></td>
+                        <td class="text-xs">{{ entry.ipAddress ?? '—' }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="text-center text-base-content/60">No audit entries.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% set pages = (total / perPage)|round(0, 'ceil') %}
+    {% if pages > 1 %}
+        <div class="mt-4 flex justify-center gap-2">
+            {% if page > 1 %}
+                <a class="btn btn-sm" href="{{ path('admin_audit_index', filters|merge({page: page - 1})) }}">Prev</a>
+            {% endif %}
+            <span class="btn btn-sm btn-ghost">Page {{ page }} / {{ pages }}</span>
+            {% if page < pages %}
+                <a class="btn btn-sm" href="{{ path('admin_audit_index', filters|merge({page: page + 1})) }}">Next</a>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

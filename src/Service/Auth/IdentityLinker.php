@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Auth;
 
+use App\Audit\AuditContext;
 use App\Entity\User;
 use App\Entity\UserIdentity;
 use App\Enum\AuthProvider;
@@ -18,6 +19,7 @@ final readonly class IdentityLinker
         private UserIdentityRepository $identities,
         private UserRepository $users,
         private EntityManagerInterface $em,
+        private AuditContext $audit,
     ) {
     }
 
@@ -73,6 +75,10 @@ final readonly class IdentityLinker
         $current->addIdentity($identity);
         $this->em->persist($identity);
         $this->em->flush();
+
+        $this->audit->set('provider', 'google');
+        $this->audit->set('subject', $identity->getSubject());
+        $this->audit->set('linked_user_id', $current->getId());
 
         return $identity;
     }

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
-use Symfony\Component\HttpFoundation\RedirectResponse;
+use App\Audit\AuditAction;
+use App\Audit\AuditContext;
+use App\Audit\Attribute\Audited;
 use App\Entity\EventCollection;
 use App\Entity\User;
 use App\Form\EventCollectionType;
@@ -12,6 +14,7 @@ use App\Repository\EventCollectionRepository;
 use App\Security\Voter\EventCollectionVoter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -21,6 +24,7 @@ final class EventCollectionController extends AbstractController
     public function __construct(
         private readonly EventCollectionRepository $collections,
         private readonly EntityManagerInterface $em,
+        private readonly AuditContext $audit,
     ) {
     }
 
@@ -39,6 +43,7 @@ final class EventCollectionController extends AbstractController
     }
 
     #[Route('/admin/collections/new', name: 'admin_collection_new', methods: ['GET', 'POST'])]
+    #[Audited(AuditAction::CollectionCreate, targetParam: null)]
     public function new(Request $request): Response
     {
         $user = $this->getUser();
@@ -55,6 +60,10 @@ final class EventCollectionController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $this->em->persist($collection);
             $this->em->flush();
+
+            $this->audit->set('created_id', $collection->getId());
+            $this->audit->targetLabel($collection->getName());
+
             $this->addFlash('success', 'Collection created.');
 
             return $this->redirectToRoute('admin_collection_index');
@@ -73,6 +82,7 @@ final class EventCollectionController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['GET', 'POST'],
     )]
+    #[Audited(AuditAction::CollectionEdit, targetParam: 'id', targetType: 'EventCollection')]
     public function edit(EventCollection $collection, Request $request): Response
     {
         $this->denyAccessUnlessGranted(EventCollectionVoter::EDIT, $collection);
@@ -81,6 +91,7 @@ final class EventCollectionController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $this->audit->targetLabel($collection->getName());
             $this->em->flush();
             $this->addFlash('success', 'Collection updated.');
 
@@ -100,6 +111,7 @@ final class EventCollectionController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['POST'],
     )]
+    #[Audited(AuditAction::CollectionDelete, targetParam: 'id', targetType: 'EventCollection')]
     public function delete(EventCollection $collection, Request $request): RedirectResponse
     {
         $this->denyAccessUnlessGranted(EventCollectionVoter::DELETE, $collection);
@@ -109,6 +121,9 @@ final class EventCollectionController extends AbstractController
         if (!is_string($token) || !$this->isCsrfTokenValid('delete_collection_' . $collection->getId(), $token)) {
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
+
+        $this->audit->snapshot(['name' => $collection->getName()]);
+        $this->audit->targetLabel($collection->getName());
 
         $this->em->remove($collection);
         $this->em->flush();

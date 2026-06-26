@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller\OAuth;
 
+use App\Audit\AuditAction;
+use App\Audit\AuditContext;
+use App\Audit\Attribute\Audited;
 use App\Entity\User;
 use App\Entity\Invitation;
 use App\Service\Auth\GoogleOAuthClient;
@@ -32,6 +35,7 @@ final class GoogleInviteController extends AbstractController
         private readonly IdentityCreator $creator,
         private readonly Security $security,
         private readonly LoggerInterface $logger,
+        private readonly AuditContext $audit,
     ) {
     }
 
@@ -59,6 +63,7 @@ final class GoogleInviteController extends AbstractController
         methods: ['GET'],
         condition: self::FLAG_CONDITION,
     )]
+    #[Audited(AuditAction::InviteRedeem)]
     public function callback(Request $request): Response
     {
         $rawToken = $request->getSession()->get(self::SESSION_KEY, '');
@@ -78,6 +83,7 @@ final class GoogleInviteController extends AbstractController
         } catch (OAuthFailure) {
             $this->logger->notice('oauth.google.login_refused', ['reason' => 'oauth_failure_invite']);
             $this->addFlash('error', 'Google sign-in failed. Please try again.');
+            $this->audit->suppress();
             return new RedirectResponse('/invite/' . $token);
         }
 
@@ -90,6 +96,7 @@ final class GoogleInviteController extends AbstractController
                 'invite_id' => $invite->getId(),
             ]);
             $this->addFlash('error', $loginRefused->reason->userMessage());
+            $this->audit->suppress();
             return new RedirectResponse('/invite/' . $token);
         }
 

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
+use App\Audit\AuditAction;
+use App\Audit\AuditContext;
+use App\Audit\Attribute\Audited;
 use App\Entity\User;
 use App\Entity\UserMailConfig;
 use App\Entity\UserMailConfigAudit;
@@ -37,6 +40,7 @@ final class UserMailController extends AbstractController
         private readonly DsnVault $vault,
         private readonly TransportBuilder $transports,
         private readonly GmailDsnFactory $gmailDsn,
+        private readonly AuditContext $audit,
     ) {
     }
 
@@ -66,6 +70,7 @@ final class UserMailController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['POST'],
     )]
+    #[Audited(AuditAction::MailConfigUpdate, targetParam: 'id', targetType: 'User')]
     public function update(User $target, Request $request): Response
     {
         /** @var User $actor */
@@ -132,6 +137,10 @@ final class UserMailController extends AbstractController
         ));
         $this->em->flush();
 
+        $this->audit->set('on_behalf_of', $target->getId());
+        $this->audit->set('from_addr', $fromAddr);
+        $this->audit->targetLabel($target->getEmail());
+
         try {
             $this->sendVerification($config, $dsn);
             $this->addFlash('success', sprintf('Verification email sent to %s.', $fromAddr));
@@ -156,6 +165,7 @@ final class UserMailController extends AbstractController
         requirements: ['id' => '\d+'],
         methods: ['POST'],
     )]
+    #[Audited(AuditAction::MailConfigClear, targetParam: 'id', targetType: 'User')]
     public function clear(User $target, Request $request): RedirectResponse
     {
         $token = $request->request->get('_token');
@@ -181,6 +191,10 @@ final class UserMailController extends AbstractController
             fromAddrSnapshot: $fromAddrSnapshot,
         ));
         $this->em->flush();
+
+        $this->audit->set('on_behalf_of', $target->getId());
+        $this->audit->set('from_addr', $fromAddrSnapshot);
+        $this->audit->targetLabel($target->getEmail());
 
         $this->addFlash('success', 'Cleared mail configuration for ' . $target->getEmail());
 

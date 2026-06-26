@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Auth;
 
+use App\Audit\AuditContext;
 use App\Entity\Invitation;
 use App\Entity\User;
 use App\Entity\UserIdentity;
@@ -20,6 +21,7 @@ final readonly class IdentityCreator
         private EntityManagerInterface $em,
         private UserRepository $users,
         private UserPasswordHasherInterface $passwordHasher,
+        private AuditContext $audit,
     ) {
     }
 
@@ -66,6 +68,14 @@ final readonly class IdentityCreator
             return $user;
         });
 
-        return $created instanceof User ? $created : null;
+        if (!$created instanceof User) {
+            return null;
+        }
+
+        $this->audit->set('provider', 'google');
+        $this->audit->set('created_user_id', $created->getId());
+        $this->audit->set('invite_id', $invite->getId());
+
+        return $created;
     }
 }
