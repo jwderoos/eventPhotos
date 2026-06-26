@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller\OAuth;
 
 use App\Audit\AuditAction;
+use App\Audit\AuditContext;
 use App\Audit\Attribute\Audited;
 use App\Entity\User;
 use App\Service\Auth\GoogleOAuthClient;
@@ -28,6 +29,7 @@ final class GoogleLinkController extends AbstractController
         private readonly GoogleOAuthClient $oauth,
         private readonly IdentityLinker $linker,
         private readonly LoggerInterface $logger,
+        private readonly AuditContext $audit,
     ) {
     }
 
@@ -65,6 +67,7 @@ final class GoogleLinkController extends AbstractController
                 ]
             );
             $this->addFlash('error', 'Google sign-in failed. Please try again.');
+            $this->audit->suppress();
 
             return new RedirectResponse('/account');
         }
@@ -80,6 +83,7 @@ final class GoogleLinkController extends AbstractController
                 ]
             );
             $this->addFlash('error', $linkRefused->reason->userMessage());
+            $this->audit->suppress();
 
             return new RedirectResponse('/account');
         }

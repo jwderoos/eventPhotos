@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\EventListener\Audit;
 
 use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
-use Symfony\Component\Security\Http\Authenticator\Passport\Badge\BadgeInterface;
 use App\Audit\AuditAction;
 use App\Audit\AuditLogger;
 use App\Entity\User;
@@ -50,7 +49,7 @@ final readonly class AuthEventListener
         $passport = $event->getPassport();
         if ($passport instanceof Passport && $passport->hasBadge(UserBadge::class)) {
             $badge = $passport->getBadge(UserBadge::class);
-            if ($badge instanceof BadgeInterface) {
+            if ($badge instanceof UserBadge) {
                 $attempted = $badge->getUserIdentifier();
             }
         }

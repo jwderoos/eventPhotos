@@ -51,8 +51,10 @@ final readonly class AuditTerminateListener
             $targetId = is_numeric($raw) ? (int) $raw : null;
         }
 
+        $action = $this->context->overriddenActionOnRequest($request) ?? $audited->action;
+
         $this->auditLogger->log(
-            $audited->action,
+            $action,
             $actorId,
             $actorLabel,
             $audited->targetType,

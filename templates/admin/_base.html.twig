@@ -109,6 +109,12 @@
                                     Invites
                                 </a>
                             </li>
+                            <li>
+                                <a href="{{ path('admin_audit_index') }}"
+                                   class="{{ route starts with 'admin_audit_' ? 'active' : '' }}">
+                                    Audit log
+                                </a>
+                            </li>
                         {% endif %}
                     </ul>
                 </aside>

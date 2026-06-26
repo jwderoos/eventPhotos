@@ -13,6 +13,8 @@ final readonly class AuditContext
 
     private const string ATTR_SUPPRESSED = '_audit_suppressed';
 
+    private const string ATTR_ACTION_OVERRIDE = '_audit_action_override';
+
     private const string KEY_TARGET_LABEL = '_target_label';
 
     public function __construct(private RequestStack $requestStack)
@@ -74,6 +76,38 @@ final readonly class AuditContext
     public function isSuppressedOnRequest(Request $request): bool
     {
         return $request->attributes->getBoolean(self::ATTR_SUPPRESSED);
+    }
+
+    /**
+     * Override the action that the terminate listener will log for this request.
+     * No-op when there is no current request (e.g. CLI / tests without a request).
+     */
+    public function overrideAction(AuditAction $action): void
+    {
+        $request = $this->requestStack->getCurrentRequest();
+        $request?->attributes->set(self::ATTR_ACTION_OVERRIDE, $action);
+    }
+
+    /**
+     * Read the action override from the given request; returns null when not set.
+     * Used directly by the terminate listener (which already has the request).
+     */
+    public function overriddenActionOnRequest(Request $request): ?AuditAction
+    {
+        $value = $request->attributes->get(self::ATTR_ACTION_OVERRIDE);
+
+        return $value instanceof AuditAction ? $value : null;
+    }
+
+    /**
+     * Read the action override via the current request; returns null when no request
+     * is on the stack or no override has been set.
+     */
+    public function overriddenAction(): ?AuditAction
+    {
+        $request = $this->requestStack->getCurrentRequest();
+
+        return $request instanceof Request ? $this->overriddenActionOnRequest($request) : null;
     }
 
     public function pulledTargetLabel(): ?string

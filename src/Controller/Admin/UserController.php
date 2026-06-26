@@ -131,6 +131,7 @@ final class UserController extends AbstractController
 
                 $target->addRole($data['role']);
                 $this->audit->changed('role', $currentTopRole, $data['role']);
+                $this->audit->overrideAction(AuditAction::UserRoleChange);
             }
 
             $this->audit->targetLabel($target->getEmail());
@@ -173,6 +174,7 @@ final class UserController extends AbstractController
                 $ownedEvents,
                 $ownedCollections,
             ));
+            $this->audit->suppress();
             return new RedirectResponse('/admin/users/' . $target->getId() . '/edit');
         }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Audit;
 
+use App\Audit\AuditAction;
 use App\Audit\AuditContext;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
@@ -52,5 +53,42 @@ final class AuditContextTest extends TestCase
         $this->assertFalse($ctx->isSuppressed());
         $this->assertSame([], $ctx->pull());
         $this->assertNull($ctx->pulledTargetLabel());
+    }
+
+    public function testOverrideActionRoundTrip(): void
+    {
+        $stack = new RequestStack();
+        $request = new Request();
+        $stack->push($request);
+        $ctx = new AuditContext($stack);
+
+        $this->assertNotInstanceOf(AuditAction::class, $ctx->overriddenAction(), 'No override set yet');
+        $this->assertNotInstanceOf(
+            AuditAction::class,
+            $ctx->overriddenActionOnRequest($request),
+            'No override on request yet',
+        );
+
+        $ctx->overrideAction(AuditAction::UserRoleChange);
+
+        $this->assertSame(AuditAction::UserRoleChange, $ctx->overriddenAction());
+        $this->assertSame(AuditAction::UserRoleChange, $ctx->overriddenActionOnRequest($request));
+    }
+
+    public function testOverrideActionNoOpWhenNoRequest(): void
+    {
+        $ctx = new AuditContext(new RequestStack());
+        // Must not throw; override is silently ignored when there is no request.
+        $ctx->overrideAction(AuditAction::UserRoleChange);
+
+        $this->assertNotInstanceOf(AuditAction::class, $ctx->overriddenAction());
+    }
+
+    public function testOverriddenActionOnRequestReturnsNullWhenNotSet(): void
+    {
+        $ctx = new AuditContext(new RequestStack());
+        $request = new Request();
+
+        $this->assertNotInstanceOf(AuditAction::class, $ctx->overriddenActionOnRequest($request));
     }
 }

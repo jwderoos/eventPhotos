@@ -130,6 +130,7 @@ final class InvitationController extends AbstractController
                 'Invite is already %s — nothing to revoke.',
                 $invite->status()->value,
             ));
+            $this->audit->suppress();
             return new RedirectResponse($this->generateUrl('admin_invite_index'));
         }
 

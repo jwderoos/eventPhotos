@@ -28,10 +28,11 @@ final class AdminActionsAuditTest extends AuditWebTestCase
 
         $this->assertResponseRedirects();
 
-        $rows = $this->auditRows(AuditAction::UserEdit);
-        $this->assertCount(1, $rows);
+        // Role change must produce a UserRoleChange row, NOT a generic UserEdit row.
+        $roleChangeRows = $this->auditRows(AuditAction::UserRoleChange);
+        $this->assertCount(1, $roleChangeRows, 'Expected exactly one UserRoleChange audit row');
 
-        $context = $rows[0]->getContext();
+        $context = $roleChangeRows[0]->getContext();
         $this->assertIsArray($context);
         $this->assertArrayHasKey('changes', $context);
         $changes = $context['changes'];
@@ -41,6 +42,32 @@ final class AdminActionsAuditTest extends AuditWebTestCase
         $this->assertIsArray($roleChange);
         $this->assertSame('ROLE_USER', $roleChange[0]);
         $this->assertSame('ROLE_ORGANIZER', $roleChange[1]);
+
+        // Verify the override: no generic UserEdit row was written for this request.
+        $userEditRows = $this->auditRows(AuditAction::UserEdit);
+        $this->assertSame([], $userEditRows, 'No UserEdit row should be written when role changes');
+    }
+
+    public function testNameOnlyEditProducesUserEditRow(): void
+    {
+        $this->loginAdmin();
+        $target = $this->makeUser('rename-me@example.com', 'ROLE_USER');
+        $targetId = (int) $target->getId();
+
+        $crawler = $this->client->request(Request::METHOD_GET, '/admin/users/' . $targetId . '/edit');
+        $form = $crawler->selectButton('Save')->form();
+        $form['user_edit[displayName]'] = 'New Display Name';
+        // Role field left as-is (no role change).
+        $this->client->submit($form);
+
+        $this->assertResponseRedirects();
+
+        // Name-only edit → generic UserEdit row.
+        $userEditRows = $this->auditRows(AuditAction::UserEdit);
+        $this->assertCount(1, $userEditRows, 'Name-only edit must produce a UserEdit row');
+        // No UserRoleChange row.
+        $roleChangeRows = $this->auditRows(AuditAction::UserRoleChange);
+        $this->assertSame([], $roleChangeRows, 'No UserRoleChange row expected for name-only edit');
     }
 
     public function testRevokingAnInvitationIsAudited(): void
@@ -75,6 +102,39 @@ final class AdminActionsAuditTest extends AuditWebTestCase
         $context = $rows[0]->getContext();
         $this->assertIsArray($context);
         $this->assertArrayHasKey('created_id', $context);
+    }
+
+    public function testDeleteBlockedByOwnedEventsWritesNoAuditRow(): void
+    {
+        $this->loginAdmin();
+        $target = $this->makeUser('owned-events@example.com', 'ROLE_ORGANIZER');
+        $this->makeEvent('test-event-del-block', $target);
+        $targetId = (int) $target->getId();
+
+        $this->client->request(Request::METHOD_POST, '/admin/users/' . $targetId . '/delete', [
+            '_token' => $this->primeCsrfToken('delete_user_' . $targetId),
+        ]);
+
+        $this->assertResponseRedirects();
+        $this->assertSame([], $this->auditRows(AuditAction::UserDelete));
+    }
+
+    public function testRevokeAlreadyRevokedInviteWritesNoAuditRow(): void
+    {
+        $admin = $this->loginAdmin();
+        $invite = $this->createPendingInvitation($admin);
+        // Revoke it directly via domain method so it is no longer pending.
+        $invite->revoke($admin);
+
+        $this->em->flush();
+        $inviteId = (int) $invite->getId();
+
+        $this->client->request(Request::METHOD_POST, '/admin/invites/' . $inviteId . '/revoke', [
+            '_token' => $this->primeCsrfToken('invite_revoke_' . $inviteId),
+        ]);
+
+        $this->assertResponseRedirects();
+        $this->assertSame([], $this->auditRows(AuditAction::InviteRevoke));
     }
 
     private function createPendingInvitation(User $createdBy): Invitation
