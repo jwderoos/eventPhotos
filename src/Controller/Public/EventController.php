@@ -319,7 +319,10 @@ final class EventController extends AbstractController
 
     private function startInEventTimezone(Event $event): DateTimeImmutable
     {
-        return $event->getStartsAt()->setTimezone(new DateTimeZone($event->getTimezone()));
+        $dateTime =  $this->photos->findFirstReadyTakenAt($event) ??
+            $event->getStartsAt();
+
+        return $dateTime->setTimezone(new DateTimeZone($event->getTimezone()));
     }
 
     /**
