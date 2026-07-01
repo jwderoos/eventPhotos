@@ -109,40 +109,90 @@ final class EventPublishTest extends WebTestCase
         self::assertResponseStatusCodeSame(422);
     }
 
-    public function testToggleNotificationsRequiresActiveMail(): void
+    public function testNewFormHidesCheckboxWithoutActiveMail(): void
     {
-        [$owner, $event] = $this->makeOrganizerAndEvent('toggle-nomail', withMail: false);
+        $owner = $this->makeOrganizer('new-nomail', withMail: false);
         $this->client->loginUser($owner);
 
-        $this->client->request(
-            Request::METHOD_POST,
-            '/admin/events/' . $event->getId() . '/notifications',
-            [
-                '_token' => $this->primeCsrfToken('notifications' . $event->getId()),
-                'enabled' => '1',
-            ]
-        );
-
-        self::assertResponseStatusCodeSame(422);
+        $crawler = $this->client->request(Request::METHOD_GET, '/admin/events/new');
+        self::assertResponseIsSuccessful();
+        $this->assertCount(0, $crawler->filter('input[name="event[notificationsEnabled]"]'));
     }
 
-    public function testToggleNotificationsEnables(): void
+    public function testNewFormShowsCheckboxUncheckedWithActiveMail(): void
     {
-        [$owner, $event] = $this->makeOrganizerAndEvent('toggle-on', withMail: true);
+        $owner = $this->makeOrganizer('new-mail', withMail: true);
+        $this->client->loginUser($owner);
+
+        $crawler  = $this->client->request(Request::METHOD_GET, '/admin/events/new');
+        self::assertResponseIsSuccessful();
+        $checkbox = $crawler->filter('input[name="event[notificationsEnabled]"]');
+        $this->assertCount(1, $checkbox);
+        $this->assertNull($checkbox->attr('checked'));
+
+        $form = $crawler->selectButton('Create')->form([
+            'event[name]'                  => 'Notify Event',
+            'event[eventDate]'             => '2026-07-15',
+            'event[startTime]'             => '10:00',
+            'event[endTime]'               => '14:00',
+            'event[timezone]'              => 'Europe/Amsterdam',
+            'event[notificationsEnabled]'  => '1',
+        ]);
+        $this->client->submit($form);
+        self::assertResponseRedirects('/admin/events');
+
+        $created = $this->em->getRepository(Event::class)->findOneBy(['name' => 'Notify Event']);
+        $this->assertInstanceOf(Event::class, $created);
+        $this->assertTrue($created->areNotificationsEnabled());
+    }
+
+    public function testEditCheckboxTogglesFlagBothWays(): void
+    {
+        [$owner, $event] = $this->makeOrganizerAndEvent('edit-toggle', withMail: true);
         $event->disableNotifications();
         $this->em->flush();
         $this->client->loginUser($owner);
 
-        $this->client->request(
-            Request::METHOD_POST,
-            '/admin/events/' . $event->getId() . '/notifications',
-            [
-                '_token' => $this->primeCsrfToken('notifications' . $event->getId()),
-                'enabled' => '1',
-            ]
-        );
+        // Enable via the checkbox.
+        $crawler = $this->client->request(Request::METHOD_GET, sprintf('/admin/events/%d/edit', (int) $event->getId()));
+        $form    = $crawler->selectButton('Save')->form();
+        /** @phpstan-ignore-next-line method.nonObject */
+        $form['event[notificationsEnabled]']->tick();
+        $this->client->submit($form);
+        self::assertResponseRedirects('/admin/events');
 
-        self::assertResponseRedirects();
+        $this->em->clear();
+        $this->assertTrue($this->reloadEvent($event->getId())->areNotificationsEnabled());
+
+        // Disable via the checkbox.
+        $crawler = $this->client->request(Request::METHOD_GET, sprintf('/admin/events/%d/edit', (int) $event->getId()));
+        $form    = $crawler->selectButton('Save')->form();
+        /** @phpstan-ignore-next-line method.nonObject */
+        $form['event[notificationsEnabled]']->untick();
+        $this->client->submit($form);
+        self::assertResponseRedirects('/admin/events');
+
+        $this->em->clear();
+        $this->assertFalse($this->reloadEvent($event->getId())->areNotificationsEnabled());
+    }
+
+    public function testEditWithoutActiveMailPreservesExistingFlag(): void
+    {
+        // An event whose flag was enabled while mail was active, then mail lapsed.
+        [$owner, $event] = $this->makeOrganizerAndEvent('edit-nomail', withMail: false);
+        $event->enableNotifications();
+        $this->em->flush();
+        $this->client->loginUser($owner);
+
+        $crawler = $this->client->request(Request::METHOD_GET, sprintf('/admin/events/%d/edit', (int) $event->getId()));
+        self::assertResponseIsSuccessful();
+        $this->assertCount(0, $crawler->filter('input[name="event[notificationsEnabled]"]'));
+
+        // Submitting the form (no checkbox present) must not clear the stored flag.
+        $form = $crawler->selectButton('Save')->form();
+        $this->client->submit($form);
+        self::assertResponseRedirects('/admin/events');
+
         $this->em->clear();
         $this->assertTrue($this->reloadEvent($event->getId())->areNotificationsEnabled());
     }
@@ -169,10 +219,7 @@ final class EventPublishTest extends WebTestCase
         $this->em->flush();
     }
 
-    /**
-     * @return array{0: User, 1: Event}
-     */
-    private function makeOrganizerAndEvent(string $slug, bool $withMail): array
+    private function makeOrganizer(string $slug, bool $withMail): User
     {
         $owner = new User($slug . '-owner@example.com', 'Owner');
         $owner->addRole('ROLE_ORGANIZER');
@@ -191,6 +238,18 @@ final class EventPublishTest extends WebTestCase
             $config->markVerified();
             $this->em->persist($config);
         }
+
+        $this->em->flush();
+
+        return $owner;
+    }
+
+    /**
+     * @return array{0: User, 1: Event}
+     */
+    private function makeOrganizerAndEvent(string $slug, bool $withMail): array
+    {
+        $owner = $this->makeOrganizer($slug, $withMail);
 
         $event = new Event(
             slug: $slug,

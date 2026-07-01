@@ -14,6 +14,7 @@ use Doctrine\ORM\QueryBuilder;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
@@ -112,14 +113,29 @@ final class EventType extends AbstractType
             ]);
         }
 
+        // Only offered when the owner has a verified mail transport. Kept unmapped so a
+        // submit while mail is inactive (field absent) can never silently clear the flag,
+        // and so the entity keeps its enable/disable domain API instead of a bare setter.
+        if ($options['mail_active'] === true) {
+            $builder->add('notificationsEnabled', CheckboxType::class, [
+                'mapped'   => false,
+                'required' => false,
+                'label'    => 'Allow participants to request email updates',
+                'help'     => "Shows an email sign-up form on the event's public page so "
+                    . 'visitors can be notified when the photos go live.',
+            ]);
+        }
+
         $builder->addEventListener(FormEvents::POST_SET_DATA, $this->prefillUnmappedFields(...));
         $builder->addEventListener(FormEvents::PRE_SUBMIT, $this->normalizeTimeInputs(...));
         $builder->addEventListener(FormEvents::SUBMIT, $this->composeStartsAndEnds(...));
+        $builder->addEventListener(FormEvents::SUBMIT, $this->applyNotificationsPreference(...));
     }
 
     public function configureOptions(OptionsResolver $resolver): void
     {
-        $resolver->setDefaults(['data_class' => Event::class]);
+        $resolver->setDefaults(['data_class' => Event::class, 'mail_active' => false]);
+        $resolver->setAllowedTypes('mail_active', 'bool');
     }
 
     private function prefillUnmappedFields(FormEvent $formEvent): void
@@ -137,6 +153,25 @@ final class EventType extends AbstractType
         $form->get('eventDate')->setData(new DateTimeImmutable($startsAt->format('Y-m-d')));
         $form->get('startTime')->setData($startsAt->format('H:i'));
         $form->get('endTime')->setData($endsAt->format('H:i'));
+
+        if ($form->has('notificationsEnabled')) {
+            $form->get('notificationsEnabled')->setData($event->areNotificationsEnabled());
+        }
+    }
+
+    private function applyNotificationsPreference(FormEvent $formEvent): void
+    {
+        $event = $formEvent->getData();
+        $form  = $formEvent->getForm();
+        if (!$event instanceof Event || !$form->has('notificationsEnabled')) {
+            return;
+        }
+
+        if ($form->get('notificationsEnabled')->getData() === true) {
+            $event->enableNotifications();
+        } else {
+            $event->disableNotifications();
+        }
     }
 
     private function composeStartsAndEnds(FormEvent $formEvent): void

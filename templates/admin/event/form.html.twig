@@ -45,17 +45,11 @@
                         before enabling visitor "photos are live" notifications.
                     </p>
                 {% else %}
-                    <form method="post" action="{{ path('admin_event_toggle_notifications', {id: event.id}) }}" class="flex items-center gap-3">
-                        <input type="hidden" name="_token" value="{{ csrf_token('notifications' ~ event.id) }}">
-                        <input type="hidden" name="enabled" value="{{ event.areNotificationsEnabled ? '0' : '1' }}">
-                        <span class="text-sm">
-                            Sign-ups are currently
-                            <strong>{{ event.areNotificationsEnabled ? 'open' : 'closed' }}</strong>.
-                        </span>
-                        <button type="submit" class="btn btn-sm btn-outline">
-                            {{ event.areNotificationsEnabled ? 'Close sign-ups' : 'Open sign-ups' }}
-                        </button>
-                    </form>
+                    <p class="text-sm text-base-content/70">
+                        Sign-ups are currently
+                        <strong>{{ event.areNotificationsEnabled ? 'open' : 'closed' }}</strong> —
+                        control this with the “Allow participants to request email updates” checkbox above.
+                    </p>
 
                     <p class="text-sm text-base-content/70">{{ subscriberCount }} subscriber(s) so far.</p>
 

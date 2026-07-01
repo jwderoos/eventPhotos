@@ -89,7 +89,9 @@ final class EventController extends AbstractController
         $endsAt   = $now->modify('+2 hours');
         $event    = new Event('', '', $startsAt, $endsAt, $user);
 
-        $form = $this->createForm(EventType::class, $event);
+        $form = $this->createForm(EventType::class, $event, [
+            'mail_active' => $this->mailerResolver->isCustomActive($event->getOwner()),
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -122,7 +124,9 @@ final class EventController extends AbstractController
     {
         $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
 
-        $form = $this->createForm(EventType::class, $event);
+        $mailActive = $this->mailerResolver->isCustomActive($event->getOwner());
+
+        $form = $this->createForm(EventType::class, $event, ['mail_active' => $mailActive]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -141,7 +145,7 @@ final class EventController extends AbstractController
             'event' => $event,
             'mode'  => 'edit',
             'subscriberCount'  => $this->subscriptions->countByEvent($event),
-            'mailActive'       => $this->mailerResolver->isCustomActive($event->getOwner()),
+            'mailActive'       => $mailActive,
             'readyPhotoCount'  => $this->photos->countReady($event),
             'projectedMinutes' => (int) ceil($confirmedCount / $rate),
         ]);
@@ -201,37 +205,6 @@ final class EventController extends AbstractController
         $this->bus->dispatch(new SendEventLiveNotifications((int) $event->getId()));
 
         $this->addFlash('success', 'Event published. Notifying confirmed subscribers.');
-
-        return $this->redirectToRoute('admin_event_edit', ['id' => $event->getId()]);
-    }
-
-    #[Route(
-        '/admin/events/{id}/notifications',
-        name: 'admin_event_toggle_notifications',
-        requirements: ['id' => '\d+'],
-        methods: ['POST'],
-    )]
-    #[Audited(AuditAction::EventNotificationsToggle, targetParam: 'id', targetType: 'Event')]
-    public function toggleNotifications(Event $event, Request $request): Response
-    {
-        $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
-
-        $token = $request->request->get('_token');
-        if (!is_string($token) || !$this->isCsrfTokenValid('notifications' . $event->getId(), $token)) {
-            throw $this->createAccessDeniedException('Invalid CSRF token.');
-        }
-
-        if (!$this->mailerResolver->isCustomActive($event->getOwner())) {
-            return new Response('Mail transport not configured.', Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        if ($request->request->getBoolean('enabled')) {
-            $event->enableNotifications();
-        } else {
-            $event->disableNotifications();
-        }
-
-        $this->em->flush();
 
         return $this->redirectToRoute('admin_event_edit', ['id' => $event->getId()]);
     }
