@@ -1,4 +1,4 @@
-name: eventPhotos-prod
+name: eventphotos-prod
 
 services:
   php:
@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.prod
       target: php
-    image: eventPhotos-php:latest
+    image: eventphotos-php:latest
     env_file:
       - .env.prod
     environment:
@@ -28,7 +28,7 @@ services:
     cpus: 4
 
   worker:
-    image: eventPhotos-php:latest
+    image: eventphotos-php:latest
     # §3.4 memory-limit bump 128M → 256M. GD decoding a 25 MB JPEG into a
     # ~5760×3840 truecolor image transiently resident ≈ 67 MB; 128 MB had no
     # headroom for large-megapixel uploads.
@@ -54,7 +54,7 @@ services:
     cpus: 2
 
   migrate:
-    image: eventPhotos-php:latest
+    image: eventphotos-php:latest
     command: php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
     env_file:
       - .env.prod
@@ -71,7 +71,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.prod
       target: nginx
-    image: eventPhotos-nginx:latest
+    image: eventphotos-nginx:latest
     ports:
       - "${HOST_HTTP_PORT:-8081}:80"
     volumes:
