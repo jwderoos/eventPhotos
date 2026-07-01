@@ -58,7 +58,7 @@
             </p>
         </div>
 
-        {{ form_row(form.fromAddr, {attr: {'data-mail-provider-target': 'fromAddr'}}) }}
+        {{ form_row(form.fromAddr, {attr: {'data-mail-provider-target': 'fromAddr', 'data-action': 'input->mail-provider#fromAddrEdited'}}) }}
         {{ form_row(form.fromName) }}
         <button type="submit" class="btn btn-primary">Save and send verification</button>
     {{ form_end(form) }}
