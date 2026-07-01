@@ -116,6 +116,41 @@ final class AccountMailFlowTest extends WebTestCase
         );
     }
 
+    public function testGmailSpacedPasswordFromRealBrowserPost(): void
+    {
+        $user = $this->createOrganizer('spaced-pw@example.com', 'secret');
+        $this->client->loginUser($user);
+
+        // Mirror the exact POST Chrome sends: 16-char app password shown as four
+        // space-separated groups. In form-urlencoded the spaces arrive as '+'/%20;
+        // BrowserKit builds the body the same way the browser does.
+        $crawler = $this->client->request(Request::METHOD_GET, '/admin/account/mail');
+        $form = $crawler->selectButton('Save and send verification')->form([
+            'user_mail_config[provider]' => 'gmail',
+            'user_mail_config[gmailEmail]' => 'trueskimmer@gmail.com',
+            'user_mail_config[gmailAppPassword]' => 'ehga xrjk htgq ecfi',
+            'user_mail_config[fromAddr]' => 'trueskimmer@gmail.com',
+            'user_mail_config[fromName]' => 'Jan Willem',
+        ]);
+        $this->client->submit($form);
+        self::assertResponseRedirects('/admin/account/mail');
+
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(User::class)->find($user->getId());
+        $config = $reloaded?->getMailConfig();
+        $this->assertInstanceOf(UserMailConfig::class, $config);
+
+        /** @var DsnVault $vault */
+        $vault = self::getContainer()->get(DsnVault::class);
+        $dsn = $vault->decrypt($config->getEncryptedDsn());
+
+        // The full 16-char password must survive — no dropped trailing character.
+        $this->assertSame(
+            'smtps://trueskimmer%40gmail.com:ehgaxrjkhtgqecfi@smtp.gmail.com:465',
+            $dsn,
+        );
+    }
+
     public function testCustomModeStillWorks(): void
     {
         $user = $this->createOrganizer('still-custom@example.com', 'secret');

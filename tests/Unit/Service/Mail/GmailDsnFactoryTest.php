@@ -22,6 +22,24 @@ final class GmailDsnFactoryTest extends TestCase
         $this->assertSame('abcdefghijklmnop', $parsed->getPassword());
     }
 
+    /**
+     * Google's app-password UI (and some clipboards) separate the four groups with
+     * non-breaking spaces, not ASCII spaces. These must be stripped just like regular
+     * spaces, otherwise they get URL-encoded into the DSN and decoded back into the
+     * password, producing a >16-byte secret that Gmail rejects with 535 BadCredentials.
+     */
+    public function testUnicodeWhitespaceIsStripped(): void
+    {
+        $nbsp = "\u{00A0}";       // non-breaking space
+        $narrow = "\u{202F}";     // narrow no-break space
+        $password = 'abcd' . $nbsp . 'efgh' . $narrow . 'ijkl' . $nbsp . 'mnop';
+
+        $dsn = new GmailDsnFactory()->build('name@gmail.com', $password);
+        $parsed = Dsn::fromString($dsn);
+
+        $this->assertSame('abcdefghijklmnop', $parsed->getPassword());
+    }
+
     public function testUrlSignificantCharsAreEncoded(): void
     {
         // App passwords are alphanumeric in practice, but the encoder must be robust:

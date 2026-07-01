@@ -222,7 +222,7 @@ final class AccountMailController extends AbstractController
         $email = new TemplatedEmail()
             ->from($from)
             ->to($config->getFromAddr())
-            ->subject('Verify your eventFotos mail configuration')
+            ->subject('Verify your eventPhotos mail configuration')
             ->htmlTemplate('email/mail-config/verify.html.twig')
             ->textTemplate('email/mail-config/verify.txt.twig')
             ->context(['verifyUrl' => $verifyUrl]);

@@ -238,9 +238,9 @@ final class UserController extends AbstractController
         }
 
         $email = new TemplatedEmail()
-            ->from(new Address('no-reply@eventfotos.local', 'eventFotos'))
+            ->from(new Address('no-reply@eventPhotos.local', 'eventPhotos'))
             ->to($user->getEmail())
-            ->subject('Set your eventFotos password')
+            ->subject('Set your eventPhotos password')
             ->htmlTemplate('reset_password/email.html.twig')
             ->context(['user' => $user, 'resetToken' => $token]);
 

@@ -14,7 +14,10 @@ final class GmailDsnFactory
 
     public function build(string $email, #[SensitiveParameter] string $appPassword): string
     {
-        $password = (string) preg_replace('/\s+/', '', $appPassword);
+        // Strip ASCII *and* Unicode whitespace: Google's app-password UI separates the
+        // four groups with non-breaking spaces (U+00A0 / U+202F), which the non-Unicode
+        // \s does not match — they would survive, get URL-encoded, and corrupt the secret.
+        $password = (string) preg_replace('/[\s\p{Z}]+/u', '', $appPassword);
 
         return sprintf(
             'smtps://%s:%s@%s:%d',
