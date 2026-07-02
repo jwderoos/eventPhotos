@@ -3,8 +3,22 @@
 {% block html_attributes %}data-theme="silk"{% endblock %}
 
 {% block body %}
-    <div class="flex min-h-screen flex-col">
-        <header class="border-b border-base-300 bg-base-100">
+    {#- The branded styling lives on the full-page container so a custom background
+        / glow flows continuously behind header, content and footer (no seam), and
+        text-base-content makes ALL page text follow the resolved font color. Header
+        and footer are transparent so the one background shows through. Unset fields
+        emit no override (null-omit) → the silk theme stands. -#}
+    <div
+        class="flex min-h-screen flex-col text-base-content"
+        data-style-root
+        {% if resolvedStyle is defined and resolvedStyle and (resolvedStyle.fontColor or resolvedStyle.backgroundColor or resolvedStyle.buttonColor or resolvedStyle.backgroundCss) %}style="
+            {%- if resolvedStyle.fontColor %}--color-base-content: {{ resolvedStyle.fontColor }};{% endif -%}
+            {%- if resolvedStyle.backgroundColor %}--color-base-100: {{ resolvedStyle.backgroundColor }};{% endif -%}
+            {%- if resolvedStyle.buttonColor %}--color-primary: {{ resolvedStyle.buttonColor }}; --color-primary-content: {{ resolvedStyle.buttonContentColor }};{% endif -%}
+            {%- if resolvedStyle.backgroundCss %}background: {{ resolvedStyle.backgroundCss }};{% endif -%}
+        "{% endif %}
+    >
+        <header>
             <div class="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
                 <a href="{{ path('public_home') }}" class="text-lg font-semibold tracking-tight">
                     Event Photos
@@ -13,22 +27,13 @@
         </header>
 
         <main class="flex-1">
-            <div
-                class="mx-auto max-w-5xl px-4 py-10"
-                data-style-root
-                {% if resolvedStyle is defined and resolvedStyle and (resolvedStyle.fontColor or resolvedStyle.backgroundColor or resolvedStyle.buttonColor or resolvedStyle.backgroundCss) %}style="
-                    {%- if resolvedStyle.fontColor %}--color-base-content: {{ resolvedStyle.fontColor }};{% endif -%}
-                    {%- if resolvedStyle.backgroundColor %}--color-base-100: {{ resolvedStyle.backgroundColor }};{% endif -%}
-                    {%- if resolvedStyle.buttonColor %}--color-primary: {{ resolvedStyle.buttonColor }}; --color-primary-content: {{ resolvedStyle.buttonContentColor }};{% endif -%}
-                    {%- if resolvedStyle.backgroundCss %}background: {{ resolvedStyle.backgroundCss }};{% endif -%}
-                "{% endif %}
-            >
+            <div class="mx-auto max-w-5xl px-4 py-10">
                 {% block public_main %}{% endblock %}
             </div>
         </main>
 
-        <footer class="border-t border-base-300 bg-base-200">
-            <div class="mx-auto max-w-5xl px-4 py-6 text-sm text-base-content/60">
+        <footer>
+            <div class="mx-auto max-w-5xl px-4 py-6 text-sm opacity-70">
                 © {{ "now"|date("Y") }} Event Photos
             </div>
         </footer>
