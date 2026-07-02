@@ -7,6 +7,8 @@ namespace App\Form;
 use App\Entity\Event;
 use App\Entity\EventCollection;
 use App\Entity\User;
+use App\Form\StyleSettingsType;
+use App\Service\Style\ResolvedStyle;
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\ORM\EntityRepository;
@@ -126,6 +128,11 @@ final class EventType extends AbstractType
             ]);
         }
 
+        $builder->add('style', StyleSettingsType::class, [
+            'label'     => false,
+            'inherited' => $options['inherited'],
+        ]);
+
         $builder->addEventListener(FormEvents::POST_SET_DATA, $this->prefillUnmappedFields(...));
         $builder->addEventListener(FormEvents::PRE_SUBMIT, $this->normalizeTimeInputs(...));
         $builder->addEventListener(FormEvents::SUBMIT, $this->composeStartsAndEnds(...));
@@ -134,8 +141,9 @@ final class EventType extends AbstractType
 
     public function configureOptions(OptionsResolver $resolver): void
     {
-        $resolver->setDefaults(['data_class' => Event::class, 'mail_active' => false]);
+        $resolver->setDefaults(['data_class' => Event::class, 'mail_active' => false, 'inherited' => null]);
         $resolver->setAllowedTypes('mail_active', 'bool');
+        $resolver->setAllowedTypes('inherited', ['null', ResolvedStyle::class]);
     }
 
     private function prefillUnmappedFields(FormEvent $formEvent): void

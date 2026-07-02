@@ -13,7 +13,16 @@
         </header>
 
         <main class="flex-1">
-            <div class="mx-auto max-w-5xl px-4 py-10">
+            <div
+                class="mx-auto max-w-5xl px-4 py-10"
+                data-style-root
+                {% if resolvedStyle is defined and resolvedStyle and (resolvedStyle.fontColor or resolvedStyle.backgroundColor or resolvedStyle.buttonColor or resolvedStyle.backgroundCss) %}style="
+                    {%- if resolvedStyle.fontColor %}--color-base-content: {{ resolvedStyle.fontColor }};{% endif -%}
+                    {%- if resolvedStyle.backgroundColor %}--color-base-100: {{ resolvedStyle.backgroundColor }};{% endif -%}
+                    {%- if resolvedStyle.buttonColor %}--color-primary: {{ resolvedStyle.buttonColor }}; --color-primary-content: {{ resolvedStyle.buttonContentColor }};{% endif -%}
+                    {%- if resolvedStyle.backgroundCss %}background: {{ resolvedStyle.backgroundCss }};{% endif -%}
+                "{% endif %}
+            >
                 {% block public_main %}{% endblock %}
             </div>
         </main>

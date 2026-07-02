@@ -6,6 +6,8 @@ namespace App\Form;
 
 use App\Entity\EventCollection;
 use App\Entity\User;
+use App\Form\StyleSettingsType;
+use App\Service\Style\ResolvedStyle;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
@@ -36,10 +38,16 @@ final class EventCollectionType extends AbstractType
                 'choice_label' => 'email',
             ]);
         }
+
+        $builder->add('style', StyleSettingsType::class, [
+            'label'     => false,
+            'inherited' => $options['inherited'],
+        ]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
     {
-        $resolver->setDefaults(['data_class' => EventCollection::class]);
+        $resolver->setDefaults(['data_class' => EventCollection::class, 'inherited' => null]);
+        $resolver->setAllowedTypes('inherited', ['null', ResolvedStyle::class]);
     }
 }

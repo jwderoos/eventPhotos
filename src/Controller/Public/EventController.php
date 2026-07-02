@@ -13,6 +13,7 @@ use App\Repository\PhotoRepository;
 use App\Service\Event\PhotosUrlBuilder;
 use App\Service\Mail\OrganizerMailerResolver;
 use App\Service\QrCodeRenderer;
+use App\Service\Style\StyleResolver;
 use DateTimeImmutable;
 use DateTimeZone;
 use League\Flysystem\FilesystemException;
@@ -46,6 +47,7 @@ final class EventController extends AbstractController
         private readonly FilesystemOperator $eventLogosStorage,
         private readonly LoggerInterface $logger,
         private readonly OrganizerMailerResolver $mailerResolver,
+        private readonly StyleResolver $styleResolver,
     ) {
     }
 
@@ -67,6 +69,7 @@ final class EventController extends AbstractController
             'photosUrlAbsolute'     => $this->photosUrl->build($event, $when, absolute: true),
             'notificationsOpen'     => $event->areNotificationsEnabled() && !$event->isPublished() && $mailActive,
             'notificationsPublished' => $event->isPublished(),
+            'resolvedStyle'         => $this->styleResolver->resolve($event),
         ]);
     }
 
@@ -147,18 +150,19 @@ final class EventController extends AbstractController
         $firstRank = $photos === [] ? null : $this->photos->countReadyBefore($photos[0]) + 1;
 
         return $this->render('public/event/photos.html.twig', [
-            'event'        => $event,
-            'timestamp'    => $timestamp,
-            'windowBefore' => Event::WINDOW_BEFORE_MINUTES,
-            'windowAfter'  => Event::WINDOW_AFTER_MINUTES,
-            'photos'       => $photos,
-            'capHit'       => count($photos) === self::HARD_CAP,
-            'firstAt'      => $firstAt,
-            'lastAt'       => $lastAt,
-            'prevAt'       => $prevAt,
-            'nextAt'       => $nextAt,
-            'totalReady'   => $totalReady,
-            'firstRank'    => $firstRank,
+            'event'         => $event,
+            'timestamp'     => $timestamp,
+            'windowBefore'  => Event::WINDOW_BEFORE_MINUTES,
+            'windowAfter'   => Event::WINDOW_AFTER_MINUTES,
+            'photos'        => $photos,
+            'capHit'        => count($photos) === self::HARD_CAP,
+            'firstAt'       => $firstAt,
+            'lastAt'        => $lastAt,
+            'prevAt'        => $prevAt,
+            'nextAt'        => $nextAt,
+            'totalReady'    => $totalReady,
+            'firstRank'     => $firstRank,
+            'resolvedStyle' => $this->styleResolver->resolve($event),
         ], $response);
     }
 

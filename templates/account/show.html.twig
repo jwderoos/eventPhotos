@@ -76,5 +76,15 @@
         {{ form(displayNameForm) }}
     </section>
     {% endif %}
+
+    {% if styleForm is defined %}
+    <section class="space-y-3">
+        <h2 class="text-lg font-medium">Branding defaults</h2>
+        <p class="text-sm text-base-content/70">
+            These apply to your events unless a collection or event overrides them.
+        </p>
+        {{ form(styleForm) }}
+    </section>
+    {% endif %}
 </div>
 {% endblock %}

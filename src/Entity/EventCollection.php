@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\Entity\StyleSettings;
 use Stringable;
 use App\Repository\EventCollectionRepository;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -20,6 +21,9 @@ class EventCollection implements Stringable
     #[ORM\GeneratedValue]
     #[ORM\Column(type: Types::INTEGER)]
     private ?int $id = null;
+
+    #[ORM\Embedded(class: StyleSettings::class, columnPrefix: 'style_')]
+    private StyleSettings $style;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
@@ -38,11 +42,17 @@ class EventCollection implements Stringable
         private User $owner,
     ) {
         $this->events = new ArrayCollection();
+        $this->style  = new StyleSettings();
     }
 
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getStyle(): StyleSettings
+    {
+        return $this->style;
     }
 
     public function getSlug(): string

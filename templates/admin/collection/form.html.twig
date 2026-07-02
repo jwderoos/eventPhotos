@@ -21,8 +21,17 @@
 
     {{ form_start(form, {attr: {id: 'collection-form', class: 'card bg-base-100 shadow-sm'}}) }}
         <div class="card-body grid gap-4 lg:grid-cols-2">
-            {{ form_widget(form) }}
+            <div class="space-y-4">
+                {{ form_row(form.slug) }}
+                {{ form_row(form.name) }}
+                {{ form_row(form.description) }}
+                {% if form.owner is defined %}{{ form_row(form.owner) }}{% endif %}
+            </div>
+            <div>
+                {% include '_partials/_style_fields.html.twig' with {styleForm: form.style, inherited: styleInherited} only %}
+            </div>
         </div>
+        {{ form_widget(form) }}
     {{ form_end(form, {render_rest: false}) }}
 {% endblock %}
 

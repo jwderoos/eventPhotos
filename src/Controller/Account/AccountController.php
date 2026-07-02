@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Controller\Account;
 
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use App\Entity\OrganizerProfile;
 use App\Entity\User;
 use App\Form\AccountDisplayNameType;
 use App\Form\AccountPasswordChangeType;
+use App\Form\OrganizerProfileType;
+use App\Repository\OrganizerProfileRepository;
 use App\Repository\UserIdentityRepository;
 use App\Security\Voter\UserIdentityVoter;
 use Doctrine\ORM\EntityManagerInterface;
@@ -27,7 +30,13 @@ final class AccountController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
         private readonly UserIdentityRepository $identities,
+        private readonly OrganizerProfileRepository $organizerProfiles,
     ) {
+    }
+
+    private function loadOrCreateProfile(User $user): OrganizerProfile
+    {
+        return $this->organizerProfiles->findOneBy(['user' => $user]) ?? new OrganizerProfile($user);
     }
 
     #[Route('/account', name: 'account_show', methods: ['GET'])]
@@ -46,11 +55,16 @@ final class AccountController extends AbstractController
         ]);
         $displayNameForm->get('displayName')->setData($user->getDisplayName());
 
+        $styleForm = $this->createForm(OrganizerProfileType::class, $this->loadOrCreateProfile($user), [
+            'action' => $this->generateUrl('account_change_style'),
+        ]);
+
         return $this->render('account/show.html.twig', [
             'user' => $user,
             'identities' => $user->getIdentities(),
             'passwordForm' => $passwordForm,
             'displayNameForm' => $displayNameForm,
+            'styleForm' => $styleForm,
         ]);
     }
 
@@ -120,6 +134,33 @@ final class AccountController extends AbstractController
 
         $this->logger->info('account.display_name_changed', ['user_id' => $user->getId()]);
         $this->addFlash('success', 'Display name updated.');
+        return $this->redirectToRoute('account_show');
+    }
+
+    #[Route('/account/style', name: 'account_change_style', methods: ['POST'])]
+    public function changeStyle(Request $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user    = $this->getUser();
+        $profile = $this->loadOrCreateProfile($user);
+
+        $form = $this->createForm(OrganizerProfileType::class, $profile);
+        $form->handleRequest($request);
+
+        if (!$form->isSubmitted() || !$form->isValid()) {
+            $this->addFlash('error', 'Styling update failed — check the form.');
+
+            return $this->redirectToRoute('account_show');
+        }
+
+        if ($profile->getId() === null) {
+            $this->em->persist($profile);
+        }
+
+        $this->em->flush();
+
+        $this->addFlash('success', 'Styling defaults updated.');
+
         return $this->redirectToRoute('account_show');
     }
 

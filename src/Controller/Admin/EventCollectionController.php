@@ -12,6 +12,7 @@ use App\Entity\User;
 use App\Form\EventCollectionType;
 use App\Repository\EventCollectionRepository;
 use App\Security\Voter\EventCollectionVoter;
+use App\Service\Style\StyleResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -25,6 +26,7 @@ final class EventCollectionController extends AbstractController
         private readonly EventCollectionRepository $collections,
         private readonly EntityManagerInterface $em,
         private readonly AuditContext $audit,
+        private readonly StyleResolver $styleResolver,
     ) {
     }
 
@@ -54,7 +56,8 @@ final class EventCollectionController extends AbstractController
 
         $collection = new EventCollection('', '', $user);
 
-        $form = $this->createForm(EventCollectionType::class, $collection);
+        $inherited = $this->styleResolver->resolveChain($this->styleResolver->profileStyleFor($user));
+        $form      = $this->createForm(EventCollectionType::class, $collection, ['inherited' => $inherited]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -70,9 +73,10 @@ final class EventCollectionController extends AbstractController
         }
 
         return $this->render('admin/collection/form.html.twig', [
-            'form'       => $form,
-            'collection' => $collection,
-            'mode'       => 'new',
+            'form'           => $form,
+            'collection'     => $collection,
+            'mode'           => 'new',
+            'styleInherited' => $inherited,
         ]);
     }
 
@@ -87,7 +91,10 @@ final class EventCollectionController extends AbstractController
     {
         $this->denyAccessUnlessGranted(EventCollectionVoter::EDIT, $collection);
 
-        $form = $this->createForm(EventCollectionType::class, $collection);
+        $inherited = $this->styleResolver->resolveChain(
+            $this->styleResolver->profileStyleFor($collection->getOwner()),
+        );
+        $form = $this->createForm(EventCollectionType::class, $collection, ['inherited' => $inherited]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -99,9 +106,10 @@ final class EventCollectionController extends AbstractController
         }
 
         return $this->render('admin/collection/form.html.twig', [
-            'form'       => $form,
-            'collection' => $collection,
-            'mode'       => 'edit',
+            'form'           => $form,
+            'collection'     => $collection,
+            'mode'           => 'edit',
+            'styleInherited' => $inherited,
         ]);
     }
 

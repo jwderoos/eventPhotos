@@ -27,11 +27,34 @@
 
 {%- block form_widget_simple -%}
     {%- set type = type|default('text') -%}
-    {%- if type != 'hidden' -%}
+    {%- if type == 'color' -%}
+        {%- set attr = attr|merge({class: (attr.class|default('') ~ ' h-10 w-16 rounded border border-base-300 cursor-pointer p-1 bg-base-100')|trim}) -%}
+    {%- elseif type != 'hidden' -%}
         {%- set attr = attr|merge({class: (attr.class|default('') ~ ' input input-bordered w-full')|trim}) -%}
     {%- endif -%}
     {{- parent() -}}
 {%- endblock form_widget_simple -%}
+
+{%- block checkbox_widget -%}
+    {%- set attr = attr|merge({class: (attr.class|default('') ~ ' checkbox')|trim}) -%}
+    {{- parent() -}}
+{%- endblock checkbox_widget -%}
+
+{#- Checkboxes need box-then-label, not the generic label-above-widget row. -#}
+{%- block checkbox_row -%}
+    <div class="form-control w-full">
+        <label class="label cursor-pointer justify-start gap-3 py-1">
+            {{- form_widget(form) -}}
+            {%- if label is not same as(false) -%}
+                <span class="label-text">
+                    {{- (label is empty ? name|humanize : label)|trans(label_translation_parameters|default({}), translation_domain|default('messages')) -}}
+                </span>
+            {%- endif -%}
+        </label>
+        {{- form_help(form) -}}
+        {{- form_errors(form) -}}
+    </div>
+{%- endblock checkbox_row -%}
 
 {%- block textarea_widget -%}
     {%- set attr = attr|merge({class: (attr.class|default('') ~ ' textarea textarea-bordered w-full')|trim}) -%}
@@ -45,7 +68,7 @@
 
 {%- block form_help -%}
     {%- if help is not empty -%}
-        <small class="text-xs text-base-content/60">{{ help|trans(help_translation_parameters|default([]), translation_domain|default('messages')) }}</small>
+        <small class="block w-full mt-1 text-xs text-base-content/60">{{ help|trans(help_translation_parameters|default([]), translation_domain|default('messages')) }}</small>
     {%- endif -%}
 {%- endblock form_help -%}
 

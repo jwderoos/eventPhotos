@@ -17,6 +17,7 @@ use App\Repository\PhotoRepository;
 use App\Security\Voter\EventVoter;
 use App\Service\Mail\OrganizerMailerResolver;
 use App\Service\QrCodeRenderer;
+use App\Service\Style\StyleResolver;
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
@@ -49,6 +50,7 @@ final class EventController extends AbstractController
         #[Autowire('%env(int:EVENT_LIVE_NOTIFICATION_RATE_PER_MIN)%')]
         private readonly int $notificationRatePerMinute,
         private readonly AuditContext $audit,
+        private readonly StyleResolver $styleResolver,
     ) {
     }
 
@@ -89,8 +91,10 @@ final class EventController extends AbstractController
         $endsAt   = $now->modify('+2 hours');
         $event    = new Event('', '', $startsAt, $endsAt, $user);
 
-        $form = $this->createForm(EventType::class, $event, [
+        $inherited = $this->styleResolver->resolveChain($this->styleResolver->profileStyleFor($user));
+        $form      = $this->createForm(EventType::class, $event, [
             'mail_active' => $this->mailerResolver->isCustomActive($event->getOwner()),
+            'inherited'   => $inherited,
         ]);
         $form->handleRequest($request);
 
@@ -107,9 +111,10 @@ final class EventController extends AbstractController
         }
 
         return $this->render('admin/event/form.html.twig', [
-            'form'  => $form,
-            'event' => $event,
-            'mode'  => 'new',
+            'form'          => $form,
+            'event'         => $event,
+            'mode'          => 'new',
+            'styleInherited' => $inherited,
         ]);
     }
 
@@ -125,8 +130,15 @@ final class EventController extends AbstractController
         $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
 
         $mailActive = $this->mailerResolver->isCustomActive($event->getOwner());
+        $inherited  = $this->styleResolver->resolveChain(
+            $event->getCollection()?->getStyle(),
+            $this->styleResolver->profileStyleFor($event->getOwner()),
+        );
 
-        $form = $this->createForm(EventType::class, $event, ['mail_active' => $mailActive]);
+        $form = $this->createForm(EventType::class, $event, [
+            'mail_active' => $mailActive,
+            'inherited'   => $inherited,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -137,17 +149,18 @@ final class EventController extends AbstractController
             return $this->redirectToRoute('admin_event_index');
         }
 
-        $rate = max(1, $this->notificationRatePerMinute);
+        $rate           = max(1, $this->notificationRatePerMinute);
         $confirmedCount = count($this->subscriptions->findConfirmedByEvent($event));
 
         return $this->render('admin/event/form.html.twig', [
-            'form'  => $form,
-            'event' => $event,
-            'mode'  => 'edit',
+            'form'             => $form,
+            'event'            => $event,
+            'mode'             => 'edit',
             'subscriberCount'  => $this->subscriptions->countByEvent($event),
             'mailActive'       => $mailActive,
             'readyPhotoCount'  => $this->photos->countReady($event),
             'projectedMinutes' => (int) ceil($confirmedCount / $rate),
+            'styleInherited'   => $inherited,
         ]);
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\Entity\StyleSettings;
 use DomainException;
 use Stringable;
 use App\Repository\EventRepository;
@@ -32,6 +33,9 @@ class Event implements Stringable
     #[ORM\GeneratedValue]
     #[ORM\Column(type: Types::INTEGER)]
     private ?int $id = null;
+
+    #[ORM\Embedded(class: StyleSettings::class, columnPrefix: 'style_')]
+    private StyleSettings $style;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
@@ -83,11 +87,17 @@ class Event implements Stringable
         // both timestamps to UTC at the entity boundary so the round-trip is stable.
         $this->startsAt = $startsAt->setTimezone(new DateTimeZone('UTC'));
         $this->endsAt   = $endsAt->setTimezone(new DateTimeZone('UTC'));
+        $this->style    = new StyleSettings();
     }
 
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getStyle(): StyleSettings
+    {
+        return $this->style;
     }
 
     public function getSlug(): string

@@ -1,0 +1,44 @@
+{# params: styleForm (FormView for the 'style' child), inherited (ResolvedStyle|null) #}
+<div class="space-y-4"
+     {{ stimulus_controller('style-preview') }}
+     data-action="input->style-preview#render change->style-preview#render"
+     data-style-preview-inherited-font-value="{{ inherited.fontColor ?? '' }}"
+     data-style-preview-inherited-background-value="{{ inherited.backgroundColor ?? '' }}"
+     data-style-preview-inherited-button-value="{{ inherited.buttonColor ?? '' }}"
+     data-style-preview-inherited-glow-value="{{ inherited and inherited.glowEnabled ? '1' : '' }}">
+
+    {# data-theme="silk" makes the uncustomised preview match the public page's
+       actual defaults (the public surface uses the silk theme, not the dark admin one). #}
+    <div data-style-preview-target="card" data-theme="silk"
+         class="card bg-base-100 text-base-content shadow-sm overflow-hidden border border-base-300">
+        <div class="card-body items-center text-center gap-3">
+            <h3 class="text-xl font-bold text-base-content">Preview</h3>
+            <button type="button" class="btn btn-primary">Meld je aan</button>
+        </div>
+    </div>
+
+    {% set rows = [
+        {custom: 'customFontColor',       field: 'fontColor',       label: 'Font color'},
+        {custom: 'customBackgroundColor', field: 'backgroundColor', label: 'Background color'},
+        {custom: 'customButtonColor',     field: 'buttonColor',     label: 'Button color'}
+    ] %}
+    {% for row in rows %}
+        <div class="flex items-center gap-3">
+            <label class="flex w-48 shrink-0 items-center gap-2 cursor-pointer text-sm font-medium">
+                {{ form_widget(attribute(styleForm, row.custom), {attr: {'data-style-preview-target': 'toggle', 'data-field': row.field, 'class': 'checkbox-sm'}}) }}
+                <span>{{ row.label }}</span>
+            </label>
+            {{ form_widget(attribute(styleForm, row.field), {type: 'color', attr: {'data-style-preview-target': 'input', 'data-field': row.field}}) }}
+        </div>
+    {% endfor %}
+
+    <div class="flex items-center gap-3">
+        <span class="w-48 shrink-0 text-sm font-medium">Background glow</span>
+        {{ form_widget(styleForm.glowMode, {attr: {'data-style-preview-target': 'glowMode', 'class': 'select-sm'}}) }}
+    </div>
+
+    <p class="text-xs text-base-content/60">
+        Untick a color to inherit it from the collection / your organizer defaults.
+        Glow is auto-derived from the button color.
+    </p>
+</div>
