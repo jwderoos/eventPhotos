@@ -86,4 +86,33 @@ final class BrandResolverTest extends TestCase
         $this->assertFalse($resolved->hasLogo);
         $this->assertNull($resolved->url);
     }
+
+    public function testResolveForOwnerReturnsNullWhenNoProfile(): void
+    {
+        $owner = new User('owner@example.com', 'Owner');
+
+        $repo = $this->createStub(OrganizerProfileRepository::class);
+        $repo->method('findOneBy')->willReturn(null);
+
+        $this->assertNotInstanceOf(ResolvedBrand::class, new BrandResolver($repo)->resolveForOwner($owner));
+    }
+
+    public function testResolveForOwnerReturnsBrandFromProfile(): void
+    {
+        $owner = new User('owner@example.com', 'Owner');
+        $profile = new OrganizerProfile($owner);
+        $profile->setBrandLabel('Acme Corp');
+        $profile->setBrandLogoFilename('acme-abc123.png');
+        $profile->setBrandUrl('https://acme.example');
+
+        $repo = $this->createStub(OrganizerProfileRepository::class);
+        $repo->method('findOneBy')->willReturn($profile);
+
+        $resolved = new BrandResolver($repo)->resolveForOwner($owner);
+
+        $this->assertInstanceOf(ResolvedBrand::class, $resolved);
+        $this->assertSame('Acme Corp', $resolved->label);
+        $this->assertTrue($resolved->hasLogo);
+        $this->assertSame('https://acme.example', $resolved->url);
+    }
 }

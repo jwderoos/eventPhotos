@@ -66,14 +66,22 @@
     {% if passwordForm is defined %}
     <section class="space-y-3">
         <h2 class="text-lg font-medium">{% if user.hasUsablePassword %}Change password{% else %}Set password{% endif %}</h2>
-        {{ form(passwordForm) }}
+        {{ form_start(passwordForm) }}
+            {{ form_widget(passwordForm) }}
+            <button type="submit" class="btn btn-primary mt-3">
+                {% if user.hasUsablePassword %}Change password{% else %}Set password{% endif %}
+            </button>
+        {{ form_end(passwordForm) }}
     </section>
     {% endif %}
 
     {% if displayNameForm is defined %}
     <section class="space-y-3">
         <h2 class="text-lg font-medium">Display name</h2>
-        {{ form(displayNameForm) }}
+        {{ form_start(displayNameForm) }}
+            {{ form_widget(displayNameForm) }}
+            <button type="submit" class="btn btn-primary mt-3">Save display name</button>
+        {{ form_end(displayNameForm) }}
     </section>
     {% endif %}
 
@@ -91,7 +99,10 @@
                      class="h-16 w-16 object-contain border rounded bg-base-200" />
             </div>
         {% endif %}
-        {{ form(styleForm) }}
+        {{ form_start(styleForm) }}
+            {{ form_widget(styleForm) }}
+            <button type="submit" class="btn btn-primary mt-3">Save branding</button>
+        {{ form_end(styleForm) }}
     </section>
     {% endif %}
 </div>

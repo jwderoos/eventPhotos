@@ -12,6 +12,7 @@ use App\Entity\User;
 use App\Form\EventCollectionType;
 use App\Repository\EventCollectionRepository;
 use App\Security\Voter\EventCollectionVoter;
+use App\Service\Brand\BrandPreviewResolver;
 use App\Service\Style\StyleResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -27,6 +28,7 @@ final class EventCollectionController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly AuditContext $audit,
         private readonly StyleResolver $styleResolver,
+        private readonly BrandPreviewResolver $brandPreview,
     ) {
     }
 
@@ -77,6 +79,7 @@ final class EventCollectionController extends AbstractController
             'collection'     => $collection,
             'mode'           => 'new',
             'styleInherited' => $inherited,
+            'brandPreview'   => $this->brandPreview->forOwner($user),
         ]);
     }
 
@@ -110,6 +113,7 @@ final class EventCollectionController extends AbstractController
             'collection'     => $collection,
             'mode'           => 'edit',
             'styleInherited' => $inherited,
+            'brandPreview'   => $this->brandPreview->forOwner($collection->getOwner()),
         ]);
     }
 

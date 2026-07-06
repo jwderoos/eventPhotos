@@ -21,7 +21,7 @@ final class AdminActionsAuditTest extends AuditWebTestCase
         $targetId = (int) $target->getId();
 
         $crawler = $this->client->request(Request::METHOD_GET, '/admin/users/' . $targetId . '/edit');
-        $form = $crawler->selectButton('Save')->form();
+        $form = $crawler->filter('#user-form')->form();
         $form['user_edit[role]'] = 'ROLE_ORGANIZER';
         $form['user_edit[displayName]'] = $target->getDisplayName();
         $this->client->submit($form);
@@ -55,7 +55,7 @@ final class AdminActionsAuditTest extends AuditWebTestCase
         $targetId = (int) $target->getId();
 
         $crawler = $this->client->request(Request::METHOD_GET, '/admin/users/' . $targetId . '/edit');
-        $form = $crawler->selectButton('Save')->form();
+        $form = $crawler->filter('#user-form')->form();
         $form['user_edit[displayName]'] = 'New Display Name';
         // Role field left as-is (no role change).
         $this->client->submit($form);

@@ -15,6 +15,7 @@ use App\Repository\EventNotificationSubscriptionRepository;
 use App\Repository\EventRepository;
 use App\Repository\PhotoRepository;
 use App\Security\Voter\EventVoter;
+use App\Service\Brand\BrandPreviewResolver;
 use App\Service\Mail\OrganizerMailerResolver;
 use App\Service\QrCodeRenderer;
 use App\Service\Style\StyleResolver;
@@ -51,6 +52,7 @@ final class EventController extends AbstractController
         private readonly int $notificationRatePerMinute,
         private readonly AuditContext $audit,
         private readonly StyleResolver $styleResolver,
+        private readonly BrandPreviewResolver $brandPreview,
     ) {
     }
 
@@ -111,10 +113,11 @@ final class EventController extends AbstractController
         }
 
         return $this->render('admin/event/form.html.twig', [
-            'form'          => $form,
-            'event'         => $event,
-            'mode'          => 'new',
+            'form'           => $form,
+            'event'          => $event,
+            'mode'           => 'new',
             'styleInherited' => $inherited,
+            'brandPreview'   => $this->brandPreview->forOwner($user),
         ]);
     }
 
@@ -161,6 +164,7 @@ final class EventController extends AbstractController
             'readyPhotoCount'  => $this->photos->countReady($event),
             'projectedMinutes' => (int) ceil($confirmedCount / $rate),
             'styleInherited'   => $inherited,
+            'brandPreview'     => $this->brandPreview->forOwner($event->getOwner()),
         ]);
     }
 

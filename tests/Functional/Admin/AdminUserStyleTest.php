@@ -75,6 +75,23 @@ final class AdminUserStyleTest extends WebTestCase
         $this->assertSame('https://target.example', $profile->getBrandUrl());
     }
 
+    public function testStylingBrandFormHasItsOwnSubmitButton(): void
+    {
+        $admin  = $this->seedUser('admin-submit@example.com', ['ROLE_ADMIN']);
+        $target = $this->seedUser('target-submit@example.com', ['ROLE_ORGANIZER']);
+
+        $this->client->loginUser($admin);
+        $crawler = $this->client->request(Request::METHOD_GET, '/admin/users/' . $target->getId() . '/edit');
+        self::assertResponseIsSuccessful();
+
+        // The branding form posts to admin_user_change_style (.../style) and needs
+        // its own submit button — the page's primary "Save" targets the user-form
+        // (display name / role), not this one.
+        $form   = $crawler->filter('form[action$="/style"]');
+        $submit = $form->filter('button[type="submit"], input[type="submit"]');
+        $this->assertGreaterThan(0, $submit->count(), 'styling & brand form has no submit button');
+    }
+
     public function testBrandLogoRouteReturns404WhenTargetHasNoLogo(): void
     {
         $admin  = $this->seedUser('admin2@example.com', ['ROLE_ADMIN']);

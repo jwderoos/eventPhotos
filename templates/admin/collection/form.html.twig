@@ -28,7 +28,7 @@
                 {% if form.owner is defined %}{{ form_row(form.owner) }}{% endif %}
             </div>
             <div>
-                {% include '_partials/_style_fields.html.twig' with {styleForm: form.style, inherited: styleInherited} only %}
+                {% include '_partials/_style_fields.html.twig' with {styleForm: form.style, inherited: styleInherited, brandPreview: brandPreview} only %}
             </div>
         </div>
         {{ form_widget(form) }}

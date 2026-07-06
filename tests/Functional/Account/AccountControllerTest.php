@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Account;
 
+use Iterator;
 use App\Entity\User;
 use App\Entity\UserIdentity;
 use App\Enum\AuthProvider;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Request;
@@ -59,6 +61,38 @@ final class AccountControllerTest extends WebTestCase
         $this->client->request(Request::METHOD_GET, '/account');
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('h2', 'Linked identities');
+    }
+
+    /**
+     * Each standalone account form must render its own submit button. DomCrawler's
+     * ->form() synthesizes submission without a button, so form-submit tests passed
+     * while a real browser had nothing to click (regression guard for the missing
+     * submit buttons on /account).
+     *
+     * @return Iterator<string, array{string}>
+     */
+    public static function accountFormActions(): Iterator
+    {
+        yield 'password' => ['/account/password'];
+        yield 'display-name' => ['/account/display-name'];
+        yield 'style' => ['/account/style'];
+    }
+
+    #[DataProvider('accountFormActions')]
+    public function testEachAccountFormHasASubmitButton(string $actionSuffix): void
+    {
+        $this->client->loginUser($this->makeUser());
+        $crawler = $this->client->request(Request::METHOD_GET, '/account');
+        self::assertResponseIsSuccessful();
+
+        $form    = $crawler->filter(sprintf('form[action$="%s"]', $actionSuffix));
+        $submits = $form->filter('button[type="submit"], input[type="submit"]');
+
+        $this->assertGreaterThan(
+            0,
+            $submits->count(),
+            sprintf('form with action ending "%s" has no submit button', $actionSuffix),
+        );
     }
 
     public function testChangePasswordRequiresCurrentWhenSet(): void

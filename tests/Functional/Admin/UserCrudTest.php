@@ -105,11 +105,14 @@ final class UserCrudTest extends WebTestCase
         $other  = $this->seedUser('other@example.com', 'Other', ['ROLE_USER']);
         $client->loginUser($admin);
 
-        $client->request(Request::METHOD_GET, '/admin/users/' . $other->getId() . '/edit');
-        $client->submitForm('Save', [
+        $crawler = $client->request(Request::METHOD_GET, '/admin/users/' . $other->getId() . '/edit');
+        // Target the user_edit form by id — the page now also carries a
+        // "Save styling & brand" button, so submitForm('Save') is ambiguous.
+        $form = $crawler->filter('#user-form')->form([
             'user_edit[displayName]' => 'Renamed',
             'user_edit[role]'        => 'ROLE_ORGANIZER',
         ]);
+        $client->submit($form);
 
         self::assertResponseRedirects('/admin/users');
 
@@ -143,10 +146,11 @@ final class UserCrudTest extends WebTestCase
         $admin  = $this->seedUser('admin@example.com', 'Admin', ['ROLE_ADMIN']);
         $client->loginUser($admin);
 
-        $client->request(Request::METHOD_GET, '/admin/users/' . $admin->getId() . '/edit');
-        $client->submitForm('Save', [
+        $crawler = $client->request(Request::METHOD_GET, '/admin/users/' . $admin->getId() . '/edit');
+        $form = $crawler->filter('#user-form')->form([
             'user_edit[displayName]' => 'Renamed Admin',
         ]);
+        $client->submit($form);
         self::assertResponseRedirects('/admin/users');
 
         $container = self::getContainer();

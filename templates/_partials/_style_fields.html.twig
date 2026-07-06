@@ -1,4 +1,4 @@
-{# params: styleForm (FormView for the 'style' child), inherited (ResolvedStyle|null) #}
+{# params: styleForm (FormView for the 'style' child), inherited (ResolvedStyle|null), brandPreview (BrandPreview|null) #}
 <div class="space-y-4"
      {{ stimulus_controller('style-preview') }}
      data-action="input->style-preview#render change->style-preview#render"
@@ -12,6 +12,27 @@
     <div data-style-preview-target="card" data-theme="silk"
          class="card bg-base-100 text-base-content shadow-sm overflow-hidden border border-base-300">
         <div class="card-body items-center text-center gap-3">
+            {# Static miniature of the public header (templates/public/_base.html.twig).
+               Brand is per-organizer, static relative to the color inputs, so it is
+               rendered once server-side; the Stimulus controller only restyles the card. #}
+            <div class="flex flex-col items-center gap-0.5">
+                {% if brandPreview is defined and brandPreview %}
+                    <span class="flex items-center gap-2">
+                        {% if brandPreview.logoUrl %}
+                            <img src="{{ brandPreview.logoUrl }}"
+                                 alt="{{ brandPreview.label ?? 'Brand logo' }}"
+                                 class="h-6 w-auto object-contain" />
+                        {% endif %}
+                        {% if brandPreview.label %}
+                            <span class="text-base font-semibold tracking-tight">{{ brandPreview.label }}</span>
+                        {% endif %}
+                    </span>
+                    <span class="text-xs opacity-60">powered by: EventPhotos by JWdR</span>
+                {% else %}
+                    <span class="text-base font-semibold tracking-tight">EventPhotos by JWdR</span>
+                {% endif %}
+            </div>
+
             <h3 class="text-xl font-bold text-base-content">Preview</h3>
             <button type="button" class="btn btn-primary">Meld je aan</button>
         </div>
