@@ -41,6 +41,56 @@
         </form>
     {% endif %}
 
+    {% if styleForm is defined %}
+        <section class="mt-8 space-y-3">
+            <h2 class="text-lg font-medium">Styling &amp; brand</h2>
+            <p class="text-sm text-base-content/70">
+                Applies to this user's public event pages.
+            </p>
+            {% if brandLogoSet %}
+                <div class="flex items-center gap-3">
+                    <span class="text-sm font-medium">Current brand logo:</span>
+                    <img src="{{ path('admin_user_brand_logo', {id: target_id}) }}"
+                         alt="Brand logo"
+                         class="h-16 w-16 object-contain border rounded bg-base-200" />
+                </div>
+            {% endif %}
+            {{ form(styleForm) }}
+        </section>
+    {% endif %}
+
+    {% if identities is defined %}
+        <section class="mt-8 space-y-3">
+            <h2 class="text-lg font-medium">Linked identities</h2>
+            {% if identities is empty %}
+                <p class="text-sm text-base-content/70">No identities linked.</p>
+            {% else %}
+                <table class="table">
+                    <thead>
+                        <tr><th>Provider</th><th>Email</th><th>Linked</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                    {% for identity in identities %}
+                        <tr>
+                            <td>{{ identity.provider.value|capitalize }}</td>
+                            <td>{{ identity.email }}</td>
+                            <td>{{ identity.linkedAt|date('Y-m-d H:i') }}</td>
+                            <td>
+                                <form method="post"
+                                      action="{{ path('admin_user_identity_unlink', {id: target_id, identityId: identity.id}) }}">
+                                    <input type="hidden" name="_token"
+                                           value="{{ csrf_token('admin-unlink-identity-' ~ identity.id) }}">
+                                    <button class="btn btn-sm btn-ghost">Unlink</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </section>
+    {% endif %}
+
 {% endblock %}
 
 {% block admin_actions %}

@@ -25,6 +25,8 @@ enum AuditAction: string
     case UserRoleChange = 'user.role_change';
     case UserDelete = 'user.delete';
     case UserSendReset = 'user.send_reset';
+    case UserStyleChange = 'user.style_change';
+    case UserIdentityUnlink = 'user.identity_unlink';
 
     case InviteCreate = 'invite.create';
     case InviteRevoke = 'invite.revoke';

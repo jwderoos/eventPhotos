@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace App\Controller\Account;
 
 use Symfony\Component\HttpFoundation\RedirectResponse;
-use App\Entity\OrganizerProfile;
 use App\Entity\User;
 use App\Form\AccountDisplayNameType;
 use App\Form\AccountPasswordChangeType;
 use App\Form\OrganizerProfileType;
-use App\Repository\OrganizerProfileRepository;
 use App\Repository\UserIdentityRepository;
+use App\Service\Organizer\OrganizerProfileProvider;
 use App\Security\Voter\UserIdentityVoter;
 use Doctrine\ORM\EntityManagerInterface;
 use League\Flysystem\FilesystemException;
@@ -35,15 +34,10 @@ final class AccountController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
         private readonly UserIdentityRepository $identities,
-        private readonly OrganizerProfileRepository $organizerProfiles,
+        private readonly OrganizerProfileProvider $organizerProfiles,
         #[Autowire(service: 'brand_logos_storage')]
         private readonly FilesystemOperator $brandLogosStorage,
     ) {
-    }
-
-    private function loadOrCreateProfile(User $user): OrganizerProfile
-    {
-        return $this->organizerProfiles->findOneBy(['user' => $user]) ?? new OrganizerProfile($user);
     }
 
     #[Route('/account', name: 'account_show', methods: ['GET'])]
@@ -62,7 +56,7 @@ final class AccountController extends AbstractController
         ]);
         $displayNameForm->get('displayName')->setData($user->getDisplayName());
 
-        $profile = $this->loadOrCreateProfile($user);
+        $profile = $this->organizerProfiles->loadOrCreate($user);
 
         $styleForm = $this->createForm(OrganizerProfileType::class, $profile, [
             'action' => $this->generateUrl('account_change_style'),
@@ -152,7 +146,7 @@ final class AccountController extends AbstractController
     {
         /** @var User $user */
         $user    = $this->getUser();
-        $profile = $this->loadOrCreateProfile($user);
+        $profile = $this->organizerProfiles->loadOrCreate($user);
 
         $form = $this->createForm(OrganizerProfileType::class, $profile);
         $form->handleRequest($request);
@@ -179,7 +173,7 @@ final class AccountController extends AbstractController
     {
         /** @var User $user */
         $user    = $this->getUser();
-        $profile = $this->loadOrCreateProfile($user);
+        $profile = $this->organizerProfiles->loadOrCreate($user);
 
         $filename = $profile->getBrandLogoFilename();
         if ($filename === null) {

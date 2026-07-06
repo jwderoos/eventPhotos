@@ -8,15 +8,23 @@ use App\Audit\AuditAction;
 use App\Audit\AuditContext;
 use App\Audit\Attribute\Audited;
 use App\Entity\User;
+use App\Entity\UserIdentity;
+use App\Form\OrganizerProfileType;
 use App\Form\UserCreateType;
 use App\Form\UserEditType;
 use App\Repository\EventCollectionRepository;
 use App\Repository\EventRepository;
+use App\Repository\UserIdentityRepository;
 use App\Repository\UserRepository;
+use App\Security\Voter\UserIdentityVoter;
 use App\Security\Voter\UserVoter;
+use App\Service\Organizer\OrganizerProfileProvider;
 use Doctrine\ORM\EntityManagerInterface;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\FilesystemOperator;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,6 +40,8 @@ use SymfonyCasts\Bundle\ResetPassword\ResetPasswordHelperInterface;
 
 final class UserController extends AbstractController
 {
+    private const int BRAND_LOGO_PREVIEW_MAX_AGE = 300;
+
     public function __construct(
         private readonly UserRepository $users,
         private readonly EntityManagerInterface $em,
@@ -41,6 +51,10 @@ final class UserController extends AbstractController
         private readonly EventRepository $events,
         private readonly EventCollectionRepository $collections,
         private readonly AuditContext $audit,
+        private readonly OrganizerProfileProvider $organizerProfiles,
+        #[Autowire(service: 'brand_logos_storage')]
+        private readonly FilesystemOperator $brandLogosStorage,
+        private readonly UserIdentityRepository $identities,
     ) {
     }
 
@@ -140,12 +154,20 @@ final class UserController extends AbstractController
             return new RedirectResponse('/admin/users');
         }
 
+        $profile = $this->organizerProfiles->loadOrCreate($target);
+        $styleForm = $this->createForm(OrganizerProfileType::class, $profile, [
+            'action' => $this->generateUrl('admin_user_change_style', ['id' => $target->getId()]),
+        ]);
+
         $status = $form->isSubmitted() && !$form->isValid() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK;
         return $this->render('admin/user/form.html.twig', [
             'form'         => $form,
             'mode'         => 'edit',
             'target_id'    => $target->getId(),
             'target_email' => $target->getEmail(),
+            'styleForm'    => $styleForm,
+            'brandLogoSet' => $profile->getBrandLogoFilename() !== null,
+            'identities'   => $target->getIdentities(),
         ], new Response(null, $status));
     }
 
@@ -207,6 +229,103 @@ final class UserController extends AbstractController
         $this->audit->targetLabel($target->getEmail());
         $this->sendInviteEmail($target);
         $this->addFlash('success', sprintf('Reset email sent to %s.', $target->getEmail()));
+
+        return new RedirectResponse('/admin/users/' . $target->getId() . '/edit');
+    }
+
+    #[Route(
+        '/admin/users/{id}/style',
+        name: 'admin_user_change_style',
+        requirements: ['id' => '\d+'],
+        methods: ['POST'],
+    )]
+    #[Audited(AuditAction::UserStyleChange, targetParam: 'id', targetType: 'User')]
+    public function changeStyle(User $target, Request $request): RedirectResponse
+    {
+        $this->denyAccessUnlessGranted(UserVoter::EDIT, $target);
+
+        $profile = $this->organizerProfiles->loadOrCreate($target);
+        $form = $this->createForm(OrganizerProfileType::class, $profile);
+        $form->handleRequest($request);
+
+        if (!$form->isSubmitted() || !$form->isValid()) {
+            // Redirect (3xx) would otherwise log a spurious audit row — suppress it.
+            $this->audit->suppress();
+            $this->addFlash('error', 'Styling update failed — check the form.');
+            return new RedirectResponse('/admin/users/' . $target->getId() . '/edit');
+        }
+
+        if ($profile->getId() === null) {
+            $this->em->persist($profile);
+        }
+
+        $this->em->flush();
+
+        $this->audit->targetLabel($target->getEmail());
+        $this->addFlash('success', 'Styling defaults updated.');
+        return new RedirectResponse('/admin/users/' . $target->getId() . '/edit');
+    }
+
+    #[Route(
+        '/admin/users/{id}/brand-logo',
+        name: 'admin_user_brand_logo',
+        requirements: ['id' => '\d+'],
+        methods: ['GET'],
+    )]
+    public function brandLogo(User $target): Response
+    {
+        $this->denyAccessUnlessGranted(UserVoter::VIEW, $target);
+
+        $profile  = $this->organizerProfiles->loadOrCreate($target);
+        $filename = $profile->getBrandLogoFilename();
+        if ($filename === null) {
+            throw $this->createNotFoundException();
+        }
+
+        try {
+            $contents = $this->brandLogosStorage->read($filename);
+        } catch (FilesystemException) {
+            throw $this->createNotFoundException();
+        }
+
+        $response = new Response($contents);
+        $response->headers->set(
+            'Content-Type',
+            str_ends_with(strtolower($filename), '.png') ? 'image/png' : 'image/jpeg',
+        );
+        $response->headers->set('Cache-Control', 'private, max-age=' . self::BRAND_LOGO_PREVIEW_MAX_AGE);
+
+        return $response;
+    }
+
+    #[Route(
+        '/admin/users/{id}/identities/{identityId}/unlink',
+        name: 'admin_user_identity_unlink',
+        requirements: ['id' => '\d+', 'identityId' => '\d+'],
+        methods: ['POST'],
+    )]
+    #[Audited(AuditAction::UserIdentityUnlink, targetParam: 'id', targetType: 'User')]
+    public function unlinkIdentity(User $target, int $identityId, Request $request): RedirectResponse
+    {
+        $identity = $this->identities->find($identityId);
+        if (!$identity instanceof UserIdentity || $identity->getUser() !== $target) {
+            throw $this->createNotFoundException();
+        }
+
+        $this->denyAccessUnlessGranted(UserIdentityVoter::UNLINK, $identity);
+
+        $token = $request->request->get('_token');
+        if (!is_string($token) || !$this->isCsrfTokenValid('admin-unlink-identity-' . $identityId, $token)) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
+        $target->removeIdentity($identity);
+        $this->em->remove($identity);
+        $this->em->flush();
+
+        $this->audit->set('identity_id', $identityId);
+        $this->audit->targetLabel($target->getEmail());
+        $this->addFlash('success', 'Identity unlinked.');
 
         return new RedirectResponse('/admin/users/' . $target->getId() . '/edit');
     }
