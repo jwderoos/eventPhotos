@@ -14,8 +14,11 @@ use App\Repository\OrganizerProfileRepository;
 use App\Repository\UserIdentityRepository;
 use App\Security\Voter\UserIdentityVoter;
 use Doctrine\ORM\EntityManagerInterface;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\FilesystemOperator;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -25,12 +28,16 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_USER')]
 final class AccountController extends AbstractController
 {
+    private const int LOGO_PREVIEW_MAX_AGE = 300;
+
     public function __construct(
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
         private readonly UserIdentityRepository $identities,
         private readonly OrganizerProfileRepository $organizerProfiles,
+        #[Autowire(service: 'brand_logos_storage')]
+        private readonly FilesystemOperator $brandLogosStorage,
     ) {
     }
 
@@ -55,7 +62,9 @@ final class AccountController extends AbstractController
         ]);
         $displayNameForm->get('displayName')->setData($user->getDisplayName());
 
-        $styleForm = $this->createForm(OrganizerProfileType::class, $this->loadOrCreateProfile($user), [
+        $profile = $this->loadOrCreateProfile($user);
+
+        $styleForm = $this->createForm(OrganizerProfileType::class, $profile, [
             'action' => $this->generateUrl('account_change_style'),
         ]);
 
@@ -65,6 +74,7 @@ final class AccountController extends AbstractController
             'passwordForm' => $passwordForm,
             'displayNameForm' => $displayNameForm,
             'styleForm' => $styleForm,
+            'brandLogoSet' => $profile->getBrandLogoFilename() !== null,
         ]);
     }
 
@@ -162,6 +172,34 @@ final class AccountController extends AbstractController
         $this->addFlash('success', 'Styling defaults updated.');
 
         return $this->redirectToRoute('account_show');
+    }
+
+    #[Route('/account/brand-logo', name: 'account_brand_logo', methods: ['GET'])]
+    public function brandLogo(): Response
+    {
+        /** @var User $user */
+        $user    = $this->getUser();
+        $profile = $this->loadOrCreateProfile($user);
+
+        $filename = $profile->getBrandLogoFilename();
+        if ($filename === null) {
+            throw $this->createNotFoundException();
+        }
+
+        try {
+            $contents = $this->brandLogosStorage->read($filename);
+        } catch (FilesystemException) {
+            throw $this->createNotFoundException();
+        }
+
+        $response = new Response($contents);
+        $response->headers->set(
+            'Content-Type',
+            str_ends_with(strtolower($filename), '.png') ? 'image/png' : 'image/jpeg',
+        );
+        $response->headers->set('Cache-Control', 'private, max-age=' . self::LOGO_PREVIEW_MAX_AGE);
+
+        return $response;
     }
 
     #[Route('/account/identities/{id}/unlink', name: 'account_identity_unlink', methods: ['POST'])]

@@ -20,9 +20,34 @@
     >
         <header>
             <div class="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-                <a href="{{ path('public_home') }}" class="text-lg font-semibold tracking-tight">
-                    Event Photos
-                </a>
+                {% if brand is defined and brand %}
+                    <div class="flex flex-col gap-0.5">
+                        {% set brand_content %}
+                            <span class="flex items-center gap-2">
+                                {% if brand.hasLogo %}
+                                    <img src="{{ path('public_event_brand_logo', {slug: event.slug}) }}"
+                                         alt="{{ brand.label ?? 'Brand logo' }}"
+                                         class="h-8 w-auto object-contain" />
+                                {% endif %}
+                                {% if brand.label %}
+                                    <span class="text-lg font-semibold tracking-tight">{{ brand.label }}</span>
+                                {% endif %}
+                            </span>
+                        {% endset %}
+
+                        {% if brand.url %}
+                            <a href="{{ brand.url }}" data-brand-primary rel="noopener" target="_blank">{{ brand_content }}</a>
+                        {% else %}
+                            <span data-brand-primary>{{ brand_content }}</span>
+                        {% endif %}
+
+                        <span class="text-xs opacity-60">powered by: EventPhotos by JWdR</span>
+                    </div>
+                {% else %}
+                    <a href="{{ path('public_home') }}" class="text-lg font-semibold tracking-tight">
+                        EventPhotos by JWdR
+                    </a>
+                {% endif %}
             </div>
         </header>
 
@@ -34,7 +59,7 @@
 
         <footer>
             <div class="mx-auto max-w-5xl px-4 py-6 text-sm opacity-70">
-                © {{ "now"|date("Y") }} Event Photos
+                © {{ "now"|date("Y") }} EventPhotos by JWdR
             </div>
         </footer>
     </div>

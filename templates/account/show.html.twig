@@ -83,6 +83,14 @@
         <p class="text-sm text-base-content/70">
             These apply to your events unless a collection or event overrides them.
         </p>
+        {% if brandLogoSet %}
+            <div class="flex items-center gap-3">
+                <span class="text-sm font-medium">Current brand logo:</span>
+                <img src="{{ path('account_brand_logo') }}"
+                     alt="Brand logo"
+                     class="h-16 w-16 object-contain border rounded bg-base-200" />
+            </div>
+        {% endif %}
         {{ form(styleForm) }}
     </section>
     {% endif %}

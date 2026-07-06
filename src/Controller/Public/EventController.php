@@ -9,7 +9,9 @@ use App\Entity\EventDisplayState;
 use App\Entity\Photo;
 use App\Entity\PhotoStatus;
 use App\Repository\EventRepository;
+use App\Repository\OrganizerProfileRepository;
 use App\Repository\PhotoRepository;
+use App\Service\Brand\BrandResolver;
 use App\Service\Event\PhotosUrlBuilder;
 use App\Service\Mail\OrganizerMailerResolver;
 use App\Service\QrCodeRenderer;
@@ -35,6 +37,8 @@ final class EventController extends AbstractController
 
     private const int DISPLAY_QR_SIZE = 720;
 
+    private const int BRAND_LOGO_MAX_AGE = 300;
+
     private const string TIME_PATTERN = '/^(?:[01]\d|2[0-3]):[0-5]\d$/';
 
     public function __construct(
@@ -48,6 +52,10 @@ final class EventController extends AbstractController
         private readonly LoggerInterface $logger,
         private readonly OrganizerMailerResolver $mailerResolver,
         private readonly StyleResolver $styleResolver,
+        #[Autowire(service: 'brand_logos_storage')]
+        private readonly FilesystemOperator $brandLogosStorage,
+        private readonly OrganizerProfileRepository $organizerProfiles,
+        private readonly BrandResolver $brandResolver,
     ) {
     }
 
@@ -70,6 +78,7 @@ final class EventController extends AbstractController
             'notificationsOpen'     => $event->areNotificationsEnabled() && !$event->isPublished() && $mailActive,
             'notificationsPublished' => $event->isPublished(),
             'resolvedStyle'         => $this->styleResolver->resolve($event),
+            'brand'                 => $this->brandResolver->resolve($event),
         ]);
     }
 
@@ -163,6 +172,7 @@ final class EventController extends AbstractController
             'totalReady'    => $totalReady,
             'firstRank'     => $firstRank,
             'resolvedStyle' => $this->styleResolver->resolve($event),
+            'brand'         => $this->brandResolver->resolve($event),
         ], $response);
     }
 
@@ -199,6 +209,50 @@ final class EventController extends AbstractController
             'previewUrl' => $this->generateUrl('photo_serve_preview', ['slug' => $slug, 'id' => $neighbor->getId()]),
             'thumbUrl'   => $this->generateUrl('photo_serve_thumb', ['slug' => $slug, 'id' => $neighbor->getId()]),
         ]);
+    }
+
+    #[Route(
+        '/e/{slug}/brand-logo.png',
+        name: 'public_event_brand_logo',
+        requirements: ['slug' => '[a-z0-9-]+'],
+        methods: ['GET'],
+    )]
+    public function brandLogo(string $slug, Request $request): Response
+    {
+        $event   = $this->resolve($slug);
+        $profile = $this->organizerProfiles->findOneBy(['user' => $event->getOwner()]);
+
+        $filename = $profile?->getBrandLogoFilename();
+        if ($profile === null || $filename === null) {
+            throw new NotFoundHttpException();
+        }
+
+        $updatedAt = $profile->getBrandLogoUpdatedAt();
+        $etag = sha1(sprintf(
+            '%d|%s',
+            (int) $profile->getId(),
+            $updatedAt instanceof DateTimeImmutable ? $updatedAt->format('U') : '-',
+        ));
+
+        $response = new Response();
+        $response->setEtag($etag);
+        $response->setPublic();
+        $response->setMaxAge(self::BRAND_LOGO_MAX_AGE);
+
+        if ($response->isNotModified($request)) {
+            return $response;
+        }
+
+        try {
+            $contents = $this->brandLogosStorage->read($filename);
+        } catch (FilesystemException) {
+            throw new NotFoundHttpException();
+        }
+
+        $response->setContent($contents);
+        $response->headers->set('Content-Type', $this->brandLogoMime($filename));
+
+        return $response;
     }
 
     #[Route(
@@ -398,5 +452,14 @@ final class EventController extends AbstractController
             ]);
             return null;
         }
+    }
+
+    private function brandLogoMime(string $filename): string
+    {
+        return match (strtolower(pathinfo($filename, PATHINFO_EXTENSION))) {
+            'png'         => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            default       => 'application/octet-stream',
+        };
     }
 }

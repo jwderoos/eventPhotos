@@ -4,6 +4,10 @@ flysystem:
             adapter: 'local'
             options:
                 directory: '%kernel.project_dir%/var/uploads/event-logos'
+        brand_logos_storage:
+            adapter: 'local'
+            options:
+                directory: '%kernel.project_dir%/var/uploads/brand-logos'
         photo_originals_storage:
             adapter: 'local'
             options:
