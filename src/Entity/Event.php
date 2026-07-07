@@ -54,6 +54,12 @@ class Event implements Stringable
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?DateTimeImmutable $logoUpdatedAt = null;
 
+    #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
+    private ?string $bannerFilename = null;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?DateTimeImmutable $bannerUpdatedAt = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?DateTimeImmutable $publishedAt = null;
 
@@ -256,6 +262,26 @@ class Event implements Stringable
     public function setLogoFilename(?string $logoFilename): void
     {
         $this->logoFilename = $logoFilename;
+    }
+
+    public function getBannerFilename(): ?string
+    {
+        return $this->bannerFilename;
+    }
+
+    public function setBannerFilename(?string $bannerFilename): void
+    {
+        $this->bannerFilename = $bannerFilename;
+    }
+
+    public function getBannerUpdatedAt(): ?DateTimeImmutable
+    {
+        return $this->bannerUpdatedAt;
+    }
+
+    public function setBannerUpdatedAt(?DateTimeImmutable $bannerUpdatedAt): void
+    {
+        $this->bannerUpdatedAt = $bannerUpdatedAt;
     }
 
     public function getLogoUpdatedAt(): ?DateTimeImmutable

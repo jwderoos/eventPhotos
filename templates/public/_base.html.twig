@@ -51,6 +51,16 @@
             </div>
         </header>
 
+        {% if event is defined and event and event.bannerFilename %}
+            <div class="w-full" data-event-hero>
+                <img
+                    src="{{ path('public_event_banner', {slug: event.slug}) }}"
+                    alt="{{ event.name }}"
+                    class="h-40 w-full object-cover sm:h-56 md:h-72"
+                />
+            </div>
+        {% endif %}
+
         <main class="flex-1">
             <div class="mx-auto max-w-5xl px-4 py-10">
                 {% block public_main %}{% endblock %}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Photo;
 
+use App\Service\Image\GdImageResizer;
 use App\Service\Photo\DerivativeGenerator;
 use League\Flysystem\Filesystem;
 use League\Flysystem\InMemory\InMemoryFilesystemAdapter;
@@ -22,7 +23,7 @@ final class DerivativeGeneratorTest extends TestCase
         );
         $originalsFs->write('event-1/42.jpg', $originalBytes);
 
-        $generator = new DerivativeGenerator($originalsFs, $thumbsFs, $previewsFs);
+        $generator = new DerivativeGenerator($originalsFs, $thumbsFs, $previewsFs, new GdImageResizer());
         [$width, $height, $derivativeBytes] = $generator->generate('event-1/42.jpg');
 
         $this->assertSame(3000, $width);

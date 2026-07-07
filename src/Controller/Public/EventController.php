@@ -39,6 +39,8 @@ final class EventController extends AbstractController
 
     private const int BRAND_LOGO_MAX_AGE = 300;
 
+    private const int BANNER_MAX_AGE = 31536000;
+
     private const string TIME_PATTERN = '/^(?:[01]\d|2[0-3]):[0-5]\d$/';
 
     public function __construct(
@@ -56,6 +58,8 @@ final class EventController extends AbstractController
         private readonly FilesystemOperator $brandLogosStorage,
         private readonly OrganizerProfileRepository $organizerProfiles,
         private readonly BrandResolver $brandResolver,
+        #[Autowire(service: 'event_banners_storage')]
+        private readonly FilesystemOperator $eventBannersStorage,
     ) {
     }
 
@@ -228,31 +232,52 @@ final class EventController extends AbstractController
         }
 
         $updatedAt = $profile->getBrandLogoUpdatedAt();
-        $etag = sha1(sprintf(
+        $etagSeed  = sprintf(
             '%d|%s',
             (int) $profile->getId(),
             $updatedAt instanceof DateTimeImmutable ? $updatedAt->format('U') : '-',
-        ));
+        );
 
-        $response = new Response();
-        $response->setEtag($etag);
-        $response->setPublic();
-        $response->setMaxAge(self::BRAND_LOGO_MAX_AGE);
+        return $this->serveCachedFile(
+            $request,
+            $this->brandLogosStorage,
+            $filename,
+            $etagSeed,
+            self::BRAND_LOGO_MAX_AGE,
+            $this->brandLogoMime($filename),
+        );
+    }
 
-        if ($response->isNotModified($request)) {
-            return $response;
-        }
-
-        try {
-            $contents = $this->brandLogosStorage->read($filename);
-        } catch (FilesystemException) {
+    #[Route(
+        '/e/{slug}/banner.jpg',
+        name: 'public_event_banner',
+        requirements: ['slug' => '[a-z0-9-]+'],
+        methods: ['GET'],
+    )]
+    public function banner(string $slug, Request $request): Response
+    {
+        $event    = $this->resolve($slug);
+        $filename = $event->getBannerFilename();
+        if ($filename === null) {
             throw new NotFoundHttpException();
         }
 
-        $response->setContent($contents);
-        $response->headers->set('Content-Type', $this->brandLogoMime($filename));
+        $updatedAt = $event->getBannerUpdatedAt();
+        $etagSeed  = sprintf(
+            '%d|%s',
+            (int) $event->getId(),
+            $updatedAt instanceof DateTimeImmutable ? $updatedAt->format('U') : '-',
+        );
 
-        return $response;
+        return $this->serveCachedFile(
+            $request,
+            $this->eventBannersStorage,
+            $filename,
+            $etagSeed,
+            self::BANNER_MAX_AGE,
+            'image/jpeg',
+            true,
+        );
     }
 
     #[Route(
@@ -461,5 +486,38 @@ final class EventController extends AbstractController
             'jpg', 'jpeg' => 'image/jpeg',
             default       => 'application/octet-stream',
         };
+    }
+
+    private function serveCachedFile(
+        Request $request,
+        FilesystemOperator $storage,
+        string $filename,
+        string $etagSeed,
+        int $maxAge,
+        string $contentType,
+        bool $immutable = false,
+    ): Response {
+        $response = new Response();
+        $response->setEtag(sha1($etagSeed));
+        $response->setPublic();
+        $response->setMaxAge($maxAge);
+        if ($immutable) {
+            $response->headers->addCacheControlDirective('immutable');
+        }
+
+        if ($response->isNotModified($request)) {
+            return $response;
+        }
+
+        try {
+            $contents = $storage->read($filename);
+        } catch (FilesystemException) {
+            throw new NotFoundHttpException();
+        }
+
+        $response->setContent($contents);
+        $response->headers->set('Content-Type', $contentType);
+
+        return $response;
     }
 }

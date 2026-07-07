@@ -68,8 +68,9 @@ Storage paths (all under `var/uploads/`, local Flysystem adapters configured in 
 - `photo_thumbs_storage` → `var/uploads/photos/thumbs/...`
 - `photo_previews_storage` → `var/uploads/photos/previews/...`
 - `event_logos_storage` → `var/uploads/event-logos/` (Vich-managed, on the `Event` entity)
+- `event_banners_storage` → `var/uploads/event-banners/event-<id>.jpg` (public event hero; single normalized JPEG derivative synchronously generated on upload, no original kept; served via `public_event_banner`)
 
-When injecting a specific storage, use `#[Autowire(service: 'photo_originals_storage')] FilesystemOperator $originals` — there are four `FilesystemOperator` services, so plain autowiring is ambiguous.
+When injecting a specific storage, use `#[Autowire(service: 'photo_originals_storage')] FilesystemOperator $originals` — there are six `FilesystemOperator` services, so plain autowiring is ambiguous.
 
 ### Domain model
 

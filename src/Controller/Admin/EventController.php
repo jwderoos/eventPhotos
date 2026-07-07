@@ -16,6 +16,7 @@ use App\Repository\EventRepository;
 use App\Repository\PhotoRepository;
 use App\Security\Voter\EventVoter;
 use App\Service\Brand\BrandPreviewResolver;
+use App\Service\Event\BannerUploader;
 use App\Service\Mail\OrganizerMailerResolver;
 use App\Service\QrCodeRenderer;
 use App\Service\Style\StyleResolver;
@@ -24,9 +25,11 @@ use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\FilesystemOperator;
+use Symfony\Component\Form\FormInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -53,6 +56,7 @@ final class EventController extends AbstractController
         private readonly AuditContext $audit,
         private readonly StyleResolver $styleResolver,
         private readonly BrandPreviewResolver $brandPreview,
+        private readonly BannerUploader $bannerUploader,
     ) {
     }
 
@@ -104,6 +108,9 @@ final class EventController extends AbstractController
             $this->em->persist($event);
             $this->em->flush();
 
+            $this->applyBanner($form, $event);
+            $this->em->flush();
+
             $this->audit->set('created_id', $event->getId());
             $this->audit->targetLabel($event->getName() . ' (' . $event->getSlug() . ')');
 
@@ -145,6 +152,7 @@ final class EventController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $this->applyBanner($form, $event);
             $this->audit->targetLabel($event->getName() . ' (' . $event->getSlug() . ')');
             $this->em->flush();
             $this->addFlash('success', 'Event updated.');
@@ -303,6 +311,21 @@ final class EventController extends AbstractController
         $response->headers->set('Cache-Control', 'private, max-age=300');
 
         return $response;
+    }
+
+    /** @param FormInterface<Event> $form */
+    private function applyBanner(FormInterface $form, Event $event): void
+    {
+        if ($form->get('removeBanner')->getData() === true) {
+            $this->bannerUploader->remove($event);
+
+            return;
+        }
+
+        $file = $form->get('bannerFile')->getData();
+        if ($file instanceof UploadedFile) {
+            $this->bannerUploader->upload($event, (string) file_get_contents($file->getPathname()));
+        }
     }
 
     private function readLogoBytes(Event $event): ?string
