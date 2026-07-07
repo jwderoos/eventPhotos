@@ -1,0 +1,62 @@
+# VPS overlay for compose.prod.yaml. Layer with:
+#   docker compose -f compose.prod.yaml -f compose.vps.yaml --env-file .env.prod ...
+# (deploy.sh does this when COMPOSE_FILES is set — see docs/setup/ovh-vps-deploy.md.)
+# Requires Docker Compose >= 2.24 for the `!override` tag.
+name: eventphotos-prod
+
+services:
+  # Only the caddy container is bound to the public network; it terminates TLS
+  # and reverse-proxies to nginx over the compose network.
+  caddy:
+    image: caddy:2-alpine
+    env_file:
+      - .env.prod            # supplies {$DOMAIN} used by the Caddyfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # ACME account + issued certs — MUST persist
+      - caddy_config:/config
+    depends_on:
+      nginx:
+        condition: service_started
+    restart: unless-stopped
+    mem_limit: 64m
+    cpus: 0.5
+
+  # nginx no longer publishes a host port; Caddy reaches it as nginx:80 in-network.
+  nginx:
+    ports: !override []
+    mem_limit: 128m
+    cpus: 0.5
+
+  php:
+    # Append the VPS pool mount (base already mounts uploads/share; compose
+    # concatenates volume lists, so we add ONLY the extra mount here).
+    volumes:
+      - ./docker/php/fpm-pool.vps.conf:/usr/local/etc/php-fpm.d/zz-www.conf:ro
+    mem_limit: 1g
+    cpus: 1.5
+
+  worker:
+    mem_limit: 384m
+    cpus: 1
+
+  database:
+    # Retuned for 4 GB total; overrides the base command wholesale.
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c work_mem=8MB
+      -c maintenance_work_mem=128MB
+      -c max_connections=50
+      -c random_page_cost=1.1
+      -c checkpoint_completion_target=0.9
+    mem_limit: 1g
+    cpus: 1.5
+
+volumes:
+  caddy_data:
+  caddy_config:

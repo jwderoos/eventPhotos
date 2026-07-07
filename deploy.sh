@@ -33,7 +33,18 @@ mkdir -p "${DATA_DIR}/postgres" "${DATA_DIR}/uploads" "${DATA_DIR}/share"
 echo ">>> git pull"
 git pull --ff-only
 
-COMPOSE=(docker compose -f compose.prod.yaml --env-file .env.prod)
+# Compose file list + worker scale are env-overridable so the same script serves
+# TrueNAS (defaults) and the VPS overlay:
+#   COMPOSE_FILES="compose.prod.yaml compose.vps.yaml" WORKER_SCALE=1 ./deploy.sh
+COMPOSE_FILES="${COMPOSE_FILES:-compose.prod.yaml}"
+WORKER_SCALE="${WORKER_SCALE:-3}"
+
+COMPOSE=(docker compose)
+# shellcheck disable=SC2086 # intentional word-splitting of the space-separated list
+for f in ${COMPOSE_FILES}; do COMPOSE+=(-f "$f"); done
+COMPOSE+=(--env-file .env.prod)
+
+echo ">>> using compose files: ${COMPOSE_FILES} (worker scale ${WORKER_SCALE})"
 
 echo ">>> docker compose build"
 "${COMPOSE[@]}" build
@@ -48,7 +59,7 @@ echo ">>> docker compose up -d"
 # Anyone running `docker compose up` directly (outside this script) will get
 # only 1 worker; that's intentional for ad-hoc maintenance but means deploys
 # MUST go through this script to keep the 3-worker fleet active.
-"${COMPOSE[@]}" up -d --remove-orphans --scale worker=3
+"${COMPOSE[@]}" up -d --remove-orphans --scale worker="${WORKER_SCALE}"
 
 echo ">>> done"
 "${COMPOSE[@]}" ps
