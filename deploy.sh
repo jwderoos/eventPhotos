@@ -27,6 +27,18 @@ if [[ -z "${DATA_DIR}" ]]; then
     exit 1
 fi
 
+# Fail fast if the per-organizer mail encryption key is missing or not 32 bytes.
+# An empty/invalid key decodes to <32 bytes and DsnVault throws on construction,
+# 500-ing every mail-touching page (admin events, account mail, public landing).
+# Catching it here turns a runtime 500 into a clear deploy-time error.
+MAIL_KEY="$(grep -E '^MAIL_CONFIG_ENCRYPTION_KEY=' .env.prod | cut -d= -f2-)"
+MAIL_KEY_BYTES="$(printf '%s' "${MAIL_KEY}" | base64 -d 2>/dev/null | wc -c | tr -d ' ')"
+if [[ "${MAIL_KEY_BYTES}" != "32" ]]; then
+    echo "ERROR: MAIL_CONFIG_ENCRYPTION_KEY must base64-decode to 32 bytes (got ${MAIL_KEY_BYTES:-0})." >&2
+    echo "       Generate one with: openssl rand -base64 32" >&2
+    exit 1
+fi
+
 echo ">>> ensuring persistent data dirs exist under ${DATA_DIR}"
 mkdir -p "${DATA_DIR}/postgres" "${DATA_DIR}/uploads" "${DATA_DIR}/share"
 

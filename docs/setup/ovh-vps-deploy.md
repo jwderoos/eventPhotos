@@ -64,7 +64,10 @@ git checkout main
 
 cp .env.vps.example .env.prod && chmod 600 .env.prod
 # Fill in: DOMAIN, DEFAULT_URI (https://<DOMAIN>), APP_SECRET (openssl rand -hex 32),
-# POSTGRES_PASSWORD + matching DATABASE_URL, MAILER_DSN.
+# POSTGRES_PASSWORD + matching DATABASE_URL, MAILER_DSN,
+# MAIL_CONFIG_ENCRYPTION_KEY (openssl rand -base64 32 — REQUIRED, must decode to
+# 32 bytes; an empty/invalid key 500s every mail-touching page). deploy.sh
+# validates this and aborts if it is missing or the wrong length.
 vim .env.prod
 
 # Data dir ownership so the containers can write:
