@@ -164,8 +164,4 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $this->mailConfig = $mailConfig;
     }
-
-    public function eraseCredentials(): void
-    {
-    }
 }

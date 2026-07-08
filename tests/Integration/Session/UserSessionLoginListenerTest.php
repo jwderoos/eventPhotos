@@ -95,10 +95,6 @@ final class UserSessionLoginListenerTest extends KernelTestCase
                 return null;
             }
 
-            public function eraseCredentials(): void
-            {
-            }
-
             public function getUserIdentifier(): string
             {
                 return 'other@example.com';
