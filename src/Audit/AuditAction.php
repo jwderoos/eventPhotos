@@ -11,6 +11,8 @@ enum AuditAction: string
     case EventDelete = 'event.delete';
     case EventPublish = 'event.publish';
     case EventNotificationsToggle = 'event.notifications_toggle';
+    case EventExport = 'event.export';
+    case EventImport = 'event.import';
 
     case CollectionCreate = 'collection.create';
     case CollectionEdit = 'collection.edit';

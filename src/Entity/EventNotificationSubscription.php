@@ -64,6 +64,38 @@ class EventNotificationSubscription
         $this->confirmationExpiresAt = $this->createdAt->modify(sprintf('+%d days', $ttlDays));
     }
 
+    /**
+     * Rebuild a subscription from an event-export archive: fresh tokens (source
+     * tokens never travel), but the original status and timestamps restored
+     * directly — the normal confirm()/unsubscribe() API would overwrite them
+     * with "now" and can reject expired confirmations.
+     */
+    public static function reconstituteForImport(
+        Event $event,
+        string $email,
+        EventNotificationStatus $status,
+        DateTimeImmutable $createdAt,
+        ?DateTimeImmutable $confirmedAt,
+        ?DateTimeImmutable $unsubscribedAt,
+        ?DateTimeImmutable $notifiedAt,
+    ): self {
+        $sub = new self($event, $email, $createdAt);
+
+        $sub->status         = $status;
+        $sub->confirmedAt    = $confirmedAt;
+        $sub->unsubscribedAt = $unsubscribedAt;
+        $sub->notifiedAt     = $notifiedAt;
+
+        if ($status !== EventNotificationStatus::Pending) {
+            // Mirror the state-machine invariant: only pending rows carry a
+            // live confirmation token / expiry.
+            $sub->confirmationToken     = null;
+            $sub->confirmationExpiresAt = null;
+        }
+
+        return $sub;
+    }
+
     public function confirm(DateTimeImmutable $now): void
     {
         if ($this->status !== EventNotificationStatus::Pending) {
@@ -153,6 +185,21 @@ class EventNotificationSubscription
     public function getNotifiedAt(): ?DateTimeImmutable
     {
         return $this->notifiedAt;
+    }
+
+    public function getConfirmedAt(): ?DateTimeImmutable
+    {
+        return $this->confirmedAt;
+    }
+
+    public function getUnsubscribedAt(): ?DateTimeImmutable
+    {
+        return $this->unsubscribedAt;
+    }
+
+    public function getCreatedAt(): DateTimeImmutable
+    {
+        return $this->createdAt;
     }
 
     private function generateToken(): string

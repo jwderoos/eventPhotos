@@ -9,6 +9,7 @@ use App\Audit\AuditContext;
 use App\Audit\Attribute\Audited;
 use App\Entity\Event;
 use App\Entity\User;
+use App\Form\EventImportType;
 use App\Form\EventType;
 use App\Message\SendEventLiveNotifications;
 use App\Repository\EventNotificationSubscriptionRepository;
@@ -16,6 +17,10 @@ use App\Repository\EventRepository;
 use App\Repository\PhotoRepository;
 use App\Security\Voter\EventVoter;
 use App\Service\Brand\BrandPreviewResolver;
+use App\Service\Event\Archive\InvalidArchiveException;
+use App\Service\Event\Archive\SlugAlreadyExistsException;
+use App\Service\Event\EventArchiveExporter;
+use App\Service\Event\EventArchiveImporter;
 use App\Service\Mail\OrganizerMailerResolver;
 use App\Service\QrCodeRenderer;
 use App\Service\Style\StyleResolver;
@@ -27,9 +32,12 @@ use League\Flysystem\FilesystemOperator;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -53,6 +61,8 @@ final class EventController extends AbstractController
         private readonly AuditContext $audit,
         private readonly StyleResolver $styleResolver,
         private readonly BrandPreviewResolver $brandPreview,
+        private readonly EventArchiveExporter $exporter,
+        private readonly EventArchiveImporter $importer,
     ) {
     }
 
@@ -119,6 +129,51 @@ final class EventController extends AbstractController
             'styleInherited' => $inherited,
             'brandPreview'   => $this->brandPreview->forOwner($user),
         ]);
+    }
+
+    #[Route('/admin/events/import', name: 'admin_event_import', methods: ['GET', 'POST'])]
+    #[Audited(AuditAction::EventImport, targetParam: null)]
+    public function import(Request $request): Response
+    {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $form = $this->createForm(EventImportType::class);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $archive = $form->get('archive')->getData();
+            $owner   = $form->has('owner') && $form->get('owner')->getData() instanceof User
+                ? $form->get('owner')->getData()
+                : $user;
+
+            if ($archive instanceof UploadedFile) {
+                try {
+                    $event = $this->importer->import($archive->getPathname(), $owner);
+
+                    $this->audit->set('created_id', $event->getId());
+                    $this->audit->targetLabel($event->getName() . ' (' . $event->getSlug() . ')');
+                    $this->addFlash('success', sprintf('Imported event "%s".', $event->getName()));
+
+                    return $this->redirectToRoute('admin_event_edit', ['id' => $event->getId()]);
+                } catch (SlugAlreadyExistsException $e) {
+                    $this->addFlash('error', sprintf(
+                        'An event with slug "%s" already exists — import refused.',
+                        $e->slug,
+                    ));
+
+                    return $this->redirectToRoute('admin_event_import');
+                } catch (InvalidArchiveException $e) {
+                    $this->addFlash('error', 'Invalid archive: ' . $e->getMessage());
+
+                    return $this->redirectToRoute('admin_event_import');
+                }
+            }
+        }
+
+        return $this->render('admin/event/import.html.twig', ['form' => $form]);
     }
 
     #[Route(
@@ -301,6 +356,30 @@ final class EventController extends AbstractController
         $response = new Response($contents);
         $response->headers->set('Content-Type', $this->mimeFromExtension($filename));
         $response->headers->set('Cache-Control', 'private, max-age=300');
+
+        return $response;
+    }
+
+    #[Route(
+        '/admin/events/{id}/export',
+        name: 'admin_event_export',
+        requirements: ['id' => '\d+'],
+        methods: ['GET'],
+    )]
+    #[Audited(AuditAction::EventExport, targetParam: 'id', targetType: 'Event')]
+    public function export(Event $event): BinaryFileResponse
+    {
+        $this->denyAccessUnlessGranted(EventVoter::VIEW, $event);
+
+        $this->audit->targetLabel($event->getName() . ' (' . $event->getSlug() . ')');
+
+        $response = new BinaryFileResponse($this->exporter->export($event));
+        $response->headers->set('Content-Type', 'application/zip');
+        $response->setContentDisposition(
+            ResponseHeaderBag::DISPOSITION_ATTACHMENT,
+            sprintf('event-%s.zip', $event->getSlug()),
+        );
+        $response->deleteFileAfterSend(true);
 
         return $response;
     }
