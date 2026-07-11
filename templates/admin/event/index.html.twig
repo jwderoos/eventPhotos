@@ -14,7 +14,10 @@
 {% block admin_main %}
     <header class="mb-6 flex items-center justify-between">
         <h1 class="text-2xl font-semibold">Events</h1>
-        <a href="{{ path('admin_event_new') }}" class="btn btn-primary btn-sm">+ New event</a>
+        <div class="flex items-center gap-2">
+            <a href="{{ path('admin_event_import') }}" class="btn btn-secondary btn-sm">Import event</a>
+            <a href="{{ path('admin_event_new') }}" class="btn btn-primary btn-sm">+ New event</a>
+        </div>
     </header>
 
     {% if events %}
@@ -52,6 +55,8 @@
                                        class="btn btn-ghost btn-xs">Photos</a>
                                     <a href="{{ path('admin_event_edit', {id: event.id}) }}"
                                        class="btn btn-ghost btn-xs">Edit</a>
+                                    <a href="{{ path('admin_event_export', {id: event.id}) }}"
+                                       class="btn btn-ghost btn-xs">Export</a>
                                     <form method="post"
                                           action="{{ path('admin_event_delete', {id: event.id}) }}"
                                           onsubmit="return confirm('Delete this event?')"

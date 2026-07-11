@@ -6,7 +6,6 @@ namespace App\Tests\Functional\Admin;
 
 use App\Entity\Event;
 use App\Entity\Photo;
-use App\Entity\PhotoStatus;
 use App\Entity\User;
 use DateTimeImmutable;
 use DateTimeZone;

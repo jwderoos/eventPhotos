@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Rector\Config\RectorConfig;
 use Rector\Php81\Rector\Array_\ArrayToFirstClassCallableRector;
+use Rector\Php84\Rector\Class_\PropertyHookRector;
 use Rector\ValueObject\PhpVersion;
 
 return RectorConfig::configure()
@@ -62,6 +63,9 @@ return RectorConfig::configure()
     ])
     // uncomment to reach your current PHP version
     ->withPhpVersion(PhpVersion::PHP_85)
+    ->withRules([
+        PropertyHookRector::class,
+    ])
     ->withAttributesSets()
     ->withPhpSets()
 ;

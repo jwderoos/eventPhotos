@@ -1,0 +1,9 @@
+# EventPhotos VPS TLS terminator. {$DOMAIN} comes from .env.prod (env_file on the
+# caddy service). Caddy auto-provisions + renews the Let's Encrypt cert and
+# redirects HTTP→HTTPS. Upload size / body limits stay in the app nginx
+# (client_max_body_size 32M) — Caddy does not re-cap. Certs persist in the
+# caddy_data named volume so restarts don't re-hit ACME rate limits.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy nginx:80
+}

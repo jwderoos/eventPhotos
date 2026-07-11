@@ -90,3 +90,9 @@ when@test:
 
         App\Audit\AuditLogger:
             public: true
+
+        App\Service\Event\EventArchiveExporter:
+            public: true
+
+        App\Service\Event\EventArchiveImporter:
+            public: true
