@@ -18,6 +18,7 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Symfony\Component\Form\Extension\Core\Type\FileType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -87,6 +88,25 @@ final class EventType extends AbstractType
             'label'        => 'Logo (PNG or JPEG, max 2 MB)',
             'allow_delete' => true,
             'download_uri' => false,
+        ]);
+
+        $builder->add('bannerFile', FileType::class, [
+            'mapped'      => false,
+            'required'    => false,
+            'label'       => 'Banner / hero image (JPEG or PNG, max 5 MB — recommended 1200×400, 3:1)',
+            'constraints' => [
+                new Assert\File(
+                    maxSize: '5M',
+                    mimeTypes: ['image/jpeg', 'image/png'],
+                    mimeTypesMessage: 'Upload a JPEG or PNG image.',
+                ),
+            ],
+        ]);
+
+        $builder->add('removeBanner', CheckboxType::class, [
+            'mapped'   => false,
+            'required' => false,
+            'label'    => 'Remove current banner',
         ]);
 
         $user    = $this->security->getUser();
