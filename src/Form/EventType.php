@@ -148,6 +148,15 @@ final class EventType extends AbstractType
             ]);
         }
 
+        $builder->add('retainOriginals', CheckboxType::class, [
+            'required' => false,
+            'disabled' => $options['lock_retain_originals'],
+            'label'    => 'Keep original photos',
+            'help'     => 'Retains the full-resolution originals (up to 10 MB each) — uses '
+                . 'significantly more storage than the web derivatives. Can only be changed '
+                . 'while the event has no photos.',
+        ]);
+
         $builder->add('style', StyleSettingsType::class, [
             'label'     => false,
             'inherited' => $options['inherited'],
@@ -161,9 +170,15 @@ final class EventType extends AbstractType
 
     public function configureOptions(OptionsResolver $resolver): void
     {
-        $resolver->setDefaults(['data_class' => Event::class, 'mail_active' => false, 'inherited' => null]);
+        $resolver->setDefaults([
+            'data_class'            => Event::class,
+            'mail_active'           => false,
+            'inherited'             => null,
+            'lock_retain_originals' => true,
+        ]);
         $resolver->setAllowedTypes('mail_active', 'bool');
         $resolver->setAllowedTypes('inherited', ['null', ResolvedStyle::class]);
+        $resolver->setAllowedTypes('lock_retain_originals', 'bool');
     }
 
     private function prefillUnmappedFields(FormEvent $formEvent): void

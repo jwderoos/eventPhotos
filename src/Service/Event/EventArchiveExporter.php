@@ -33,6 +33,8 @@ final readonly class EventArchiveExporter
         private FilesystemOperator $thumbs,
         #[Autowire(service: 'photo_previews_storage')]
         private FilesystemOperator $previews,
+        #[Autowire(service: 'photo_originals_storage')]
+        private FilesystemOperator $originals,
         #[Autowire(service: 'event_logos_storage')]
         private FilesystemOperator $logos,
         #[Autowire('%env(default::DEFAULT_URI)%')]
@@ -69,6 +71,10 @@ final readonly class EventArchiveExporter
 
             $zip->addFromString('photos/' . $hash . '.thumb.jpg', $this->thumbs->read($path));
             $zip->addFromString('photos/' . $hash . '.preview.jpg', $this->previews->read($path));
+
+            if ($event->isRetainOriginals()) {
+                $zip->addFromString('photos/' . $hash . '.original.jpg', $this->originals->read($path));
+            }
 
             $manifestPhotos[] = new ManifestPhoto(
                 $hash,
@@ -120,6 +126,7 @@ final readonly class EventArchiveExporter
             $style->getButtonColor(),
             $style->getGlowEnabled(),
             $logoFilename,
+            $event->isRetainOriginals(),
         );
     }
 

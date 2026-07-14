@@ -54,6 +54,12 @@ final class EventController extends AbstractController
         private readonly UrlGeneratorInterface $urlGenerator,
         #[Autowire(service: 'event_logos_storage')]
         private readonly FilesystemOperator $eventLogosStorage,
+        #[Autowire(service: 'photo_originals_storage')]
+        private readonly FilesystemOperator $photoOriginals,
+        #[Autowire(service: 'photo_thumbs_storage')]
+        private readonly FilesystemOperator $photoThumbs,
+        #[Autowire(service: 'photo_previews_storage')]
+        private readonly FilesystemOperator $photoPreviews,
         private readonly LoggerInterface $logger,
         private readonly OrganizerMailerResolver $mailerResolver,
         private readonly MessageBusInterface $bus,
@@ -108,8 +114,9 @@ final class EventController extends AbstractController
 
         $inherited = $this->styleResolver->resolveChain($this->styleResolver->profileStyleFor($user));
         $form      = $this->createForm(EventType::class, $event, [
-            'mail_active' => $this->mailerResolver->isCustomActive($event->getOwner()),
-            'inherited'   => $inherited,
+            'mail_active'           => $this->mailerResolver->isCustomActive($event->getOwner()),
+            'inherited'             => $inherited,
+            'lock_retain_originals' => false,
         ]);
         $form->handleRequest($request);
 
@@ -200,8 +207,9 @@ final class EventController extends AbstractController
         );
 
         $form = $this->createForm(EventType::class, $event, [
-            'mail_active' => $mailActive,
-            'inherited'   => $inherited,
+            'mail_active'           => $mailActive,
+            'inherited'             => $inherited,
+            'lock_retain_originals' => $event->getId() !== null && $this->photos->countForEvent($event) > 0,
         ]);
         $form->handleRequest($request);
 
@@ -242,12 +250,23 @@ final class EventController extends AbstractController
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
+        $eventId = (int) $event->getId();
+
         // Snapshot key fields BEFORE the row is gone (terminate runs after the delete is flushed).
         $this->audit->snapshot(['name' => $event->getName(), 'slug' => $event->getSlug()]);
         $this->audit->targetLabel($event->getName() . ' (' . $event->getSlug() . ')');
 
         $this->em->remove($event);
         $this->em->flush();
+
+        $dir = sprintf('event-%d', $eventId);
+        foreach ([$this->photoOriginals, $this->photoThumbs, $this->photoPreviews] as $fs) {
+            try {
+                $fs->deleteDirectory($dir);
+            } catch (FilesystemException) {
+                // Best-effort — event may have had no photos / no derivatives.
+            }
+        }
 
         $this->addFlash('success', 'Event deleted.');
 

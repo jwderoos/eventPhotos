@@ -20,6 +20,7 @@ final readonly class ManifestEvent
         public ?string $buttonColor,
         public ?bool $glowEnabled,
         public ?string $logoFilename,
+        public bool $retainOriginals = false,
     ) {
     }
 }

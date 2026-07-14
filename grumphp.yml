@@ -96,6 +96,7 @@ grumphp:
 
         phpstan:
             configuration: phpstan.neon
+            memory_limit: "1G"
             triggered_by:
                 - 'php'
 

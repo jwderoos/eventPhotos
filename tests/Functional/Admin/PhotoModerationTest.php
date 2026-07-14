@@ -119,6 +119,33 @@ final class PhotoModerationTest extends WebTestCase
         $this->assertFalse($this->previews->fileExists($path));
     }
 
+    public function testDeletingPhotoRemovesRetainedOriginal(): void
+    {
+        $this->event->setRetainOriginals(true);
+        $this->em->flush();
+
+        $photo = new Photo($this->event, str_pad('c', 64, '0'), 'c.jpg', 100);
+        $this->em->persist($photo);
+        $this->em->flush();
+
+        $eventId = (int) $this->event->getId();
+        $photoId = (int) $photo->getId();
+        $path    = sprintf('event-%d/%d.jpg', $eventId, $photoId);
+        $this->originals->write($path, "\xFF\xD8ORIGINAL");
+
+        $token = $this->primeCsrfToken('delete_photo_' . $photoId);
+        $this->client->request(
+            Request::METHOD_POST,
+            sprintf('/admin/events/%d/photos/%d/delete', $eventId, $photoId),
+            ['_token' => $token],
+        );
+
+        $this->assertFalse(
+            $this->originals->fileExists($path),
+            'Retained original must be removed when the photo is deleted.',
+        );
+    }
+
     public function testDeleteAllRemovesEveryPhotoAndItsFiles(): void
     {
         $eventId = (int) $this->event->getId();

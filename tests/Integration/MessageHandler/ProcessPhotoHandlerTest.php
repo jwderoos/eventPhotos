@@ -149,6 +149,44 @@ final class ProcessPhotoHandlerTest extends KernelTestCase
         );
     }
 
+    public function testRetainKeepsOriginalOnSuccess(): void
+    {
+        $this->event->setRetainOriginals(true);
+        $this->em->flush();
+
+        $photo = $this->seedPending('with-datetime-original.jpg', 'ee');
+
+        ($this->handler)(new ProcessPhoto($photo->getId() ?? 0));
+        $this->em->refresh($photo);
+
+        $this->assertSame(PhotoStatus::Ready, $photo->getStatus());
+        $path = sprintf('event-%d/%d.jpg', $this->event->getId(), $photo->getId());
+        $this->assertTrue(
+            $this->originals->fileExists($path),
+            'Original must be retained after successful ingest when retainOriginals is on.',
+        );
+        $this->assertTrue($this->thumbs->fileExists($path));
+        $this->assertTrue($this->previews->fileExists($path));
+    }
+
+    public function testRetainKeepsOriginalOnRejection(): void
+    {
+        $this->event->setRetainOriginals(true);
+        $this->em->flush();
+
+        $photo = $this->seedPending('no-exif.jpg', 'ff');
+
+        ($this->handler)(new ProcessPhoto($photo->getId() ?? 0));
+        $this->em->refresh($photo);
+
+        $this->assertSame(PhotoStatus::Failed, $photo->getStatus());
+        $path = sprintf('event-%d/%d.jpg', $this->event->getId(), $photo->getId());
+        $this->assertTrue(
+            $this->originals->fileExists($path),
+            'Original must be retained after domain rejection when retainOriginals is on.',
+        );
+    }
+
     public function testIdempotentWhenAlreadyReady(): void
     {
         $photo = $this->seedPending('with-datetime-original.jpg', 'cc');

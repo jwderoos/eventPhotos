@@ -32,7 +32,9 @@ use Throwable;
 
 final class PhotoController extends AbstractController
 {
-    private const int MAX_BYTES = 25 * 1024 * 1024;
+    // Mirrored client-side in assets/controllers/photo_uploader_controller.js (MAX_BYTES + UI copy).
+    // Keep both in sync — tests/Unit/Asset/PhotoUploaderCapTest.php guards against drift.
+    private const int MAX_BYTES = 10 * 1024 * 1024;
 
     private const int PER_PAGE = 100;
 

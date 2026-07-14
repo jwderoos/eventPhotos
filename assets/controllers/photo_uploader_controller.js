@@ -1,6 +1,6 @@
 import { Controller } from '@hotwired/stimulus';
 
-const MAX_BYTES = 25 * 1024 * 1024;
+const MAX_BYTES = 10 * 1024 * 1024;
 const CONCURRENCY = 3;
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg'];
 
@@ -19,7 +19,7 @@ export default class extends Controller {
                     Choose files
                     <input type="file" multiple accept="image/jpeg,.jpg,.jpeg" class="hidden" data-file-input>
                 </label>
-                <p class="text-xs text-base-content/50 mt-2">JPEG only, up to 25 MB each</p>
+                <p class="text-xs text-base-content/50 mt-2">JPEG only, up to 10 MB each</p>
             </div>
             <div class="mt-3 max-h-64 overflow-y-auto border border-base-300 rounded-box p-3 hidden"
                  data-queue-panel>
@@ -106,7 +106,7 @@ export default class extends Controller {
             return;
         }
         if (file.size > MAX_BYTES) {
-            this.fail(job, 'Too large (>25 MB)');
+            this.fail(job, 'Too large (>10 MB)');
             return;
         }
 

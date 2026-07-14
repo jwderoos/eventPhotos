@@ -45,6 +45,7 @@ final readonly class EventArchiveManifest
                 'endsAt'               => $this->event->endsAt,
                 'publishedAt'          => $this->event->publishedAt,
                 'notificationsEnabled' => $this->event->notificationsEnabled,
+                'retainOriginals'      => $this->event->retainOriginals,
                 'style'                => [
                     'fontColor'       => $this->event->fontColor,
                     'backgroundColor' => $this->event->backgroundColor,
@@ -129,6 +130,7 @@ final readonly class EventArchiveManifest
             self::nullableStr($style, 'buttonColor'),
             isset($style['glowEnabled']) ? (bool) $style['glowEnabled'] : null,
             $logoArray === null ? null : self::nullableStr($logoArray, 'filename'),
+            (bool) ($event['retainOriginals'] ?? false),
         );
 
         $photos = [];

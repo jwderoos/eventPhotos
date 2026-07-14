@@ -273,6 +273,36 @@ final class EventTest extends TestCase
         $this->assertSame(EventDisplayState::Live, $event->computeDisplayState($atStart));
     }
 
+    public function testRetainOriginalsDefaultsToFalse(): void
+    {
+        $event = new Event(
+            'slug',
+            'Name',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 12:00'),
+            new User('o@x', 'Owner'),
+        );
+
+        $this->assertFalse($event->isRetainOriginals());
+    }
+
+    public function testRetainOriginalsCanBeToggled(): void
+    {
+        $event = new Event(
+            'slug',
+            'Name',
+            new DateTimeImmutable('2026-06-10 10:00'),
+            new DateTimeImmutable('2026-06-10 12:00'),
+            new User('o@x', 'Owner'),
+        );
+
+        $event->setRetainOriginals(true);
+        $this->assertTrue($event->isRetainOriginals());
+
+        $event->setRetainOriginals(false);
+        $this->assertFalse($event->isRetainOriginals());
+    }
+
     private function validator(): ValidatorInterface
     {
         return Validation::createValidatorBuilder()

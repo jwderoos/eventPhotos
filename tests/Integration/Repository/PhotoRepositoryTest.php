@@ -320,6 +320,20 @@ final class PhotoRepositoryTest extends KernelTestCase
         $this->assertSame(2, $this->repo->countReady($this->event));
     }
 
+    public function testCountForEventCountsAllStatuses(): void
+    {
+        $this->assertSame(0, $this->repo->countForEvent($this->event));
+
+        $this->createPending();
+        $this->createReady('2026-06-10 12:00:00');
+        $failed = $this->createPending();
+        $failed->markFailed('forced');
+
+        $this->em->flush();
+
+        $this->assertSame(3, $this->repo->countForEvent($this->event));
+    }
+
     public function testCountReadyBeforeReturnsRankMinusOneAndBreaksTiesOnId(): void
     {
         $first  = $this->createReady('2026-06-10 11:00:00');

@@ -39,6 +39,8 @@ final readonly class EventArchiveImporter
         private FilesystemOperator $previews,
         #[Autowire(service: 'event_logos_storage')]
         private FilesystemOperator $logos,
+        #[Autowire(service: 'photo_originals_storage')]
+        private FilesystemOperator $originals,
     ) {
     }
 
@@ -99,6 +101,8 @@ final readonly class EventArchiveImporter
         if ($me->notificationsEnabled) {
             $event->enableNotifications();
         }
+
+        $event->setRetainOriginals($me->retainOriginals);
 
         /** @var list<array{FilesystemOperator, string}> $written */
         $written = [];
@@ -167,6 +171,12 @@ final readonly class EventArchiveImporter
         $written[] = [$this->thumbs, $path];
         $this->previews->write($path, $previewBytes);
         $written[] = [$this->previews, $path];
+
+        if ($event->isRetainOriginals()) {
+            $originalBytes = $this->readJpeg($zip, 'photos/' . $mp->contentHash . '.original.jpg');
+            $this->originals->write($path, $originalBytes);
+            $written[] = [$this->originals, $path];
+        }
     }
 
     private function reconstituteSubscription(

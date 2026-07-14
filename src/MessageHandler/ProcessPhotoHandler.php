@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MessageHandler;
 
 use RuntimeException;
+use App\Entity\Event;
 use App\Entity\PhotoStatus;
 use App\Message\ProcessPhoto;
 use App\Repository\PhotoRepository;
@@ -65,11 +66,11 @@ final readonly class ProcessPhotoHandler
             [$width, $height, $derivativeBytes] = $this->derivatives->generate($path);
             $photo->markReady($takenAt, $width, $height, $derivativeBytes);
             $this->em->flush();
-            $this->deleteOriginalQuietly($path, (int) $photo->getId());
+            $this->maybeDeleteOriginal($event, $path, (int) $photo->getId());
         } catch (PhotoRejected $photoRejected) {
             $photo->markFailed($photoRejected->getMessage());
             $this->em->flush();
-            $this->deleteOriginalQuietly($path, (int) $photo->getId());
+            $this->maybeDeleteOriginal($event, $path, (int) $photo->getId());
         }
     }
 
@@ -88,6 +89,20 @@ final readonly class ProcessPhotoHandler
                 'exception' => $filesystemException,
             ]);
         }
+    }
+
+    /**
+     * Retain-aware delete. When the event opts to keep originals (#110), the
+     * original survives at photo_originals_storage for re-ingest / paid-original
+     * flows; otherwise it is deleted post-ingest as before.
+     */
+    private function maybeDeleteOriginal(Event $event, string $path, int $photoId): void
+    {
+        if ($event->isRetainOriginals()) {
+            return;
+        }
+
+        $this->deleteOriginalQuietly($path, $photoId);
     }
 
     /**

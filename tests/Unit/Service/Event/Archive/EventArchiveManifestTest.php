@@ -32,6 +32,7 @@ final class EventArchiveManifestTest extends TestCase
                 '#3366ff',
                 true,
                 'logo.png',
+                true,
             ),
             [new ManifestPhoto(
                 'a' . str_repeat('0', 63),
@@ -64,6 +65,30 @@ final class EventArchiveManifestTest extends TestCase
         $this->assertCount(1, $restored->photos);
         $this->assertSame('confirmed', $restored->subscriptions[0]->status);
         $this->assertSame(2, $restored->skippedPhotos);
+    }
+
+    public function testRetainOriginalsSurvivesJsonRoundTrip(): void
+    {
+        $restored = EventArchiveManifest::fromJson($this->manifest()->toJson());
+
+        $this->assertTrue($restored->event->retainOriginals);
+    }
+
+    public function testRetainOriginalsDefaultsFalseWhenAbsent(): void
+    {
+        // A pre-#110 manifest with no retainOriginals key must import as retain-off.
+        $json = $this->manifest()->toJson();
+        $data = json_decode($json, true);
+        $this->assertIsArray($data);
+        $this->assertIsArray($data['event']);
+        unset($data['event']['retainOriginals']);
+
+        $reEncoded = json_encode($data);
+        $this->assertIsString($reEncoded);
+
+        $restored = EventArchiveManifest::fromJson($reEncoded);
+
+        $this->assertFalse($restored->event->retainOriginals);
     }
 
     public function testRejectsUnknownFormat(): void

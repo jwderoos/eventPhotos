@@ -157,6 +157,16 @@ final class PhotoUploadTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
     }
 
+    public function testAcceptsFileAtNewLimit(): void
+    {
+        // The standard fixture is well under 10 MB and must still ingest.
+        $file = $this->fixture('with-datetime-original.jpg');
+        $url  = sprintf('/admin/events/%d/photos', (int) $this->event->getId());
+        $this->client->request(Request::METHOD_POST, $url, [], ['file' => $file]);
+
+        self::assertResponseStatusCodeSame(202);
+    }
+
     private function fixture(string $name): UploadedFile
     {
         $src = dirname(__DIR__, 2) . '/fixtures/photos/' . $name;

@@ -42,6 +42,7 @@
                 {{ form_row(form.collection) }}
                 {% if form.owner is defined %}{{ form_row(form.owner) }}{% endif %}
                 {% if form.notificationsEnabled is defined %}{{ form_row(form.notificationsEnabled) }}{% endif %}
+                {{ form_row(form.retainOriginals) }}
             </div>
             <div>
                 {% include '_partials/_style_fields.html.twig' with {styleForm: form.style, inherited: styleInherited, brandPreview: brandPreview} only %}
