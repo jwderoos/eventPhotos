@@ -61,7 +61,11 @@ final readonly class ProcessPhotoHandler
                 @unlink($tmpFile);
             }
 
-            $this->windowGuard->assertWithinWindow($event, $takenAt);
+            if (!$message->reingest) {
+                $this->windowGuard->assertWithinWindow($event, $takenAt);
+            } else {
+                $this->derivatives->delete($path);
+            }
 
             [$width, $height, $derivativeBytes] = $this->derivatives->generate($path, $event->getPreviewSettings());
             $photo->markReady($takenAt, $width, $height, $derivativeBytes);

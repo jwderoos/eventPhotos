@@ -20,6 +20,8 @@ enum AuditAction: string
 
     case PhotoDelete = 'photo.delete';
     case PhotoDeleteAll = 'photo.delete_all';
+    case PhotoReingest = 'photo.reingest';
+    case PhotoReingestAll = 'photo.reingest_all';
     case PhotoRetry = 'photo.retry';
 
     case UserCreate = 'user.create';

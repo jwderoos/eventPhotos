@@ -255,6 +255,75 @@ final class PhotoController extends AbstractController
         ]);
     }
 
+    #[Route(
+        '/admin/events/{id}/photos/reingest',
+        name: 'admin_photo_reingest_all',
+        requirements: ['id' => '\d+'],
+        methods: ['POST'],
+    )]
+    #[Audited(AuditAction::PhotoReingestAll, targetParam: 'id', targetType: 'Event')]
+    public function reingestAll(Event $event, Request $request): RedirectResponse
+    {
+        $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
+        $this->assertCsrf($request, 'reingest_all_photos_' . $event->getId());
+
+        $eventId = (int) $event->getId();
+
+        if (!$event->isRetainOriginals()) {
+            $this->addFlash('error', 'Re-ingest is unavailable: this event does not retain originals.');
+
+            return $this->redirectToRoute('admin_photo_grid', ['id' => $eventId]);
+        }
+
+        /** @var list<Photo> $ready */
+        $ready = $this->photos->findBy(['event' => $event, 'status' => PhotoStatus::Ready]);
+        foreach ($ready as $photo) {
+            $photo->resetForReingest();
+            $this->bus->dispatch(new ProcessPhoto((int) $photo->getId(), reingest: true));
+        }
+
+        $this->em->flush();
+        $this->audit->set('reingested_count', count($ready));
+        $this->addFlash('success', sprintf('Re-ingesting %d photos.', count($ready)));
+
+        return $this->redirectToRoute('admin_photo_grid', ['id' => $eventId]);
+    }
+
+    #[Route(
+        '/admin/events/{eventId}/photos/{photoId}/reingest',
+        name: 'admin_photo_reingest',
+        requirements: ['eventId' => '\d+', 'photoId' => '\d+'],
+        methods: ['POST'],
+    )]
+    #[Audited(AuditAction::PhotoReingest, targetParam: 'photoId', targetType: 'Photo')]
+    public function reingest(int $eventId, int $photoId, Request $request): RedirectResponse
+    {
+        $photo = $this->loadOrThrow($eventId, $photoId);
+        $this->denyAccessUnlessGranted(PhotoVoter::EDIT, $photo);
+        $this->assertCsrf($request, 'reingest_photo_' . $photoId);
+
+        $page   = max(1, $request->request->getInt('page', 1));
+        $target = ['id' => $eventId, 'page' => $page];
+
+        if (!$photo->getEvent()->isRetainOriginals()) {
+            $this->addFlash('error', 'Re-ingest is unavailable: this event does not retain originals.');
+
+            return $this->redirectToRoute('admin_photo_grid', $target);
+        }
+
+        if ($photo->getStatus() !== PhotoStatus::Ready) {
+            $this->addFlash('error', 'Only ready photos can be re-ingested.');
+
+            return $this->redirectToRoute('admin_photo_grid', $target);
+        }
+
+        $photo->resetForReingest();
+        $this->bus->dispatch(new ProcessPhoto($photoId, reingest: true));
+        $this->em->flush();
+
+        return $this->redirectToRoute('admin_photo_grid', $target);
+    }
+
     private function loadOrThrow(int $eventId, int $photoId): Photo
     {
         $photo = $this->photos->find($photoId);

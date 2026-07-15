@@ -57,44 +57,55 @@
     {% endif %}
 
     {% if total > 0 %}
-        <div data-controller="delete-all-photos"
-             data-delete-all-photos-expected-value="{{ event.name }}"
-             class="mt-6 flex justify-end border-t border-base-300 pt-4">
-            <button type="button"
-                    class="btn btn-error btn-sm"
-                    data-action="click->delete-all-photos#open">
-                Delete all photos
-            </button>
-            <dialog class="modal" data-delete-all-photos-target="dialog">
-                <div class="modal-box">
-                    <h3 class="text-lg font-bold">Delete all photos for "{{ event.name }}"?</h3>
-                    <p class="py-2">
-                        This will permanently delete {{ total }} photo{% if total != 1 %}s{% endif %}
-                        and their files. This action cannot be undone.
-                    </p>
-                    <p class="text-sm">To confirm, type the event name <strong>{{ event.name }}</strong> below:</p>
-                    <input type="text"
-                           class="input input-bordered w-full mt-2"
-                           autocomplete="off"
-                           data-delete-all-photos-target="input"
-                           data-action="input->delete-all-photos#check">
-                    <div class="modal-action">
-                        <form method="dialog"><button class="btn">Cancel</button></form>
-                        <form method="post"
-                              action="{{ path('admin_photo_delete_all', {id: event.id}) }}">
-                            <input type="hidden" name="_token"
-                                   value="{{ csrf_token('delete_all_photos_' ~ event.id) }}">
-                            <button type="submit"
-                                    class="btn btn-error"
-                                    data-delete-all-photos-target="submit"
-                                    disabled>
-                                Delete all
-                            </button>
-                        </form>
+        <div class="mt-6 flex items-center justify-end gap-2 border-t border-base-300 pt-4">
+            {% if event.retainOriginals %}
+                <form method="post"
+                      action="{{ path('admin_photo_reingest_all', {id: event.id}) }}"
+                      onsubmit="return confirm('Re-ingest all {{ total }} photo{{ total != 1 ? 's' : '' }}? Every thumbnail and preview will be regenerated from the originals using the current display settings.');"
+                      class="inline">
+                    <input type="hidden" name="_token" value="{{ csrf_token('reingest_all_photos_' ~ event.id) }}">
+                    <button type="submit" class="btn btn-outline btn-sm">Re-ingest all photos</button>
+                </form>
+            {% endif %}
+            <div data-controller="delete-all-photos"
+                 data-delete-all-photos-expected-value="{{ event.name }}"
+                 class="inline">
+                <button type="button"
+                        class="btn btn-error btn-sm"
+                        data-action="click->delete-all-photos#open">
+                    Delete all photos
+                </button>
+                <dialog class="modal" data-delete-all-photos-target="dialog">
+                    <div class="modal-box">
+                        <h3 class="text-lg font-bold">Delete all photos for "{{ event.name }}"?</h3>
+                        <p class="py-2">
+                            This will permanently delete {{ total }} photo{% if total != 1 %}s{% endif %}
+                            and their files. This action cannot be undone.
+                        </p>
+                        <p class="text-sm">To confirm, type the event name <strong>{{ event.name }}</strong> below:</p>
+                        <input type="text"
+                               class="input input-bordered w-full mt-2"
+                               autocomplete="off"
+                               data-delete-all-photos-target="input"
+                               data-action="input->delete-all-photos#check">
+                        <div class="modal-action">
+                            <form method="dialog"><button class="btn">Cancel</button></form>
+                            <form method="post"
+                                  action="{{ path('admin_photo_delete_all', {id: event.id}) }}">
+                                <input type="hidden" name="_token"
+                                       value="{{ csrf_token('delete_all_photos_' ~ event.id) }}">
+                                <button type="submit"
+                                        class="btn btn-error"
+                                        data-delete-all-photos-target="submit"
+                                        disabled>
+                                    Delete all
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                </div>
-                <form method="dialog" class="modal-backdrop"><button>close</button></form>
-            </dialog>
+                    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+                </dialog>
+            </div>
         </div>
     {% endif %}
 </turbo-frame>

@@ -206,6 +206,48 @@ final class ProcessPhotoHandlerTest extends KernelTestCase
         ($this->handler)(new ProcessPhoto(999999));
     }
 
+    public function testReingestSkipsWindowGuardAndRegenerates(): void
+    {
+        // Event window is two days after the fixture's EXIF timestamp, so a fresh
+        // ingest would window-reject. Re-ingest must NOT re-reject.
+        $this->event->setRetainOriginals(true);
+        $this->event->setStartsAt(new DateTimeImmutable('2026-06-12 10:00', new DateTimeZone('UTC')));
+        $this->event->setEndsAt(new DateTimeImmutable('2026-06-12 14:00', new DateTimeZone('UTC')));
+
+        $this->em->flush();
+
+        // Simulate the controller having reset a Ready photo back to Pending, with
+        // its retained original still on disk (seedPending writes the original).
+        $photo = $this->seedPending('with-datetime-original.jpg', 'reingest-window');
+        $path  = sprintf('event-%d/%d.jpg', $this->event->getId(), $photo->getId());
+
+        // Stale derivatives from the previous ingest.
+        $this->thumbs->write($path, 'STALE-THUMB');
+        $this->previews->write($path, 'STALE-PREVIEW');
+
+        ($this->handler)(new ProcessPhoto($photo->getId() ?? 0, reingest: true));
+        $this->em->refresh($photo);
+
+        $this->assertSame(
+            PhotoStatus::Ready,
+            $photo->getStatus(),
+            'Re-ingest must not window-reject an already-accepted photo.',
+        );
+        $this->assertTrue($this->thumbs->fileExists($path));
+        $this->assertTrue($this->previews->fileExists($path));
+        $this->assertNotSame('STALE-THUMB', $this->thumbs->read($path), 'Thumb should be regenerated.');
+        $this->assertNotSame('STALE-PREVIEW', $this->previews->read($path), 'Preview should be regenerated.');
+        $this->assertSame(
+            $this->thumbs->fileSize($path) + $this->previews->fileSize($path),
+            $photo->getDerivativeBytes(),
+            'derivativeBytes must reflect the freshly generated derivatives.',
+        );
+        $this->assertTrue(
+            $this->originals->fileExists($path),
+            'Original must survive re-ingest so the event can be re-ingested again.',
+        );
+    }
+
     private function seedPending(string $fixtureFile, string $hashSeed): Photo
     {
         $photo = new Photo(

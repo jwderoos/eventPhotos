@@ -184,4 +184,18 @@ class Photo
         $this->processingError = null;
         $this->status = PhotoStatus::Pending;
     }
+
+    public function resetForReingest(): void
+    {
+        if ($this->status !== PhotoStatus::Ready) {
+            throw new DomainException(sprintf(
+                'Photo %d cannot be reset for re-ingest from %s.',
+                (int) $this->id,
+                $this->status->value,
+            ));
+        }
+
+        $this->processingError = null;
+        $this->status = PhotoStatus::Pending;
+    }
 }

@@ -6,6 +6,7 @@ namespace App\Service\Photo;
 
 use App\Entity\PreviewSettings;
 use App\Service\Image\GdImageResizer;
+use League\Flysystem\FilesystemException;
 use League\Flysystem\FilesystemOperator;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
@@ -50,5 +51,20 @@ final readonly class DerivativeGenerator
         $this->previews->write($path, $previewBytes);
 
         return [$width, $height, strlen($thumbBytes) + strlen($previewBytes)];
+    }
+
+    /**
+     * Best-effort removal of the generated derivatives at $path. Used by re-ingest
+     * (#112) to clear stale thumb/preview before regenerating. Missing files are fine.
+     */
+    public function delete(string $path): void
+    {
+        foreach ([$this->thumbs, $this->previews] as $fs) {
+            try {
+                $fs->delete($path);
+            } catch (FilesystemException) {
+                // Missing files are fine — nothing to clear.
+            }
+        }
     }
 }

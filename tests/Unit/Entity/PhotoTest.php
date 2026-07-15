@@ -76,6 +76,37 @@ final class PhotoTest extends TestCase
         $this->assertNull($photo->getProcessingError());
     }
 
+    public function testResetForReingestFromReady(): void
+    {
+        $photo = $this->makePhoto();
+        $photo->markReady(new DateTimeImmutable('2026-06-10 12:00:00'), 100, 100, 2048);
+
+        $photo->resetForReingest();
+
+        $this->assertSame(PhotoStatus::Pending, $photo->getStatus());
+        $this->assertNull($photo->getProcessingError());
+        $this->assertSame(100, $photo->getWidth());
+        $this->assertSame(100, $photo->getHeight());
+        $this->assertSame(2048, $photo->getDerivativeBytes());
+    }
+
+    public function testResetForReingestRejectedFromPending(): void
+    {
+        $photo = $this->makePhoto();
+
+        $this->expectException(DomainException::class);
+        $photo->resetForReingest();
+    }
+
+    public function testResetForReingestRejectedFromFailed(): void
+    {
+        $photo = $this->makePhoto();
+        $photo->markFailed('boom');
+
+        $this->expectException(DomainException::class);
+        $photo->resetForReingest();
+    }
+
     private function makePhoto(): Photo
     {
         $owner = new User('owner@example.test', 'Owner');

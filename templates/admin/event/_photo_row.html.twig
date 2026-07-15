@@ -50,6 +50,16 @@
                    target="_blank" rel="noopener"
                    class="btn btn-ghost btn-xs">View</a>
             {% endif %}
+            {% if event.retainOriginals and photo.status.value == 'ready' %}
+                <form method="post"
+                      action="{{ path('admin_photo_reingest', {eventId: event.id, photoId: photo.id}) }}"
+                      onsubmit="return confirm('Re-ingest this photo? Its thumbnail and preview will be regenerated from the original.');"
+                      class="inline">
+                    <input type="hidden" name="_token" value="{{ csrf_token('reingest_photo_' ~ photo.id) }}">
+                    <input type="hidden" name="page" value="{{ page|default(1) }}">
+                    <button class="btn btn-ghost btn-xs">Re-ingest</button>
+                </form>
+            {% endif %}
             <form method="post"
                   action="{{ path('admin_photo_delete', {eventId: event.id, photoId: photo.id}) }}"
                   onsubmit="return confirm('Delete this photo?');"
