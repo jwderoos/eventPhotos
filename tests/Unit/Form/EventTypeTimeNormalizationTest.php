@@ -55,11 +55,15 @@ final class EventTypeTimeNormalizationTest extends KernelTestCase
         $form  = $this->factory->create(EventType::class, $event);
 
         $form->submit([
-            'name'       => $event->getName(),
-            'eventDate'  => '2026-07-15',
-            'startTime'  => $input,
-            'endTime'    => '23:59',
-            'timezone'   => $event->getTimezone(),
+            'name'      => $event->getName(),
+            'eventDate' => '2026-07-15',
+            'startTime' => $input,
+            'endTime'   => '23:59',
+            'timezone'  => $event->getTimezone(),
+            'preview'   => [
+                'longEdge' => '1600',
+                'quality'  => '85',
+            ],
         ]);
 
         $this->assertTrue($form->isSynchronized(), 'form should be synchronized');
@@ -91,11 +95,15 @@ final class EventTypeTimeNormalizationTest extends KernelTestCase
         $form  = $this->factory->create(EventType::class, $event);
 
         $form->submit([
-            'name'       => $event->getName(),
-            'eventDate'  => '2026-07-15',
-            'startTime'  => $input,
-            'endTime'    => '23:59',
-            'timezone'   => $event->getTimezone(),
+            'name'      => $event->getName(),
+            'eventDate' => '2026-07-15',
+            'startTime' => $input,
+            'endTime'   => '23:59',
+            'timezone'  => $event->getTimezone(),
+            'preview'   => [
+                'longEdge' => '1600',
+                'quality'  => '85',
+            ],
         ]);
 
         $this->assertFalse(
@@ -110,11 +118,15 @@ final class EventTypeTimeNormalizationTest extends KernelTestCase
         $form  = $this->factory->create(EventType::class, $event);
 
         $form->submit([
-            'name'       => $event->getName(),
-            'eventDate'  => '2026-07-15',
-            'startTime'  => '0930',
-            'endTime'    => '1400',
-            'timezone'   => $event->getTimezone(),
+            'name'      => $event->getName(),
+            'eventDate' => '2026-07-15',
+            'startTime' => '0930',
+            'endTime'   => '1400',
+            'timezone'  => $event->getTimezone(),
+            'preview'   => [
+                'longEdge' => '1600',
+                'quality'  => '85',
+            ],
         ]);
 
         // Pair with EventTypeWindowCompositionTest: that suite already asserts the

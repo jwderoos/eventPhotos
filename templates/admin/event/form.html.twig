@@ -46,6 +46,11 @@
             </div>
             <div>
                 {% include '_partials/_style_fields.html.twig' with {styleForm: form.style, inherited: styleInherited, brandPreview: brandPreview} only %}
+                <div class="mt-4 space-y-2">
+                    <h2 class="text-sm font-semibold">Display image</h2>
+                    {{ form_row(form.preview.longEdge) }}
+                    {{ form_row(form.preview.quality) }}
+                </div>
             </div>
         </div>
         {{ form_widget(form) }}

@@ -37,6 +37,9 @@ class Event implements Stringable
     #[ORM\Embedded(class: StyleSettings::class, columnPrefix: 'style_')]
     private StyleSettings $style;
 
+    #[ORM\Embedded(class: PreviewSettings::class, columnPrefix: 'preview_')]
+    private PreviewSettings $preview;
+
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
 
@@ -97,6 +100,7 @@ class Event implements Stringable
         $this->startsAt = $startsAt->setTimezone(new DateTimeZone('UTC'));
         $this->endsAt   = $endsAt->setTimezone(new DateTimeZone('UTC'));
         $this->style    = new StyleSettings();
+        $this->preview  = new PreviewSettings();
     }
 
     public function getId(): ?int
@@ -107,6 +111,11 @@ class Event implements Stringable
     public function getStyle(): StyleSettings
     {
         return $this->style;
+    }
+
+    public function getPreviewSettings(): PreviewSettings
+    {
+        return $this->preview;
     }
 
     public function getSlug(): string

@@ -98,11 +98,15 @@ final class EventTypeWindowCompositionTest extends KernelTestCase
     {
         $form = $this->factory->create(EventType::class, $event);
         $form->submit([
-            'name'       => $event->getName(),
-            'eventDate'  => $date,
-            'startTime'  => $start,
-            'endTime'    => $end,
-            'timezone'   => $event->getTimezone(),
+            'name'      => $event->getName(),
+            'eventDate' => $date,
+            'startTime' => $start,
+            'endTime'   => $end,
+            'timezone'  => $event->getTimezone(),
+            'preview'   => [
+                'longEdge' => '1600',
+                'quality'  => '85',
+            ],
         ]);
     }
 

@@ -4,19 +4,16 @@ declare(strict_types=1);
 
 namespace App\Service\Photo;
 
+use App\Entity\PreviewSettings;
 use App\Service\Image\GdImageResizer;
 use League\Flysystem\FilesystemOperator;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 final readonly class DerivativeGenerator
 {
-    private const int THUMB_LONG_EDGE   = 400;
+    private const int THUMB_LONG_EDGE = 400;
 
-    private const int THUMB_QUALITY     = 80;
-
-    private const int PREVIEW_LONG_EDGE = 1600;
-
-    private const int PREVIEW_QUALITY   = 85;
+    private const int THUMB_QUALITY   = 80;
 
     public function __construct(
         #[Autowire(service: 'photo_originals_storage')]
@@ -33,7 +30,7 @@ final readonly class DerivativeGenerator
      * @return array{0:int,1:int,2:int} [width, height, derivativeBytes]
      *                                   — derivativeBytes is the sum of thumb + preview JPEG payload sizes.
      */
-    public function generate(string $path): array
+    public function generate(string $path, PreviewSettings $preview): array
     {
         $image = $this->resizer->decode($this->originals->read($path));
 
@@ -45,8 +42,8 @@ final readonly class DerivativeGenerator
             self::THUMB_QUALITY,
         );
         $previewBytes = $this->resizer->encode(
-            $this->resizer->scaleTo($image, $width, $height, self::PREVIEW_LONG_EDGE),
-            self::PREVIEW_QUALITY,
+            $this->resizer->scaleTo($image, $width, $height, $preview->getLongEdge()),
+            $preview->getQuality(),
         );
 
         $this->thumbs->write($path, $thumbBytes);

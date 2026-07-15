@@ -63,7 +63,7 @@ final readonly class ProcessPhotoHandler
 
             $this->windowGuard->assertWithinWindow($event, $takenAt);
 
-            [$width, $height, $derivativeBytes] = $this->derivatives->generate($path);
+            [$width, $height, $derivativeBytes] = $this->derivatives->generate($path, $event->getPreviewSettings());
             $photo->markReady($takenAt, $width, $height, $derivativeBytes);
             $this->em->flush();
             $this->maybeDeleteOriginal($event, $path, (int) $photo->getId());

@@ -7,6 +7,7 @@ namespace App\Form;
 use App\Entity\Event;
 use App\Entity\EventCollection;
 use App\Entity\User;
+use App\Form\PreviewSettingsType;
 use App\Form\StyleSettingsType;
 use App\Service\Style\ResolvedStyle;
 use DateTimeImmutable;
@@ -160,6 +161,11 @@ final class EventType extends AbstractType
         $builder->add('style', StyleSettingsType::class, [
             'label'     => false,
             'inherited' => $options['inherited'],
+        ]);
+
+        $builder->add('preview', PreviewSettingsType::class, [
+            'label'         => false,
+            'property_path' => 'previewSettings',
         ]);
 
         $builder->addEventListener(FormEvents::POST_SET_DATA, $this->prefillUnmappedFields(...));

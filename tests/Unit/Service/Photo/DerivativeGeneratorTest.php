@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Photo;
 
+use App\Entity\PreviewSettings;
 use App\Service\Image\GdImageResizer;
 use App\Service\Photo\DerivativeGenerator;
 use League\Flysystem\Filesystem;
@@ -12,19 +13,11 @@ use PHPUnit\Framework\TestCase;
 
 final class DerivativeGeneratorTest extends TestCase
 {
-    public function testGeneratesThumbAndPreviewAndReportsDimensions(): void
+    public function testGeneratesThumbAndDefaultPreviewAndReportsDimensions(): void
     {
-        $originalsFs = new Filesystem(new InMemoryFilesystemAdapter());
-        $thumbsFs    = new Filesystem(new InMemoryFilesystemAdapter());
-        $previewsFs  = new Filesystem(new InMemoryFilesystemAdapter());
+        [$generator, $thumbsFs, $previewsFs] = $this->makeGenerator();
 
-        $originalBytes = (string) file_get_contents(
-            dirname(__DIR__, 3) . '/fixtures/photos/bigger.jpg',
-        );
-        $originalsFs->write('event-1/42.jpg', $originalBytes);
-
-        $generator = new DerivativeGenerator($originalsFs, $thumbsFs, $previewsFs, new GdImageResizer());
-        [$width, $height, $derivativeBytes] = $generator->generate('event-1/42.jpg');
+        [$width, $height, $derivativeBytes] = $generator->generate('event-1/42.jpg', new PreviewSettings());
 
         $this->assertSame(3000, $width);
         $this->assertSame(2000, $height);
@@ -43,5 +36,38 @@ final class DerivativeGeneratorTest extends TestCase
         $previewDims = getimagesizefromstring($previewsFs->read('event-1/42.jpg'));
         $this->assertNotFalse($previewDims);
         $this->assertSame(1600, max($previewDims[0], $previewDims[1]));
+    }
+
+    public function testPreviewHonoursConfiguredLongEdge(): void
+    {
+        [$generator, , $previewsFs] = $this->makeGenerator();
+
+        $settings = new PreviewSettings();
+        $settings->setLongEdge(2048);
+
+        $generator->generate('event-1/42.jpg', $settings);
+
+        $previewDims = getimagesizefromstring($previewsFs->read('event-1/42.jpg'));
+        $this->assertNotFalse($previewDims);
+        $this->assertSame(2048, max($previewDims[0], $previewDims[1]));
+    }
+
+    /**
+     * @return array{0:DerivativeGenerator,1:Filesystem,2:Filesystem}
+     */
+    private function makeGenerator(): array
+    {
+        $originalsFs = new Filesystem(new InMemoryFilesystemAdapter());
+        $thumbsFs    = new Filesystem(new InMemoryFilesystemAdapter());
+        $previewsFs  = new Filesystem(new InMemoryFilesystemAdapter());
+
+        $originalBytes = (string) file_get_contents(
+            dirname(__DIR__, 3) . '/fixtures/photos/bigger.jpg',
+        );
+        $originalsFs->write('event-1/42.jpg', $originalBytes);
+
+        $generator = new DerivativeGenerator($originalsFs, $thumbsFs, $previewsFs, new GdImageResizer());
+
+        return [$generator, $thumbsFs, $previewsFs];
     }
 }
