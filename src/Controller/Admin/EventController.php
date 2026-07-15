@@ -211,11 +211,20 @@ final class EventController extends AbstractController
             'inherited'             => $inherited,
             'lock_retain_originals' => $event->getId() !== null && $this->photos->countForEvent($event) > 0,
         ]);
+        $bibBefore = $event->isBibIndexingEnabled();
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
             $this->applyBanner($form, $event);
             $this->audit->targetLabel($event->getName() . ' (' . $event->getSlug() . ')');
+
+            if ($event->isBibIndexingEnabled() !== $bibBefore) {
+                $this->audit->changed('bib_indexing', $bibBefore, $event->isBibIndexingEnabled());
+                if ($event->isBibIndexingEnabled()) {
+                    $this->audit->set('bib_indexing_attested', true);
+                }
+            }
+
             $this->em->flush();
             $this->addFlash('success', 'Event updated.');
 

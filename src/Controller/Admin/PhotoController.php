@@ -8,10 +8,12 @@ use App\Audit\AuditAction;
 use App\Audit\AuditContext;
 use App\Audit\Attribute\AuditIgnore;
 use App\Audit\Attribute\Audited;
+use App\Entity\BibSuppression;
 use App\Entity\Event;
 use App\Entity\Photo;
 use App\Entity\PhotoStatus;
 use App\Message\ProcessPhoto;
+use App\Repository\BibSuppressionRepository;
 use App\Repository\PhotoRepository;
 use App\Security\Voter\EventVoter;
 use App\Security\Voter\PhotoVoter;
@@ -43,6 +45,7 @@ final class PhotoController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly PhotoRepository $photos,
+        private readonly BibSuppressionRepository $bibSuppressions,
         private readonly MessageBusInterface $bus,
         #[Autowire(service: 'photo_originals_storage')]
         private readonly FilesystemOperator $originals,
@@ -322,6 +325,43 @@ final class PhotoController extends AbstractController
         $this->em->flush();
 
         return $this->redirectToRoute('admin_photo_grid', $target);
+    }
+
+    #[Route(
+        '/admin/events/{id}/bib-suppressions',
+        name: 'admin_bib_suppress',
+        requirements: ['id' => '\d+'],
+        methods: ['POST'],
+    )]
+    #[Audited(AuditAction::EventBibSuppress, targetParam: 'id', targetType: 'Event')]
+    public function suppressBib(Event $event, Request $request): RedirectResponse
+    {
+        $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
+        $this->assertCsrf($request, 'suppress_bib_' . $event->getId());
+
+        $bibNumber = trim((string) $request->request->get('bibNumber'));
+        if ($bibNumber === '') {
+            $this->addFlash('error', 'Enter a bib number to suppress.');
+
+            return $this->redirectToRoute('admin_photo_grid', ['id' => $event->getId()]);
+        }
+
+        if (mb_strlen($bibNumber) > BibSuppression::MAX_BIB_NUMBER_LENGTH) {
+            $this->addFlash('error', 'Bib number is too long.');
+
+            return $this->redirectToRoute('admin_photo_grid', ['id' => $event->getId()]);
+        }
+
+        // Plan C extends this action to also delete matching bib PhotoAttribute rows.
+        if (!$this->bibSuppressions->isSuppressed($event, $bibNumber)) {
+            $this->em->persist(new BibSuppression($event, $bibNumber));
+            $this->em->flush();
+        }
+
+        $this->audit->set('suppressed_bib', $bibNumber);
+        $this->addFlash('success', sprintf('Bib %s will not be indexed.', $bibNumber));
+
+        return $this->redirectToRoute('admin_photo_grid', ['id' => $event->getId()]);
     }
 
     private function loadOrThrow(int $eventId, int $photoId): Photo

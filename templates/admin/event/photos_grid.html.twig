@@ -56,6 +56,20 @@
         </nav>
     {% endif %}
 
+    {% if event.bibIndexingEnabled %}
+        <form method="post"
+              action="{{ path('admin_bib_suppress', {id: event.id}) }}"
+              class="mt-6 flex items-end gap-2">
+            <label class="form-control">
+                <span class="label-text">De-index a bib number</span>
+                <input type="text" name="bibNumber" class="input input-bordered input-sm" maxlength="64" required>
+            </label>
+            <input type="hidden" name="_token"
+                   value="{{ csrf_token('suppress_bib_' ~ event.id) }}">
+            <button type="submit" class="btn btn-sm">Suppress</button>
+        </form>
+    {% endif %}
+
     {% if total > 0 %}
         <div class="mt-6 flex items-center justify-end gap-2 border-t border-base-300 pt-4">
             {% if event.retainOriginals %}

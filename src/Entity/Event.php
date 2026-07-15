@@ -72,6 +72,9 @@ class Event implements Stringable
     #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     private bool $retainOriginals = false;
 
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
+    private bool $bibIndexingEnabled = false;
+
     #[Vich\UploadableField(mapping: 'event_logo', fileNameProperty: 'logoFilename')]
     #[Assert\File(
         maxSize: '2M',
@@ -264,6 +267,21 @@ class Event implements Stringable
     public function areNotificationsEnabled(): bool
     {
         return $this->notificationsEnabled;
+    }
+
+    public function enableBibIndexing(): void
+    {
+        $this->bibIndexingEnabled = true;
+    }
+
+    public function disableBibIndexing(): void
+    {
+        $this->bibIndexingEnabled = false;
+    }
+
+    public function isBibIndexingEnabled(): bool
+    {
+        return $this->bibIndexingEnabled;
     }
 
     public function isRetainOriginals(): bool

@@ -13,6 +13,7 @@ enum AuditAction: string
     case EventNotificationsToggle = 'event.notifications_toggle';
     case EventExport = 'event.export';
     case EventImport = 'event.import';
+    case EventBibSuppress = 'event.bib_suppress';
 
     case CollectionCreate = 'collection.create';
     case CollectionEdit = 'collection.edit';
