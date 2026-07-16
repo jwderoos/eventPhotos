@@ -43,3 +43,10 @@ phpstan.neon
 /.phpcs-cache
 /phpcs.xml
 ###< squizlabs/php_codesniffer ###
+
+###> app/inference ###
+/inference/.venv/
+/inference/**/__pycache__/
+/inference/.pytest_cache/
+/inference/*.egg-info/
+###< app/inference ###

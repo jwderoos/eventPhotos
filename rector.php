@@ -60,6 +60,14 @@ return RectorConfig::configure()
         ArrayToFirstClassCallableRector::class => [
             __DIR__ . '/tests/Unit/EventListener/Audit/AuditedControllerListenerTest.php',
         ],
+        // Converting setNext() to a property hook would drop the public
+        // setNext(ExtractedAttributes): void method the fake's contract
+        // requires (mirrors FakeGoogleOAuthClient's plain-setter shape),
+        // and the rewrite is unsound here anyway: it emits a non-nullable
+        // hook parameter for a nullable property, which fatals at runtime.
+        PropertyHookRector::class => [
+            __DIR__ . '/tests/Fake/FakeAttributeExtractorClient.php',
+        ],
     ])
     // uncomment to reach your current PHP version
     ->withPhpVersion(PhpVersion::PHP_85)

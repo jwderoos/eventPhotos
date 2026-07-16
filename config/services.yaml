@@ -28,6 +28,9 @@ services:
     App\Service\Mail\DnsResolver:
         alias: App\Service\Mail\SystemDnsResolver
 
+    App\Service\Photo\AttributeExtractorClientInterface:
+        alias: App\Service\Photo\AttributeExtractorClient
+
     App\Session\PdoSessionHandlerFactory:
         arguments:
             $connection: '@doctrine.dbal.default_connection'
@@ -95,4 +98,11 @@ when@test:
             public: true
 
         App\Service\Event\EventArchiveImporter:
+            public: true
+
+        App\Tests\Fake\FakeAttributeExtractorClient:
+            public: true
+
+        App\Service\Photo\AttributeExtractorClientInterface:
+            alias: App\Tests\Fake\FakeAttributeExtractorClient
             public: true

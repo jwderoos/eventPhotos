@@ -10,6 +10,7 @@ services:
       MAILER_DSN: "smtp://mailer:1025"
       APP_ENV: dev
       PHP_IDE_CONFIG: "serverName=event-photos"
+      INFERENCE_SERVICE_URL: "http://inference:8000"
     depends_on:
       database:
         condition: service_healthy
@@ -39,12 +40,28 @@ services:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=16&charset=utf8"
       MAILER_DSN: "smtp://mailer:1025"
       APP_ENV: dev
+      INFERENCE_SERVICE_URL: "http://inference:8000"
     restart: unless-stopped
     stop_signal: SIGTERM
     stop_grace_period: 30s
     depends_on:
       database:
         condition: service_healthy
+      inference:
+        condition: service_started
+
+  inference:
+    build:
+      context: ./inference
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 15s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   nginx:
     image: nginx:1.27-alpine
