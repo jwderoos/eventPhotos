@@ -8,158 +8,115 @@
         .lightbox-track.is-animating { transition: transform 250ms cubic-bezier(0.22, 0.61, 0.36, 1); }
     </style>
     <section class="space-y-6">
-        <header class="space-y-2">
+        <header class="space-y-4">
             <h1 class="text-2xl font-semibold">{{ event.name }}</h1>
 
             <form method="get"
                   action="{{ path('public_event_photos', {slug: event.slug}) }}"
-                  data-testid="time-filter"
-                  class="flex flex-wrap items-center gap-2 text-sm">
-                <label for="photos-time" class="sr-only">Time</label>
-                <input type="time"
-                       id="photos-time"
-                       name="t"
-                       value="{{ timestamp|date('H:i', event.timezone) }}"
-                       class="input input-sm input-bordered w-28">
-                <button type="submit" class="btn btn-sm">Update</button>
+                  data-testid="attribute-filter"
+                  class="flex flex-wrap items-end gap-4 text-sm">
+                <fieldset class="flex flex-wrap gap-2">
+                    <legend class="w-full text-xs uppercase text-base-content/60">Colour</legend>
+                    {% for colour in allowedColours %}
+                        <label class="flex items-center gap-1">
+                            <input type="checkbox" name="colour[]" value="{{ colour }}"
+                                   {{ colour in filter.colours ? 'checked' }}
+                                   class="checkbox checkbox-xs">
+                            <span>{{ colour }}</span>
+                        </label>
+                    {% endfor %}
+                </fieldset>
+                <fieldset class="flex flex-wrap gap-2">
+                    <legend class="w-full text-xs uppercase text-base-content/60">Garment</legend>
+                    {% for garment in allowedGarments %}
+                        <label class="flex items-center gap-1">
+                            <input type="checkbox" name="garment[]" value="{{ garment }}"
+                                   {{ garment in filter.garments ? 'checked' }}
+                                   class="checkbox checkbox-xs">
+                            <span>{{ garment|replace({'-': ' '}) }}</span>
+                        </label>
+                    {% endfor %}
+                </fieldset>
+                {% if bibSearchEnabled %}
+                    <label class="flex flex-col gap-1">
+                        <span class="text-xs uppercase text-base-content/60">Bib number</span>
+                        <input type="text" name="bib" inputmode="numeric"
+                               data-testid="bib-filter"
+                               value="{{ filter.bib }}"
+                               class="input input-sm input-bordered w-28">
+                    </label>
+                {% endif %}
+                <button type="submit" class="btn btn-sm btn-primary">Search</button>
+                {% if searchMode %}
+                    <a href="{{ path('public_event_photos', {slug: event.slug}) }}" class="btn btn-sm btn-ghost">Clear</a>
+                {% endif %}
             </form>
 
-            {% set nav_targets = {
-                'first': firstAt,
-                'prev':  prevAt,
-                'next':  nextAt,
-                'last':  lastAt,
-            } %}
-            {% set nav_labels = {
-                'first': '« First',
-                'prev':  '‹ Previous',
-                'next':  'Next ›',
-                'last':  'Last »',
-            } %}
+            {% if not searchMode %}
+                <form method="get"
+                      action="{{ path('public_event_photos', {slug: event.slug}) }}"
+                      data-testid="time-filter"
+                      class="flex flex-wrap items-center gap-2 text-sm">
+                    <label for="photos-time" class="sr-only">Time</label>
+                    <input type="time"
+                           id="photos-time"
+                           name="t"
+                           value="{{ timestamp|date('H:i', event.timezone) }}"
+                           class="input input-sm input-bordered w-28">
+                    <button type="submit" class="btn btn-sm">Update</button>
+                </form>
 
-            <nav data-testid="cross-window-nav"
-                 aria-label="Photo timeline navigation"
-                 class="flex flex-wrap items-center gap-1 text-sm">
-                {% for key, target in nav_targets %}
-                    {% if target is null %}
-                        <span data-testid="nav-{{ key }}"
-                              aria-disabled="true"
-                              class="btn btn-sm btn-disabled pointer-events-none opacity-50">
-                            {{ nav_labels[key] }}
-                        </span>
-                    {% else %}
-                        <span data-testid="nav-{{ key }}">
-                            <a href="{{ path('public_event_photos', {
-                                    slug: event.slug,
-                                    t:    target|date('H:i', event.timezone),
-                               }) }}"
-                               class="btn btn-sm">
+                {% set nav_targets = {
+                    'first': firstAt,
+                    'prev':  prevAt,
+                    'next':  nextAt,
+                    'last':  lastAt,
+                } %}
+                {% set nav_labels = {
+                    'first': '« First',
+                    'prev':  '‹ Previous',
+                    'next':  'Next ›',
+                    'last':  'Last »',
+                } %}
+
+                <nav data-testid="cross-window-nav"
+                     aria-label="Photo timeline navigation"
+                     class="flex flex-wrap items-center gap-1 text-sm">
+                    {% for key, target in nav_targets %}
+                        {% if target is null %}
+                            <span data-testid="nav-{{ key }}"
+                                  aria-disabled="true"
+                                  class="btn btn-sm btn-disabled pointer-events-none opacity-50">
                                 {{ nav_labels[key] }}
-                            </a>
-                        </span>
-                    {% endif %}
-                {% endfor %}
-            </nav>
-
-            <p class="text-sm text-base-content/70">
-                Showing
-                <time data-testid="timestamp" datetime="{{ timestamp|date('c') }}">{{ timestamp|date('H:i', event.timezone) }}</time>
-                · Window: <span data-testid="window">−{{ windowBefore }} / +{{ windowAfter }}</span> min
-                · <span data-testid="photo-count">{{ photos|length }} of {{ totalReady }}</span> photo{{ totalReady == 1 ? '' : 's' }}
-            </p>
-        </header>
-
-        {% if photos|length == 0 %}
-            <div class="rounded-box border border-base-300 bg-base-200 p-10 text-center">
-                <p class="text-base-content/70">No photos in this window yet.</p>
-            </div>
-        {% else %}
-            <div data-controller="lightbox"
-                 data-lightbox-event-slug-value="{{ event.slug }}"
-                 data-lightbox-total-ready-value="{{ totalReady }}">
-                <ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {% for photo in photos %}
-                        {% set previewUrl = path('photo_serve_preview', {slug: event.slug, id: photo.id}) %}
-                        <li data-lightbox-target="trigger"
-                            data-photo-id="{{ photo.id }}"
-                            data-photo-rank="{{ firstRank + loop.index0 }}"
-                            data-preview-url="{{ previewUrl }}">
-                            <a href="{{ previewUrl }}" rel="noopener">
-                                <img src="{{ path('photo_serve_thumb', {slug: event.slug, id: photo.id}) }}"
-                                     alt="{{ event.name }}"
-                                     loading="lazy"
-                                     class="w-full aspect-square object-cover rounded-box">
-                            </a>
-                        </li>
+                            </span>
+                        {% else %}
+                            <span data-testid="nav-{{ key }}">
+                                <a href="{{ path('public_event_photos', {
+                                        slug: event.slug,
+                                        t:    target|date('H:i', event.timezone),
+                                   }) }}"
+                                   class="btn btn-sm">
+                                    {{ nav_labels[key] }}
+                                </a>
+                            </span>
+                        {% endif %}
                     {% endfor %}
-                </ul>
+                </nav>
 
-                <dialog data-lightbox-target="dialog" class="modal">
-                    <div class="modal-box max-w-full w-full h-full p-0 m-0 rounded-none bg-black/95 flex items-center justify-center overflow-hidden">
-                        <button type="button"
-                                data-action="click->lightbox#close"
-                                aria-label="Close"
-                                class="btn btn-circle btn-sm btn-ghost absolute top-3 right-3 z-20 text-white bg-black/40 hover:bg-black/60">×</button>
-
-                        <button type="button"
-                                data-lightbox-target="prevButton"
-                                data-action="click->lightbox#previous"
-                                aria-label="Previous photo"
-                                class="btn btn-circle absolute left-3 top-1/2 -translate-y-1/2 z-10 text-white bg-black/40 hover:bg-black/60 border-0">‹</button>
-
-                        <div data-lightbox-target="track"
-                             class="lightbox-track absolute inset-0 will-change-transform touch-pan-y">
-                            <div class="lightbox-slot absolute inset-0 flex items-center justify-center"
-                                 style="transform: translate3d(-100%, 0, 0);">
-                                <img data-lightbox-target="slotPrev"
-                                     alt=""
-                                     aria-hidden="true"
-                                     class="max-w-full max-h-full object-contain select-none pointer-events-none">
-                            </div>
-                            <div class="lightbox-slot absolute inset-0 flex items-center justify-center"
-                                 style="transform: translate3d(0, 0, 0);">
-                                <img data-lightbox-target="slotCurr"
-                                     alt="{{ event.name }}"
-                                     class="max-w-full max-h-full object-contain select-none">
-                            </div>
-                            <div class="lightbox-slot absolute inset-0 flex items-center justify-center"
-                                 style="transform: translate3d(100%, 0, 0);">
-                                <img data-lightbox-target="slotNext"
-                                     alt=""
-                                     aria-hidden="true"
-                                     class="max-w-full max-h-full object-contain select-none pointer-events-none">
-                            </div>
-                        </div>
-
-                        <div data-lightbox-target="spinner"
-                             class="hidden absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                            <span class="loading loading-spinner loading-lg text-white"></span>
-                        </div>
-
-                        <div data-lightbox-target="error"
-                             class="hidden absolute inset-0 flex items-center justify-center z-10 text-white text-sm pointer-events-none">
-                            Couldn't load this photo
-                        </div>
-
-                        <button type="button"
-                                data-lightbox-target="nextButton"
-                                data-action="click->lightbox#next"
-                                aria-label="Next photo"
-                                class="btn btn-circle absolute right-3 top-1/2 -translate-y-1/2 z-10 text-white bg-black/40 hover:bg-black/60 border-0">›</button>
-
-                        <div data-lightbox-target="counter"
-                             aria-live="polite"
-                             class="absolute bottom-3 left-1/2 -translate-x-1/2 text-white text-sm bg-black/40 rounded-full px-3 py-1"></div>
-                    </div>
-                    <form method="dialog" class="modal-backdrop"><button>close</button></form>
-                </dialog>
-            </div>
-            {% if capHit %}
-                <p class="text-sm text-warning">
-                    Showing the first 200 photos in this window. Narrow your time range to see others.
+                <p class="text-sm text-base-content/70">
+                    Showing
+                    <time data-testid="timestamp" datetime="{{ timestamp|date('c') }}">{{ timestamp|date('H:i', event.timezone) }}</time>
+                    · Window: <span data-testid="window">−{{ windowBefore }} / +{{ windowAfter }}</span> min
+                    · <span data-testid="photo-count">{{ photos|length }} of {{ totalReady }}</span> photo{{ totalReady == 1 ? '' : 's' }}
+                </p>
+            {% else %}
+                <p class="text-sm text-base-content/70">
+                    <span data-testid="photo-count">{{ photos|length }}</span> matching photo{{ photos|length == 1 ? '' : 's' }}
                 </p>
             {% endif %}
-        {% endif %}
+        </header>
+
+        {% include 'public/event/_photo_grid.html.twig' %}
 
         <p>
             <a href="{{ path('public_event_landing', {slug: event.slug}) }}" class="btn btn-ghost btn-sm">

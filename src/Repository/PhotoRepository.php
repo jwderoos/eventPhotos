@@ -6,10 +6,14 @@ namespace App\Repository;
 
 use App\Entity\Event;
 use App\Entity\Photo;
+use App\Entity\PhotoAttribute;
+use App\Entity\PhotoAttributeType;
 use App\Entity\PhotoStatus;
+use App\Repository\Filter\PhotoAttributeFilter;
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\Query\Expr\Join;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -44,6 +48,65 @@ final class PhotoRepository extends ServiceEntityRepository
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
+
+        return $result;
+    }
+
+    /**
+     * Filtered gallery search over allowlisted tags. Each active dimension is an
+     * inner join on `photo_attributes`; values within a dimension are OR-ed
+     * (`IN`), dimensions are AND-ed. Spans the whole event timeline (not a
+     * time window) — search is a "find me" query, not a browse.
+     *
+     * @return list<Photo>
+     */
+    public function searchReady(Event $event, PhotoAttributeFilter $filter, int $limit): array
+    {
+        $qb = $this->createQueryBuilder('p')
+            ->distinct()
+            ->andWhere('p.event = :event')
+            ->andWhere('p.status = :status')
+            ->setParameter('event', $event)
+            ->setParameter('status', PhotoStatus::Ready)
+            ->orderBy('p.takenAt', 'ASC')
+            ->addOrderBy('p.id', 'ASC')
+            ->setMaxResults($limit);
+
+        if ($filter->colours !== []) {
+            $qb->innerJoin(
+                PhotoAttribute::class,
+                'pac',
+                Join::WITH,
+                'pac.photo = p AND pac.type = :colourType AND pac.value IN (:colours)',
+            )
+                ->setParameter('colourType', PhotoAttributeType::ClothingColor)
+                ->setParameter('colours', $filter->colours);
+        }
+
+        if ($filter->garments !== []) {
+            $qb->innerJoin(
+                PhotoAttribute::class,
+                'pag',
+                Join::WITH,
+                'pag.photo = p AND pag.type = :garmentType AND pag.value IN (:garments)',
+            )
+                ->setParameter('garmentType', PhotoAttributeType::ClothingType)
+                ->setParameter('garments', $filter->garments);
+        }
+
+        if ($filter->bib !== null) {
+            $qb->innerJoin(
+                PhotoAttribute::class,
+                'pab',
+                Join::WITH,
+                'pab.photo = p AND pab.type = :bibType AND pab.value = :bib',
+            )
+                ->setParameter('bibType', PhotoAttributeType::Bib)
+                ->setParameter('bib', $filter->bib);
+        }
+
+        /** @var list<Photo> $result */
+        $result = $qb->getQuery()->getResult();
 
         return $result;
     }

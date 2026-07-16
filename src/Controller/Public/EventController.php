@@ -9,11 +9,13 @@ use App\Entity\EventDisplayState;
 use App\Entity\Photo;
 use App\Entity\PhotoStatus;
 use App\Repository\EventRepository;
+use App\Repository\Filter\PhotoAttributeFilter;
 use App\Repository\OrganizerProfileRepository;
 use App\Repository\PhotoRepository;
 use App\Service\Brand\BrandResolver;
 use App\Service\Event\PhotosUrlBuilder;
 use App\Service\Mail\OrganizerMailerResolver;
+use App\Service\Photo\AttributeVocabulary;
 use App\Service\QrCodeRenderer;
 use App\Service\Style\StyleResolver;
 use DateTimeImmutable;
@@ -95,6 +97,11 @@ final class EventController extends AbstractController
             throw new BadRequestHttpException('Window is no longer configurable per request.');
         }
 
+        $filter = $this->buildFilter($request, $event);
+        if (!$filter->isEmpty()) {
+            return $this->renderSearch($event, $filter, $request);
+        }
+
         $timestamp = $this->resolveTimestamp($request->query->get('t'), $event);
 
         if (!$timestamp instanceof DateTimeImmutable) {
@@ -163,20 +170,100 @@ final class EventController extends AbstractController
         $firstRank = $photos === [] ? null : $this->photos->countReadyBefore($photos[0]) + 1;
 
         return $this->render('public/event/photos.html.twig', [
-            'event'         => $event,
-            'timestamp'     => $timestamp,
-            'windowBefore'  => Event::WINDOW_BEFORE_MINUTES,
-            'windowAfter'   => Event::WINDOW_AFTER_MINUTES,
-            'photos'        => $photos,
-            'capHit'        => count($photos) === self::HARD_CAP,
-            'firstAt'       => $firstAt,
-            'lastAt'        => $lastAt,
-            'prevAt'        => $prevAt,
-            'nextAt'        => $nextAt,
-            'totalReady'    => $totalReady,
-            'firstRank'     => $firstRank,
-            'resolvedStyle' => $this->styleResolver->resolve($event),
-            'brand'         => $this->brandResolver->resolve($event),
+            'event'            => $event,
+            'timestamp'        => $timestamp,
+            'windowBefore'     => Event::WINDOW_BEFORE_MINUTES,
+            'windowAfter'      => Event::WINDOW_AFTER_MINUTES,
+            'photos'           => $photos,
+            'capHit'           => count($photos) === self::HARD_CAP,
+            'firstAt'          => $firstAt,
+            'lastAt'           => $lastAt,
+            'prevAt'           => $prevAt,
+            'nextAt'           => $nextAt,
+            'totalReady'       => $totalReady,
+            'firstRank'        => $firstRank,
+            'resolvedStyle'    => $this->styleResolver->resolve($event),
+            'brand'            => $this->brandResolver->resolve($event),
+            'searchMode'       => false,
+            'filter'           => new PhotoAttributeFilter(),
+            'bibSearchEnabled' => $event->isBibIndexingEnabled(),
+            'allowedColours'   => AttributeVocabulary::COLORS,
+            'allowedGarments'  => AttributeVocabulary::GARMENTS,
+        ], $response);
+    }
+
+    private function buildFilter(Request $request, Event $event): PhotoAttributeFilter
+    {
+        $colours  = $this->allowedValues($request->query->all('colour'), AttributeVocabulary::COLORS);
+        $garments = $this->allowedValues($request->query->all('garment'), AttributeVocabulary::GARMENTS);
+
+        $bib = null;
+        if ($event->isBibIndexingEnabled()) {
+            $raw = trim((string) $request->query->get('bib', ''));
+            if ($raw !== '') {
+                $bib = $raw;
+            }
+        }
+
+        return new PhotoAttributeFilter($colours, $garments, $bib);
+    }
+
+    /**
+     * @param  array<int|string, mixed> $requested
+     * @param  list<string>             $allowed
+     * @return list<string>
+     */
+    private function allowedValues(array $requested, array $allowed): array
+    {
+        $clean = [];
+        foreach ($requested as $value) {
+            if (is_string($value) && in_array($value, $allowed, true) && !in_array($value, $clean, true)) {
+                $clean[] = $value;
+            }
+        }
+
+        return $clean;
+    }
+
+    private function renderSearch(Event $event, PhotoAttributeFilter $filter, Request $request): Response
+    {
+        $lastUpdatedAt = $this->photos->lastReadyUpdatedAtForEvent($event);
+        $readyCount    = $this->photos->countReady($event);
+        $etag          = sha1(sprintf(
+            '%d|search|%s|%s|%s|%s|%d',
+            (int) $event->getId(),
+            implode(',', $filter->colours),
+            implode(',', $filter->garments),
+            $filter->bib ?? '-',
+            $lastUpdatedAt instanceof DateTimeImmutable ? $lastUpdatedAt->format('U.u') : '-',
+            $readyCount,
+        ));
+
+        $response = new Response();
+        $response->setEtag($etag);
+        $response->setPublic();
+        $response->setMaxAge(0);
+        $response->headers->addCacheControlDirective('must-revalidate');
+
+        if ($response->isNotModified($request)) {
+            return $response;
+        }
+
+        $photos = $this->photos->searchReady($event, $filter, self::HARD_CAP);
+
+        return $this->render('public/event/photos.html.twig', [
+            'event'            => $event,
+            'searchMode'       => true,
+            'filter'           => $filter,
+            'photos'           => $photos,
+            'capHit'           => count($photos) === self::HARD_CAP,
+            'firstRank'        => 1,
+            'totalReady'       => count($photos),
+            'bibSearchEnabled' => $event->isBibIndexingEnabled(),
+            'allowedColours'   => AttributeVocabulary::COLORS,
+            'allowedGarments'  => AttributeVocabulary::GARMENTS,
+            'resolvedStyle'    => $this->styleResolver->resolve($event),
+            'brand'            => $this->brandResolver->resolve($event),
         ], $response);
     }
 
