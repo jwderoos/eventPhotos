@@ -12,6 +12,10 @@ final readonly class AttributeExtractorClient implements AttributeExtractorClien
 {
     private const int HTTP_OK = 200;
 
+    // Mirrors the PhotoAttribute.value column length (64) so an over-long
+    // value can never cause a DB truncation error / batch rollback downstream.
+    private const int MAX_VALUE_LENGTH = 64;
+
     public function __construct(
         #[Autowire(service: 'inference.client')]
         private HttpClientInterface $inferenceClient,
@@ -71,6 +75,10 @@ final readonly class AttributeExtractorClient implements AttributeExtractorClien
             }
 
             if (!is_int($confidence) && !is_float($confidence)) {
+                continue;
+            }
+
+            if (mb_strlen($value) > self::MAX_VALUE_LENGTH) {
                 continue;
             }
 

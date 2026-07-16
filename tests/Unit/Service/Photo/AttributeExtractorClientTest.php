@@ -74,4 +74,26 @@ final class AttributeExtractorClientTest extends TestCase
         $this->assertSame(['blue'], array_map(fn (AttributeScore $s): string => $s->value, $result->clothingColors));
         $this->assertSame([], $result->bibs);
     }
+
+    public function testOverLongValuesAreSkipped(): void
+    {
+        // A bib value longer than the PhotoAttribute.value column (64 chars)
+        // must be dropped rather than persisted, to avoid a DB truncation
+        // error / batch rollback downstream.
+        $json = json_encode([
+            'bibs' => [
+                ['value' => str_repeat('9', 65), 'confidence' => 0.95],
+                ['value' => '1423', 'confidence' => 0.9],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $http = new MockHttpClient(new MockResponse($json, [
+            'response_headers' => ['content-type' => 'application/json'],
+        ]));
+        $client = new AttributeExtractorClient($http);
+
+        $result = $client->extract('bytes');
+
+        $this->assertSame(['1423'], array_map(fn (AttributeScore $s): string => $s->value, $result->bibs));
+    }
 }

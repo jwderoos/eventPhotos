@@ -9,6 +9,7 @@ use App\Entity\Event;
 use App\Entity\Photo;
 use App\Entity\PhotoStatus;
 use App\Entity\User;
+use App\Message\ExtractPhotoAttributes;
 use App\Message\ProcessPhoto;
 use App\MessageHandler\ProcessPhotoHandler;
 use DateTimeImmutable;
@@ -16,6 +17,8 @@ use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
 use League\Flysystem\FilesystemOperator;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class ProcessPhotoHandlerTest extends KernelTestCase
 {
@@ -204,6 +207,28 @@ final class ProcessPhotoHandlerTest extends KernelTestCase
         $this->expectNotToPerformAssertions();
 
         ($this->handler)(new ProcessPhoto(999999));
+    }
+
+    public function testDispatchesAttributeExtractionAfterReady(): void
+    {
+        $photo = $this->seedPending('with-datetime-original.jpg', 'ex');
+
+        ($this->handler)(new ProcessPhoto($photo->getId() ?? 0));
+
+        /** @var InMemoryTransport $transport */
+        $transport = self::getContainer()->get('messenger.transport.async');
+        $messages  = array_map(
+            static fn (Envelope $e): object => $e->getMessage(),
+            $transport->getSent(),
+        );
+
+        $extraction = array_values(array_filter(
+            $messages,
+            static fn (object $m): bool => $m instanceof ExtractPhotoAttributes,
+        ));
+
+        $this->assertCount(1, $extraction);
+        $this->assertSame($photo->getId(), $extraction[0]->photoId);
     }
 
     public function testReingestSkipsWindowGuardAndRegenerates(): void

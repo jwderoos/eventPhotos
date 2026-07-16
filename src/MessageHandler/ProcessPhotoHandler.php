@@ -7,6 +7,7 @@ namespace App\MessageHandler;
 use RuntimeException;
 use App\Entity\Event;
 use App\Entity\PhotoStatus;
+use App\Message\ExtractPhotoAttributes;
 use App\Message\ProcessPhoto;
 use App\Repository\PhotoRepository;
 use App\Service\Photo\DerivativeGenerator;
@@ -20,6 +21,7 @@ use League\Flysystem\FilesystemOperator;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 #[AsMessageHandler]
 final readonly class ProcessPhotoHandler
@@ -33,6 +35,7 @@ final readonly class ProcessPhotoHandler
         #[Autowire(service: 'photo_originals_storage')]
         private FilesystemOperator $originals,
         private LoggerInterface $logger,
+        private MessageBusInterface $bus,
     ) {
     }
 
@@ -71,6 +74,10 @@ final readonly class ProcessPhotoHandler
             $photo->markReady($takenAt, $width, $height, $derivativeBytes);
             $this->em->flush();
             $this->maybeDeleteOriginal($event, $path, (int) $photo->getId());
+            // The photo is Ready and its preview derivative exists — extract searchable
+            // attributes asynchronously. Re-ingest re-enters this path, so tags are
+            // recomputed each time (the handler replaces prior tags idempotently).
+            $this->bus->dispatch(new ExtractPhotoAttributes((int) $photo->getId()));
         } catch (PhotoRejected $photoRejected) {
             $photo->markFailed($photoRejected->getMessage());
             $this->em->flush();

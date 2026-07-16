@@ -6,8 +6,12 @@ namespace App\Tests\Functional\Admin;
 
 use App\Entity\BibSuppression;
 use App\Entity\Event;
+use App\Entity\Photo;
+use App\Entity\PhotoAttribute;
+use App\Entity\PhotoAttributeType;
 use App\Entity\User;
 use App\Repository\BibSuppressionRepository;
+use App\Repository\PhotoAttributeRepository;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -126,5 +130,33 @@ final class BibSuppressionActionTest extends WebTestCase
             ->getQuery()
             ->getSingleScalarResult();
         $this->assertSame(1, $count);
+    }
+
+    public function testSuppressBibDeletesStoredBibTags(): void
+    {
+        [$user, $event] = $this->makeOrganizerWithEvent();
+
+        $photo = new Photo($event, str_pad('c1', 64, '0'), 'p.jpg', 1000);
+        $this->em->persist($photo);
+        $this->em->flush();
+
+        $this->em->persist(new PhotoAttribute($photo, PhotoAttributeType::Bib, '1423', 0.99));
+        $this->em->persist(new PhotoAttribute($photo, PhotoAttributeType::ClothingColor, 'orange', 0.9));
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $token = $this->primeCsrfToken('suppress_bib_' . $event->getId());
+
+        $this->client->request(Request::METHOD_POST, '/admin/events/' . $event->getId() . '/bib-suppressions', [
+            'bibNumber' => '1423',
+            '_token'    => $token,
+        ]);
+
+        self::assertResponseRedirects();
+
+        /** @var PhotoAttributeRepository $repo */
+        $repo = self::getContainer()->get(PhotoAttributeRepository::class);
+        $this->assertSame([], $repo->findBy(['type' => PhotoAttributeType::Bib, 'value' => '1423']));
+        $this->assertCount(1, $repo->findBy(['type' => PhotoAttributeType::ClothingColor, 'value' => 'orange']));
     }
 }

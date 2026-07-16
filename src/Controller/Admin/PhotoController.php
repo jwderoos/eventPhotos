@@ -14,6 +14,7 @@ use App\Entity\Photo;
 use App\Entity\PhotoStatus;
 use App\Message\ProcessPhoto;
 use App\Repository\BibSuppressionRepository;
+use App\Repository\PhotoAttributeRepository;
 use App\Repository\PhotoRepository;
 use App\Security\Voter\EventVoter;
 use App\Security\Voter\PhotoVoter;
@@ -46,6 +47,7 @@ final class PhotoController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly PhotoRepository $photos,
         private readonly BibSuppressionRepository $bibSuppressions,
+        private readonly PhotoAttributeRepository $photoAttributes,
         private readonly MessageBusInterface $bus,
         #[Autowire(service: 'photo_originals_storage')]
         private readonly FilesystemOperator $originals,
@@ -352,7 +354,11 @@ final class PhotoController extends AbstractController
             return $this->redirectToRoute('admin_photo_grid', ['id' => $event->getId()]);
         }
 
-        // Plan C extends this action to also delete matching bib PhotoAttribute rows.
+        // Plan C: delete every already-stored bib PhotoAttribute row event-wide so the
+        // bib disappears from search immediately (not just on the next re-ingest). The
+        // BibSuppression insert below (Plan A) blocks any future re-add on re-ingest.
+        $this->photoAttributes->deleteBibForEvent($event, $bibNumber);
+
         if (!$this->bibSuppressions->isSuppressed($event, $bibNumber)) {
             $this->em->persist(new BibSuppression($event, $bibNumber));
             $this->em->flush();
