@@ -284,10 +284,18 @@ final class PhotoController extends AbstractController
         $ready = $this->photos->findBy(['event' => $event, 'status' => PhotoStatus::Ready]);
         foreach ($ready as $photo) {
             $photo->resetForReingest();
+        }
+
+        // Commit every status→Pending BEFORE dispatching. The Doctrine transport
+        // makes a message consumable the instant it is dispatched; if a worker
+        // reads the row before this flush commits, it sees the stale Ready status
+        // and the handler no-ops, stranding the photo in Pending forever (#109).
+        $this->em->flush();
+
+        foreach ($ready as $photo) {
             $this->bus->dispatch(new ProcessPhoto((int) $photo->getId(), reingest: true));
         }
 
-        $this->em->flush();
         $this->audit->set('reingested_count', count($ready));
         $this->addFlash('success', sprintf('Re-ingesting %d photos.', count($ready)));
 
@@ -323,8 +331,10 @@ final class PhotoController extends AbstractController
         }
 
         $photo->resetForReingest();
-        $this->bus->dispatch(new ProcessPhoto($photoId, reingest: true));
+        // Flush before dispatch so the Pending transition is committed before a
+        // worker can consume the message and no-op on stale status (#109).
         $this->em->flush();
+        $this->bus->dispatch(new ProcessPhoto($photoId, reingest: true));
 
         return $this->redirectToRoute('admin_photo_grid', $target);
     }
@@ -402,10 +412,12 @@ final class PhotoController extends AbstractController
         }
 
         $photo->resetForRetry();
+        // Flush before dispatch so the Pending transition is committed before a
+        // worker can consume the message and no-op on stale status (#109).
+        $this->em->flush();
         // Fresh ingest attempt (reingest: false) so the ingest window guard applies — the
         // organizer typically widens the event window before retrying a window rejection.
         $this->bus->dispatch(new ProcessPhoto($photoId));
-        $this->em->flush();
 
         return $this->redirectToRoute('admin_photo_grid', $target);
     }

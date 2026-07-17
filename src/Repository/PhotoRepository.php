@@ -313,6 +313,32 @@ final class PhotoRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    /**
+     * Photos stranded in Pending — used by app:photo:reprocess-pending to
+     * re-dispatch a fresh ingest. Bounded by $updatedBefore so an operator can
+     * exclude uploads still legitimately in flight (whose message still exists).
+     *
+     * @return list<Photo>
+     */
+    public function findStalePending(DateTimeImmutable $updatedBefore, ?Event $event = null): array
+    {
+        $qb = $this->createQueryBuilder('p')
+            ->andWhere('p.status = :pending')
+            ->andWhere('p.updatedAt <= :cutoff')
+            ->setParameter('pending', PhotoStatus::Pending)
+            ->setParameter('cutoff', $updatedBefore)
+            ->orderBy('p.id', 'ASC');
+
+        if ($event instanceof Event) {
+            $qb->andWhere('p.event = :event')->setParameter('event', $event);
+        }
+
+        /** @var list<Photo> $result */
+        $result = $qb->getQuery()->getResult();
+
+        return $result;
+    }
+
     public function deleteAllForEvent(Event $event): int
     {
         $deleted = $this->createQueryBuilder('p')

@@ -21,3 +21,7 @@ when@test:
         messenger:
             transports:
                 async: 'in-memory://'
+            buses:
+                messenger.bus.default:
+                    middleware:
+                        - 'App\Tests\Fake\ProcessPhotoStatusProbe'

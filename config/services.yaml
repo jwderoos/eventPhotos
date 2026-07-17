@@ -65,6 +65,9 @@ when@test:
             arguments:
                 $requestStack: '@request_stack'
 
+        App\Tests\Fake\ProcessPhotoStatusProbe:
+            public: true
+
         App\Service\Auth\GoogleOAuthClient:
             alias: App\Tests\Fake\FakeGoogleOAuthClient
             public: true
