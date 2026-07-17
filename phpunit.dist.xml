@@ -42,5 +42,7 @@
     </source>
 
     <extensions>
+        <bootstrap class="App\Tests\Bootstrap\SchemaRebuildExtension"/>
+        <bootstrap class="DAMA\DoctrineTestBundle\PHPUnit\PHPUnitExtension"/>
     </extensions>
 </phpunit>

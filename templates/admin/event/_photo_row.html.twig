@@ -38,10 +38,15 @@
             ready: 'success',
             pending: 'info',
             failed: 'error',
-        }[photo.status.value] ?? 'ghost' }}"
-              {% if photo.processingError %}title="{{ photo.processingError }}"{% endif %}>
+        }[photo.status.value] ?? 'ghost' }}">
             {{ photo.status.value }}
         </span>
+        {% if photo.status.value == 'failed' and photo.processingError %}
+            <p data-role="ingest-error"
+               class="mt-1 max-w-xs whitespace-normal text-xs text-error">
+                {{ photo.processingError }}
+            </p>
+        {% endif %}
     </td>
     <td class="text-right">
         <div class="inline-flex items-center gap-1">
@@ -58,6 +63,15 @@
                     <input type="hidden" name="_token" value="{{ csrf_token('reingest_photo_' ~ photo.id) }}">
                     <input type="hidden" name="page" value="{{ page|default(1) }}">
                     <button class="btn btn-ghost btn-xs">Re-ingest</button>
+                </form>
+            {% endif %}
+            {% if event.retainOriginals and photo.status.value == 'failed' %}
+                <form method="post"
+                      action="{{ path('admin_photo_retry', {eventId: event.id, photoId: photo.id}) }}"
+                      class="inline">
+                    <input type="hidden" name="_token" value="{{ csrf_token('retry_photo_' ~ photo.id) }}">
+                    <input type="hidden" name="page" value="{{ page|default(1) }}">
+                    <button class="btn btn-ghost btn-xs text-warning">Retry</button>
                 </form>
             {% endif %}
             <form method="post"
