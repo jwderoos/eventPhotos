@@ -44,8 +44,9 @@ vendor/bin/phpcs                                  # PSR-12
 
 - Branch name must match `^(feature|hotfix|bugfix|release)/\d+-`. `main` / `develop` / `master` are blacklisted for direct commits.
 - Commit messages must contain a GitHub issue number (or be a merge from one of the prefixed branches).
-- `phpstan` level 10, `phpcs` PSR-12, `phpmnd` (no magic numbers in `src/`), `phpcpd` (50-line / 100-token duplication), `rector`, `securitychecker_roave`, and `doctrine:schema:validate` all gate commits.
+- `phpstan` level 10, `phpcs` PSR-12, `phpmnd` (no magic numbers in `src/`), `phpcpd` (50-line / 100-token duplication), `rector`, `securitychecker_roave`, `phpunit` (the full suite), and `doctrine:schema:validate` all gate commits.
 - CI workflow (`.github/workflows/ci.yml`) spins up Postgres 16, runs migrations against the test DB, then `grumphp run` with the same task list.
+- The `phpunit` gate is schema-deterministic: `App\Tests\Bootstrap\SchemaRebuildExtension` (registered in `phpunit.xml`) drops + recreates the `_test` database from migrations once, before the first test, so the schema always matches the code under test regardless of what branch last touched the local DB. `dama/doctrine-test-bundle` then wraps each test in a transaction. Set `SKIP_SCHEMA_REBUILD=1` to skip the rebuild for tight local `--filter` loops (GrumPHP/CI never set it). It lives in a PHPUnit extension, not `tests/bootstrap.php`, so process-isolated tests (`#[RunTestsInSeparateProcesses]`) don't re-fire it in a child process. See #116.
 
 ## Migrations
 
