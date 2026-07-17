@@ -31,19 +31,23 @@ final readonly class AttributeExtractorClient implements AttributeExtractorClien
             ]);
 
             if ($response->getStatusCode() !== self::HTTP_OK) {
-                return ExtractedAttributes::empty();
+                throw new AttributeExtractionUnavailable(
+                    sprintf('Inference returned HTTP %d', $response->getStatusCode()),
+                );
             }
 
             /** @var array<string, mixed> $data */
             $data = $response->toArray();
-        } catch (ExceptionInterface) {
-            return ExtractedAttributes::empty();
+        } catch (ExceptionInterface $exception) {
+            throw new AttributeExtractionUnavailable('Inference request failed', 0, $exception);
         }
 
-        // The mapping is defensive against a malformed-but-valid-JSON 200
-        // (e.g. an item missing "value" or a non-numeric "confidence"): such
-        // items are skipped rather than raising, so the "any service problem
-        // yields an empty, non-fatal result" contract holds for callers.
+        // Within a valid 200, the mapping is defensive about individual items
+        // (e.g. one missing "value" or a non-numeric "confidence"): such items
+        // are skipped rather than raising. Service-level problems (non-200,
+        // transport/timeout, undecodable body) are NOT masked — they throw
+        // AttributeExtractionUnavailable so the caller can retry rather than
+        // mistaking a failure for an empty (destructive-replace) result.
         return new ExtractedAttributes(
             $this->scores($data['clothing_colors'] ?? null, AttributeVocabulary::isColor(...)),
             $this->scores($data['clothing_types'] ?? null, AttributeVocabulary::isGarment(...)),

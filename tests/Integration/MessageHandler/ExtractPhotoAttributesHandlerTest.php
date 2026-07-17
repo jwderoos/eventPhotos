@@ -13,6 +13,7 @@ use App\Entity\User;
 use App\Message\ExtractPhotoAttributes;
 use App\MessageHandler\ExtractPhotoAttributesHandler;
 use App\Repository\PhotoAttributeRepository;
+use App\Service\Photo\AttributeExtractionUnavailable;
 use App\Service\Photo\AttributeScore;
 use App\Service\Photo\ExtractedAttributes;
 use App\Tests\Fake\FakeAttributeExtractorClient;
@@ -260,5 +261,36 @@ final class ExtractPhotoAttributesHandlerTest extends KernelTestCase
 
         $this->em->refresh($photo);
         $this->assertNotInstanceOf(DateTimeImmutable::class, $photo->getAttributesExtractedAt());
+    }
+
+    public function testExtractionFailurePreservesExistingTagsAndDoesNotMark(): void
+    {
+        $photo = $this->seedReadyPhoto('jj');
+
+        // Seed pre-existing tags directly (bypassing the handler) so the photo
+        // starts with a null attributesExtractedAt marker, matching the real
+        // "tagged once already, re-ingest kicks off a new extraction" scenario.
+        $this->em->persist(new PhotoAttribute($photo, PhotoAttributeType::ClothingColor, 'orange', 0.92));
+        $this->em->flush();
+        $this->assertSame(['orange'], $this->valuesOfType($photo, PhotoAttributeType::ClothingColor));
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $photo->getAttributesExtractedAt());
+
+        $this->client->throwOnNextExtract(new AttributeExtractionUnavailable('down'));
+
+        $threw = false;
+        try {
+            ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
+        } catch (AttributeExtractionUnavailable) {
+            $threw = true;
+        }
+
+        $this->assertTrue($threw, 'Handler must re-throw AttributeExtractionUnavailable.');
+
+        $this->em->clear();
+        /** @var Photo $refetched */
+        $refetched = $this->em->find(Photo::class, $photo->getId());
+
+        $this->assertSame(['orange'], $this->valuesOfType($refetched, PhotoAttributeType::ClothingColor));
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $refetched->getAttributesExtractedAt());
     }
 }

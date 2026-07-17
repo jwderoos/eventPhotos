@@ -12,6 +12,7 @@ use App\Message\ExtractPhotoAttributes;
 use App\Repository\BibSuppressionRepository;
 use App\Repository\PhotoAttributeRepository;
 use App\Repository\PhotoRepository;
+use App\Service\Photo\AttributeExtractionUnavailable;
 use App\Service\Photo\AttributeExtractorClientInterface;
 use App\Service\Photo\AttributeScore;
 use Doctrine\ORM\EntityManagerInterface;
@@ -66,7 +67,16 @@ final readonly class ExtractPhotoAttributesHandler
             return;
         }
 
-        $result = $this->client->extract($bytes);
+        try {
+            $result = $this->client->extract($bytes);
+        } catch (AttributeExtractionUnavailable $attributeExtractionUnavailable) {
+            $this->logger->warning('Attribute extraction unavailable; leaving photo untagged for retry.', [
+                'photoId'   => $photo->getId(),
+                'exception' => $attributeExtractionUnavailable,
+            ]);
+
+            throw $attributeExtractionUnavailable;
+        }
 
         // Idempotent replace: clear prior tags, then re-insert from the fresh result.
         $this->attributes->deleteForPhoto($photo);

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Photo;
 
+use App\Service\Photo\AttributeExtractionUnavailable;
 use App\Service\Photo\AttributeScore;
 use App\Service\Photo\AttributeExtractorClient;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -38,15 +40,26 @@ final class AttributeExtractorClientTest extends TestCase
         $this->assertEqualsWithDelta(0.95, $result->bibs[0]->confidence, 0.0001);
     }
 
-    public function testReturnsEmptyOnServerError(): void
+    public function testThrowsOnServerError(): void
     {
         $http = new MockHttpClient(new MockResponse('boom', ['http_code' => 500]));
         $client = new AttributeExtractorClient($http);
 
-        $result = $client->extract('bytes');
+        $this->expectException(AttributeExtractionUnavailable::class);
 
-        $this->assertSame([], $result->clothingColors);
-        $this->assertSame([], $result->bibs);
+        $client->extract('bytes');
+    }
+
+    public function testThrowsOnTransportError(): void
+    {
+        $http = new MockHttpClient(static function (): never {
+            throw new TransportException('boom');
+        });
+        $client = new AttributeExtractorClient($http);
+
+        $this->expectException(AttributeExtractionUnavailable::class);
+
+        $client->extract('bytes');
     }
 
     public function testMalformedItemsAreSkippedNotFatal(): void
