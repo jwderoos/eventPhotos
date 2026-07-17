@@ -202,6 +202,72 @@ final class PhotoRetryTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
     }
 
+    public function testRetryAllResetsFailedPhotosAndDispatchesFreshIngest(): void
+    {
+        $event   = $this->makeEvent(retainOriginals: true);
+        $failed1 = $this->addFailed($event, 'aa', 'boom');
+        $failed2 = $this->addFailed($event, 'bb', 'boom');
+        $ready   = $this->addReady($event, 'cc');
+
+        $token = $this->primeCsrfToken('retry_all_photos_' . $event->getId());
+        $this->client->request(
+            Request::METHOD_POST,
+            sprintf('/admin/events/%d/photos/retry-all', (int) $event->getId()),
+            ['_token' => $token],
+        );
+
+        self::assertResponseRedirects(sprintf('/admin/events/%d/photos-grid', (int) $event->getId()));
+
+        $this->em->clear();
+        /** @var Photo $reloaded1 */
+        $reloaded1 = $this->em->find(Photo::class, $failed1->getId());
+        /** @var Photo $reloaded2 */
+        $reloaded2 = $this->em->find(Photo::class, $failed2->getId());
+        /** @var Photo $reloadedReady */
+        $reloadedReady = $this->em->find(Photo::class, $ready->getId());
+        $this->assertSame(PhotoStatus::Pending, $reloaded1->getStatus());
+        $this->assertSame(PhotoStatus::Pending, $reloaded2->getStatus());
+        $this->assertSame(PhotoStatus::Ready, $reloadedReady->getStatus(), 'Only Failed photos are retried.');
+
+        $messages = $this->dispatched();
+        $this->assertCount(2, $messages, 'Only the two Failed photos are re-dispatched.');
+        foreach ($messages as $m) {
+            $this->assertFalse($m->reingest, 'Bulk retry is a fresh ingest attempt (reingest: false).');
+        }
+    }
+
+    public function testRetryAllRefusedWhenNotRetainingOriginals(): void
+    {
+        $event  = $this->makeEvent(retainOriginals: false);
+        $failed = $this->addFailed($event, 'aa', 'boom');
+
+        $token = $this->primeCsrfToken('retry_all_photos_' . $event->getId());
+        $this->client->request(
+            Request::METHOD_POST,
+            sprintf('/admin/events/%d/photos/retry-all', (int) $event->getId()),
+            ['_token' => $token],
+        );
+
+        self::assertResponseRedirects(sprintf('/admin/events/%d/photos-grid', (int) $event->getId()));
+        $this->em->clear();
+        /** @var Photo $reloaded */
+        $reloaded = $this->em->find(Photo::class, $failed->getId());
+        $this->assertSame(PhotoStatus::Failed, $reloaded->getStatus());
+        $this->assertCount(0, $this->dispatched());
+    }
+
+    public function testRetryAllRejectsMissingCsrf(): void
+    {
+        $event = $this->makeEvent(retainOriginals: true);
+
+        $this->client->request(
+            Request::METHOD_POST,
+            sprintf('/admin/events/%d/photos/retry-all', (int) $event->getId()),
+        );
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
     public function testFailedPhotoShowsErrorMessageInGrid(): void
     {
         $event = $this->makeEvent(retainOriginals: false);
@@ -218,6 +284,34 @@ final class PhotoRetryTest extends WebTestCase
             '[data-role="ingest-error"]',
             'EXIF DateTimeOriginal is missing (no EXIF data found).',
         );
+    }
+
+    public function testRetryAllButtonShownWhenRetainingAndFailedExist(): void
+    {
+        $event = $this->makeEvent(retainOriginals: true);
+        $this->addFailed($event, 'aa', 'boom');
+
+        $this->client->request(
+            Request::METHOD_GET,
+            sprintf('/admin/events/%d/photos-grid', (int) $event->getId()),
+        );
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('form[action$="/photos/retry-all"]');
+    }
+
+    public function testRetryAllButtonHiddenWhenNoFailedPhotos(): void
+    {
+        $event = $this->makeEvent(retainOriginals: true);
+        $this->addReady($event, 'aa');
+
+        $this->client->request(
+            Request::METHOD_GET,
+            sprintf('/admin/events/%d/photos-grid', (int) $event->getId()),
+        );
+
+        self::assertResponseIsSuccessful();
+        $this->assertStringNotContainsString('/retry-all', (string) $this->client->getResponse()->getContent());
     }
 
     public function testRetryButtonShownForFailedPhotoWhenRetaining(): void

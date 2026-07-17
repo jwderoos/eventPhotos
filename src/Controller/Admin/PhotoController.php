@@ -198,6 +198,7 @@ final class PhotoController extends AbstractController
             'page'            => $page,
             'perPage'         => self::PER_PAGE,
             'hasStalePending' => $hasStalePending,
+            'failedCount'     => $this->photos->countByStatus($event, PhotoStatus::Failed),
         ]);
     }
 
@@ -420,6 +421,51 @@ final class PhotoController extends AbstractController
         $this->bus->dispatch(new ProcessPhoto($photoId));
 
         return $this->redirectToRoute('admin_photo_grid', $target);
+    }
+
+    #[Route(
+        '/admin/events/{id}/photos/retry-all',
+        name: 'admin_photo_retry_all',
+        requirements: ['id' => '\d+'],
+        methods: ['POST'],
+    )]
+    #[Audited(AuditAction::PhotoRetryAll, targetParam: 'id', targetType: 'Event')]
+    public function retryAll(Event $event, Request $request): RedirectResponse
+    {
+        $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
+        $this->assertCsrf($request, 'retry_all_photos_' . $event->getId());
+
+        $eventId = (int) $event->getId();
+
+        // Same retain-originals gate as single retry: a failed photo's original is
+        // deleted at failure time unless originals are retained, so there is nothing
+        // to retry from otherwise.
+        if (!$event->isRetainOriginals()) {
+            $this->addFlash('error', 'Retry is unavailable: this event does not retain originals.');
+
+            return $this->redirectToRoute('admin_photo_grid', ['id' => $eventId]);
+        }
+
+        /** @var list<Photo> $failed */
+        $failed = $this->photos->findBy(['event' => $event, 'status' => PhotoStatus::Failed]);
+        foreach ($failed as $photo) {
+            $photo->resetForRetry();
+        }
+
+        // Commit every status→Pending BEFORE dispatching, or a worker consumes the
+        // message, sees the stale Failed status and no-ops, stranding it (#109).
+        $this->em->flush();
+
+        foreach ($failed as $photo) {
+            // Fresh ingest (reingest: false) so the window guard re-applies, mirroring single retry.
+            $this->bus->dispatch(new ProcessPhoto((int) $photo->getId()));
+        }
+
+        $count = count($failed);
+        $this->audit->set('retried_count', $count);
+        $this->addFlash('success', sprintf('Retrying %d failed photo%s.', $count, $count === 1 ? '' : 's'));
+
+        return $this->redirectToRoute('admin_photo_grid', ['id' => $eventId]);
     }
 
     private function loadOrThrow(int $eventId, int $photoId): Photo

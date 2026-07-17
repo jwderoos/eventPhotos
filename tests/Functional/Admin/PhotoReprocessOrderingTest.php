@@ -162,6 +162,31 @@ final class PhotoReprocessOrderingTest extends WebTestCase
         );
     }
 
+    public function testRetryAllCommitsPendingBeforeDispatch(): void
+    {
+        $event = $this->makeEvent();
+        $f1    = $this->addFailed($event, 'ee');
+        $f2    = $this->addFailed($event, 'ff');
+        $id1   = (int) $f1->getId();
+        $id2   = (int) $f2->getId();
+
+        $token = $this->primeCsrfToken('retry_all_photos_' . $event->getId());
+        $this->client->request(
+            Request::METHOD_POST,
+            sprintf('/admin/events/%d/photos/retry-all', (int) $event->getId()),
+            ['_token' => $token],
+        );
+
+        self::assertResponseRedirects();
+        $probe = $this->probe();
+        $this->assertSame(
+            'pending',
+            $probe->statusAtDispatch[$id1] ?? null,
+            'retryAll must flush every status→Pending before dispatching any ProcessPhoto.',
+        );
+        $this->assertSame('pending', $probe->statusAtDispatch[$id2] ?? null);
+    }
+
     public function testReingestAllCommitsPendingBeforeDispatch(): void
     {
         $event  = $this->makeEvent();

@@ -24,6 +24,7 @@ enum AuditAction: string
     case PhotoReingest = 'photo.reingest';
     case PhotoReingestAll = 'photo.reingest_all';
     case PhotoRetry = 'photo.retry';
+    case PhotoRetryAll = 'photo.retry_all';
 
     case UserCreate = 'user.create';
     case UserEdit = 'user.edit';

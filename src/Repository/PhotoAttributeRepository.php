@@ -32,6 +32,51 @@ final class PhotoAttributeRepository extends ServiceEntityRepository
         return $result;
     }
 
+    /**
+     * Per-value tag counts for one event's photos, for the admin tag overview.
+     * Counts distinct photos per (type, value) so a photo tagged the same value
+     * twice never double-counts. Ordered by type, then most-common first.
+     *
+     * @return list<array{type: string, value: string, count: int}>
+     */
+    public function aggregateForEvent(Event $event): array
+    {
+        /** @var list<array{type: mixed, value: mixed, count: mixed}> $rows */
+        $rows = $this->createQueryBuilder('a')
+            ->select('a.type AS type', 'a.value AS value', 'COUNT(DISTINCT IDENTITY(a.photo)) AS count')
+            ->innerJoin('a.photo', 'p')
+            ->andWhere('p.event = :event')
+            ->setParameter('event', $event)
+            ->groupBy('a.type')
+            ->addGroupBy('a.value')
+            ->orderBy('a.type', 'ASC')
+            ->addOrderBy('count', 'DESC')
+            ->addOrderBy('a.value', 'ASC')
+            ->getQuery()
+            ->getArrayResult();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $type  = $row['type'];
+            $value = $row['value'];
+            $count = $row['count'];
+
+            if ($type instanceof PhotoAttributeType) {
+                $typeValue = $type->value;
+            } else {
+                $typeValue = is_scalar($type) ? (string) $type : '';
+            }
+
+            $result[] = [
+                'type'  => $typeValue,
+                'value' => is_scalar($value) ? (string) $value : '',
+                'count' => is_numeric($count) ? (int) $count : 0,
+            ];
+        }
+
+        return $result;
+    }
+
     public function deleteForPhoto(Photo $photo): void
     {
         $this->getEntityManager()

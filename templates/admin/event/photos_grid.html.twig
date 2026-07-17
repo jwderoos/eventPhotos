@@ -72,6 +72,17 @@
 
     {% if total > 0 %}
         <div class="mt-6 flex items-center justify-end gap-2 border-t border-base-300 pt-4">
+            {% if event.retainOriginals and failedCount > 0 %}
+                <form method="post"
+                      action="{{ path('admin_photo_retry_all', {id: event.id}) }}"
+                      onsubmit="return confirm('Retry all {{ failedCount }} failed photo{{ failedCount != 1 ? 's' : '' }}? Each is re-ingested from its original and the ingest window guard re-applies.');"
+                      class="inline">
+                    <input type="hidden" name="_token" value="{{ csrf_token('retry_all_photos_' ~ event.id) }}">
+                    <button type="submit" class="btn btn-outline btn-warning btn-sm">
+                        Retry all failed ({{ failedCount }})
+                    </button>
+                </form>
+            {% endif %}
             {% if event.retainOriginals %}
                 <form method="post"
                       action="{{ path('admin_photo_reingest_all', {id: event.id}) }}"

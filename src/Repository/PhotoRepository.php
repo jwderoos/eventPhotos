@@ -339,6 +339,18 @@ final class PhotoRepository extends ServiceEntityRepository
         return $result;
     }
 
+    public function countByStatus(Event $event, PhotoStatus $status): int
+    {
+        return (int) $this->createQueryBuilder('p')
+            ->select('COUNT(p.id)')
+            ->andWhere('p.event = :event')
+            ->andWhere('p.status = :status')
+            ->setParameter('event', $event)
+            ->setParameter('status', $status)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function deleteAllForEvent(Event $event): int
     {
         $deleted = $this->createQueryBuilder('p')
