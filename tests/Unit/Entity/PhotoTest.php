@@ -107,6 +107,61 @@ final class PhotoTest extends TestCase
         $photo->resetForReingest();
     }
 
+    public function testNewReadyPhotoIsTaggingPending(): void
+    {
+        $photo = $this->readyPhoto();
+
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $photo->getAttributesExtractedAt());
+        $this->assertTrue($photo->isTaggingPending());
+    }
+
+    public function testMarkAttributesExtractedSetsMarkerAndClearsPending(): void
+    {
+        $photo = $this->readyPhoto();
+        $photo->markAttributesExtracted();
+
+        $this->assertInstanceOf(DateTimeImmutable::class, $photo->getAttributesExtractedAt());
+        $this->assertFalse($photo->isTaggingPending());
+    }
+
+    public function testPendingAndFailedAreNotTaggingPending(): void
+    {
+        $pending = $this->makePhoto();
+        $this->assertFalse($pending->isTaggingPending());
+
+        $failed = $this->makePhoto();
+        $failed->markFailed('boom');
+        $this->assertFalse($failed->isTaggingPending());
+    }
+
+    public function testResetForReingestClearsMarker(): void
+    {
+        $photo = $this->readyPhoto();
+        $photo->markAttributesExtracted();
+        $photo->resetForReingest();
+
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $photo->getAttributesExtractedAt());
+        $this->assertSame(PhotoStatus::Pending, $photo->getStatus());
+    }
+
+    public function testResetForRetryClearsMarker(): void
+    {
+        $photo = $this->makePhoto();
+        $photo->markFailed('boom');
+        $photo->markAttributesExtracted();
+        $photo->resetForRetry();
+
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $photo->getAttributesExtractedAt());
+    }
+
+    private function readyPhoto(): Photo
+    {
+        $photo = $this->makePhoto();
+        $photo->markReady(new DateTimeImmutable('2026-06-10 12:00:00'), 100, 100, 2048);
+
+        return $photo;
+    }
+
     private function makePhoto(): Photo
     {
         $owner = new User('owner@example.test', 'Owner');

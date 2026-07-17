@@ -92,6 +92,9 @@ final readonly class ExtractPhotoAttributesHandler
         }
 
         $this->em->flush();
+
+        $photo->markAttributesExtracted();
+        $this->em->flush();
     }
 
     private function bibIsIndexable(Photo $photo, AttributeScore $attribute): bool

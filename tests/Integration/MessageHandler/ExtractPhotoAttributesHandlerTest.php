@@ -90,6 +90,22 @@ final class ExtractPhotoAttributesHandlerTest extends KernelTestCase
     }
 
     /**
+     * A Ready photo whose preview bytes were never written to the previews disk,
+     * so the handler's read() fails and it returns early.
+     */
+    private function seedReadyPhotoWithoutPreview(string $hash): Photo
+    {
+        $photo = new Photo($this->event, str_pad($hash, 64, '0'), 'p.jpg', 1000);
+        $this->em->persist($photo);
+        $this->em->flush();
+
+        $photo->markReady(new DateTimeImmutable('2026-06-10 10:30'), 1600, 1067, 500);
+        $this->em->flush();
+
+        return $photo;
+    }
+
+    /**
      * @param list<array{string,float}> $colors
      * @param list<array{string,float}> $bibs
      */
@@ -212,5 +228,37 @@ final class ExtractPhotoAttributesHandlerTest extends KernelTestCase
         // Re-ingest re-dispatches extraction; the same bib must NOT reappear.
         ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
         $this->assertSame([], $this->valuesOfType($photo, PhotoAttributeType::Bib));
+    }
+
+    public function testMarksAttributesExtractedOnSuccessWithTags(): void
+    {
+        $photo = $this->seedReadyPhoto('gg');
+        $this->client->setNext($this->response(colors: [['orange', 0.92]]));
+
+        ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
+
+        $this->em->refresh($photo);
+        $this->assertInstanceOf(DateTimeImmutable::class, $photo->getAttributesExtractedAt());
+    }
+
+    public function testMarksAttributesExtractedOnSuccessWithNoTags(): void
+    {
+        $photo = $this->seedReadyPhoto('hh');
+        $this->client->setNext(ExtractedAttributes::empty());
+
+        ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
+
+        $this->em->refresh($photo);
+        $this->assertInstanceOf(DateTimeImmutable::class, $photo->getAttributesExtractedAt());
+    }
+
+    public function testDoesNotMarkAttributesExtractedWhenPreviewMissing(): void
+    {
+        $photo = $this->seedReadyPhotoWithoutPreview('ii');
+
+        ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
+
+        $this->em->refresh($photo);
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $photo->getAttributesExtractedAt());
     }
 }

@@ -100,7 +100,7 @@ final class PhotoRepositoryTest extends KernelTestCase
         $this->assertCount(200, $result);
     }
 
-    private function createReady(string $takenAt): Photo
+    private function createReady(string $takenAt, bool $extracted = false): Photo
     {
         $photo = new Photo(
             event: $this->event,
@@ -109,6 +109,9 @@ final class PhotoRepositoryTest extends KernelTestCase
             byteSize: 100,
         );
         $photo->markReady(new DateTimeImmutable($takenAt, new DateTimeZone('UTC')), 100, 100, 1024);
+        if ($extracted) {
+            $photo->markAttributesExtracted();
+        }
 
         $this->em->persist($photo);
         return $photo;
@@ -318,6 +321,17 @@ final class PhotoRepositoryTest extends KernelTestCase
         $this->em->flush();
 
         $this->assertSame(2, $this->repo->countReady($this->event));
+    }
+
+    public function testCountTaggedCountsOnlyReadyExtracted(): void
+    {
+        $this->createReady('2026-06-10 12:00:00', extracted: true);
+        $this->createReady('2026-06-10 12:05:00', extracted: true);
+        $this->createReady('2026-06-10 12:10:00'); // ready, not yet tagged
+        $this->createPending();
+        $this->em->flush();
+
+        $this->assertSame(2, $this->repo->countTagged($this->event));
     }
 
     public function testCountForEventCountsAllStatuses(): void

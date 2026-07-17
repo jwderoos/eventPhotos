@@ -1,9 +1,20 @@
 <turbo-frame id="photos-grid">
+    {% if processingIncomplete %}<span data-processing-incomplete hidden></span>{% endif %}
     {% if hasStalePending %}
         <div class="alert alert-warning my-4">
             Some photos look stuck. Is the worker running?
             <code>bin/console messenger:consume async failed -vv</code>
         </div>
+    {% endif %}
+    {% if hasStaleTagging %}
+        <div class="alert alert-warning my-4">
+            Some photos are taking a long time to tag. Is the worker and inference service running?
+        </div>
+    {% endif %}
+    {% if readyCount > 0 %}
+        <p class="text-sm text-base-content/70 my-2" data-testid="tagging-progress">
+            Tagging {{ taggedCount }} / {{ readyCount }}
+        </p>
     {% endif %}
 
     {% if total == 0 %}

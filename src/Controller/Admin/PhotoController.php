@@ -43,6 +43,8 @@ final class PhotoController extends AbstractController
 
     private const string STALE_PENDING_THRESHOLD = '-5 minutes';
 
+    private const string STALE_TAGGING_THRESHOLD = '-5 minutes';
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly PhotoRepository $photos,
@@ -183,22 +185,36 @@ final class PhotoController extends AbstractController
         $total = $result['total'];
 
         $hasStalePending = false;
-        $cutoff          = new DateTimeImmutable(self::STALE_PENDING_THRESHOLD);
+        $hasStaleTagging = false;
+        $pendingCutoff   = new DateTimeImmutable(self::STALE_PENDING_THRESHOLD);
+        $taggingCutoff   = new DateTimeImmutable(self::STALE_TAGGING_THRESHOLD);
         foreach ($photos as $p) {
-            if ($p->getStatus() === PhotoStatus::Pending && $p->getCreatedAt() < $cutoff) {
+            if ($p->getStatus() === PhotoStatus::Pending && $p->getCreatedAt() < $pendingCutoff) {
                 $hasStalePending = true;
-                break;
+            }
+
+            if ($p->isTaggingPending() && $p->getUpdatedAt() < $taggingCutoff) {
+                $hasStaleTagging = true;
             }
         }
 
+        $readyCount           = $this->photos->countReady($event);
+        $taggedCount          = $this->photos->countTagged($event);
+        $pendingCount         = $this->photos->countByStatus($event, PhotoStatus::Pending);
+        $processingIncomplete = $pendingCount > 0 || $taggedCount < $readyCount;
+
         return $this->render('admin/event/photos_grid.html.twig', [
-            'event'           => $event,
-            'photos'          => $photos,
-            'total'           => $total,
-            'page'            => $page,
-            'perPage'         => self::PER_PAGE,
-            'hasStalePending' => $hasStalePending,
-            'failedCount'     => $this->photos->countByStatus($event, PhotoStatus::Failed),
+            'event'                => $event,
+            'photos'               => $photos,
+            'total'                => $total,
+            'page'                 => $page,
+            'perPage'              => self::PER_PAGE,
+            'hasStalePending'      => $hasStalePending,
+            'failedCount'          => $this->photos->countByStatus($event, PhotoStatus::Failed),
+            'readyCount'           => $readyCount,
+            'taggedCount'          => $taggedCount,
+            'hasStaleTagging'      => $hasStaleTagging,
+            'processingIncomplete' => $processingIncomplete,
         ]);
     }
 

@@ -146,6 +146,19 @@ final class PhotoRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    public function countTagged(Event $event): int
+    {
+        return (int) $this->createQueryBuilder('p')
+            ->select('COUNT(p.id)')
+            ->andWhere('p.event = :event')
+            ->andWhere('p.status = :status')
+            ->andWhere('p.attributesExtractedAt IS NOT NULL')
+            ->setParameter('event', $event)
+            ->setParameter('status', PhotoStatus::Ready)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     /**
      * Count of Ready photos in the event ordered strictly before `$photo` in
      * the canonical `(takenAt ASC, id ASC)` timeline. Caller derives the

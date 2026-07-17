@@ -1,4 +1,5 @@
-<tr data-photo-id="{{ photo.id }}" data-status="{{ photo.status.value }}">
+<tr data-photo-id="{{ photo.id }}" data-status="{{ photo.status.value }}"
+    {% if photo.status.value == 'ready' %}data-tagging="{{ photo.isTaggingPending ? 'pending' : 'done' }}"{% endif %}>
     <td class="w-14">
         {% if photo.status.value == 'ready' %}
             <a href="{{ path('photo_serve_preview', {slug: photo.event.slug, id: photo.id}) }}"
@@ -46,6 +47,13 @@
                class="mt-1 max-w-xs whitespace-normal text-xs text-error">
                 {{ photo.processingError }}
             </p>
+        {% endif %}
+        {% if photo.status.value == 'ready' %}
+            {% if photo.isTaggingPending %}
+                <span class="badge badge-ghost gap-1"><span class="loading loading-spinner loading-xs"></span>tagging…</span>
+            {% else %}
+                <span class="badge badge-success badge-outline">tagged ✓</span>
+            {% endif %}
         {% endif %}
     </td>
     <td class="text-right">
