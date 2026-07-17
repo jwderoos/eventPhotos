@@ -13,6 +13,7 @@ enum AuditAction: string
     case EventNotificationsToggle = 'event.notifications_toggle';
     case EventExport = 'event.export';
     case EventImport = 'event.import';
+    case EventBibSuppress = 'event.bib_suppress';
 
     case CollectionCreate = 'collection.create';
     case CollectionEdit = 'collection.edit';
@@ -23,6 +24,7 @@ enum AuditAction: string
     case PhotoReingest = 'photo.reingest';
     case PhotoReingestAll = 'photo.reingest_all';
     case PhotoRetry = 'photo.retry';
+    case PhotoRetryAll = 'photo.retry_all';
 
     case UserCreate = 'user.create';
     case UserEdit = 'user.edit';

@@ -1,0 +1,63 @@
+{% extends 'admin/_base.html.twig' %}
+
+{% block title %}Admin — Tags · {{ event.name }}{% endblock %}
+
+{% block admin_breadcrumb %}
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li>Admin</li>
+            <li><a href="{{ path('admin_event_index') }}" class="link link-hover">Events</a></li>
+            <li>{{ event.name }}</li>
+            <li><a href="{{ path('admin_event_photo_manage', {id: event.id}) }}" class="link link-hover">Photos</a></li>
+            <li>Tags</li>
+        </ul>
+    </div>
+{% endblock %}
+
+{% block admin_main %}
+    <header class="mb-6 flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">Tags · {{ event.name }}</h1>
+        <a href="{{ path('admin_event_photo_manage', {id: event.id}) }}" class="btn btn-ghost btn-sm">← Back to photos</a>
+    </header>
+
+    <p class="mb-6 text-sm text-base-content/70">
+        Searchable tags extracted from this event's photos, with the number of photos each appears on.
+        Bib, colour and clothing-type tags link to the public gallery filtered by that value; scenes are
+        not publicly filterable.
+    </p>
+
+    <div class="grid gap-4 md:grid-cols-2">
+        {% for group in groups %}
+            <section class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-base">{{ group.label }}</h2>
+                    {% if group.items is empty %}
+                        <p class="text-sm text-base-content/60">None yet.</p>
+                    {% else %}
+                        <div class="flex flex-wrap gap-2">
+                            {% for item in group.items %}
+                                {% if group.param %}
+                                    <a data-role="tag-chip"
+                                       href="{{ path('public_event_photos', {
+                                           slug: event.slug,
+                                           (group.param): group.multi ? [item.value] : item.value,
+                                       }) }}"
+                                       target="_blank" rel="noopener"
+                                       class="badge badge-outline gap-1 hover:badge-primary">
+                                        {{ item.value }}
+                                        <span class="opacity-60">({{ item.count }})</span>
+                                    </a>
+                                {% else %}
+                                    <span data-role="tag-chip-plain" class="badge badge-outline gap-1">
+                                        {{ item.value }}
+                                        <span class="opacity-60">({{ item.count }})</span>
+                                    </span>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
+        {% endfor %}
+    </div>
+{% endblock %}

@@ -24,6 +24,7 @@ use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormEvent;
 use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
@@ -158,6 +159,20 @@ final class EventType extends AbstractType
                 . 'while the event has no photos.',
         ]);
 
+        $builder->add('bibIndexingEnabled', CheckboxType::class, [
+            'mapped'   => false,
+            'required' => false,
+            'label'    => 'Enable bib-number search (races only)',
+            'help'     => 'Lets visitors find photos by bib number. Bib numbers are personal '
+                . 'data — only enable this if your event terms/registration cover it.',
+        ]);
+
+        $builder->add('bibIndexingAttestation', CheckboxType::class, [
+            'mapped'   => false,
+            'required' => false,
+            'label'    => 'I confirm my event terms / registration basis cover photo bib-search.',
+        ]);
+
         $builder->add('style', StyleSettingsType::class, [
             'label'     => false,
             'inherited' => $options['inherited'],
@@ -172,6 +187,7 @@ final class EventType extends AbstractType
         $builder->addEventListener(FormEvents::PRE_SUBMIT, $this->normalizeTimeInputs(...));
         $builder->addEventListener(FormEvents::SUBMIT, $this->composeStartsAndEnds(...));
         $builder->addEventListener(FormEvents::SUBMIT, $this->applyNotificationsPreference(...));
+        $builder->addEventListener(FormEvents::SUBMIT, $this->applyBibIndexingPreference(...));
     }
 
     public function configureOptions(OptionsResolver $resolver): void
@@ -206,6 +222,10 @@ final class EventType extends AbstractType
         if ($form->has('notificationsEnabled')) {
             $form->get('notificationsEnabled')->setData($event->areNotificationsEnabled());
         }
+
+        if ($form->has('bibIndexingEnabled')) {
+            $form->get('bibIndexingEnabled')->setData($event->isBibIndexingEnabled());
+        }
     }
 
     private function applyNotificationsPreference(FormEvent $formEvent): void
@@ -220,6 +240,34 @@ final class EventType extends AbstractType
             $event->enableNotifications();
         } else {
             $event->disableNotifications();
+        }
+    }
+
+    private function applyBibIndexingPreference(FormEvent $formEvent): void
+    {
+        $event = $formEvent->getData();
+        $form  = $formEvent->getForm();
+        if (!$event instanceof Event || !$form->has('bibIndexingEnabled')) {
+            return;
+        }
+
+        $wantEnabled = $form->get('bibIndexingEnabled')->getData() === true;
+        $wasEnabled  = $event->isBibIndexingEnabled();
+
+        // Attestation is required to cross from disabled → enabled. Staying enabled or
+        // disabling never requires it.
+        if ($wantEnabled && !$wasEnabled && $form->get('bibIndexingAttestation')->getData() !== true) {
+            $form->get('bibIndexingAttestation')->addError(
+                new FormError('Confirm your lawful basis to enable bib-number search.'),
+            );
+
+            return;
+        }
+
+        if ($wantEnabled) {
+            $event->enableBibIndexing();
+        } else {
+            $event->disableBibIndexing();
         }
     }
 

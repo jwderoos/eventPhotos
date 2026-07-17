@@ -42,6 +42,7 @@ vendor/bin/phpcs                                  # PSR-12
 
 ## CI / branching gates (GrumPHP — enforced locally on commit AND in CI)
 
+- Claude should create a branch from main when starting work that will change/create files on disk
 - Branch name must match `^(feature|hotfix|bugfix|release)/\d+-`. `main` / `develop` / `master` are blacklisted for direct commits.
 - Commit messages must contain a GitHub issue number (or be a merge from one of the prefixed branches).
 - `phpstan` level 10, `phpcs` PSR-12, `phpmnd` (no magic numbers in `src/`), `phpcpd` (50-line / 100-token duplication), `rector`, `securitychecker_roave`, `phpunit` (the full suite), and `doctrine:schema:validate` all gate commits.
