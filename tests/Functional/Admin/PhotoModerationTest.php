@@ -74,22 +74,6 @@ final class PhotoModerationTest extends WebTestCase
         $this->client->loginUser($owner);
     }
 
-    public function testRetryRouteIsGone(): void
-    {
-        $photo = new Photo($this->event, str_repeat('a', 64), 'x.jpg', 100);
-        $photo->markFailed('boom');
-
-        $this->em->persist($photo);
-        $this->em->flush();
-
-        $this->client->request(
-            Request::METHOD_POST,
-            sprintf('/admin/events/%d/photos/%d/retry', (int) $this->event->getId(), (int) $photo->getId()),
-        );
-
-        self::assertResponseStatusCodeSame(404);
-    }
-
     public function testDeleteRemovesRowAndStorageFiles(): void
     {
         $photo = new Photo($this->event, str_repeat('b', 64), 'x.jpg', 100);

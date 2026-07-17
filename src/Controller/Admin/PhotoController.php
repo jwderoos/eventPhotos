@@ -324,6 +324,46 @@ final class PhotoController extends AbstractController
         return $this->redirectToRoute('admin_photo_grid', $target);
     }
 
+    #[Route(
+        '/admin/events/{eventId}/photos/{photoId}/retry',
+        name: 'admin_photo_retry',
+        requirements: ['eventId' => '\d+', 'photoId' => '\d+'],
+        methods: ['POST'],
+    )]
+    #[Audited(AuditAction::PhotoRetry, targetParam: 'photoId', targetType: 'Photo')]
+    public function retry(int $eventId, int $photoId, Request $request): RedirectResponse
+    {
+        $photo = $this->loadOrThrow($eventId, $photoId);
+        $this->denyAccessUnlessGranted(PhotoVoter::EDIT, $photo);
+        $this->assertCsrf($request, 'retry_photo_' . $photoId);
+
+        $page   = max(1, $request->request->getInt('page', 1));
+        $target = ['id' => $eventId, 'page' => $page];
+
+        // Retry re-runs ingest from the stored original. A failed photo's original is
+        // deleted at failure time unless the event retains originals (see ProcessPhotoHandler),
+        // so retry is only possible when originals are kept.
+        if (!$photo->getEvent()->isRetainOriginals()) {
+            $this->addFlash('error', 'Retry is unavailable: this event does not retain originals.');
+
+            return $this->redirectToRoute('admin_photo_grid', $target);
+        }
+
+        if ($photo->getStatus() !== PhotoStatus::Failed) {
+            $this->addFlash('error', 'Only failed photos can be retried.');
+
+            return $this->redirectToRoute('admin_photo_grid', $target);
+        }
+
+        $photo->resetForRetry();
+        // Fresh ingest attempt (reingest: false) so the ingest window guard applies — the
+        // organizer typically widens the event window before retrying a window rejection.
+        $this->bus->dispatch(new ProcessPhoto($photoId));
+        $this->em->flush();
+
+        return $this->redirectToRoute('admin_photo_grid', $target);
+    }
+
     private function loadOrThrow(int $eventId, int $photoId): Photo
     {
         $photo = $this->photos->find($photoId);
