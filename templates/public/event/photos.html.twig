@@ -11,6 +11,7 @@
         <header class="space-y-4">
             <h1 class="text-2xl font-semibold">{{ event.name }}</h1>
 
+            {% if filterAvailable %}
             <form method="get"
                   action="{{ path('public_event_photos', {slug: event.slug}) }}"
                   data-testid="attribute-filter"
@@ -51,6 +52,7 @@
                     <a href="{{ path('public_event_photos', {slug: event.slug}) }}" class="btn btn-sm btn-ghost">Clear</a>
                 {% endif %}
             </form>
+            {% endif %}
 
             {% if not searchMode %}
                 <form method="get"

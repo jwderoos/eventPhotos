@@ -11,6 +11,7 @@ use App\Entity\PhotoStatus;
 use App\Repository\EventRepository;
 use App\Repository\Filter\PhotoAttributeFilter;
 use App\Repository\OrganizerProfileRepository;
+use App\Repository\PhotoAttributeRepository;
 use App\Repository\PhotoRepository;
 use App\Service\Brand\BrandResolver;
 use App\Service\Event\PhotosUrlBuilder;
@@ -49,6 +50,7 @@ final class EventController extends AbstractController
         private readonly EventRepository $events,
         private readonly ClockInterface $clock,
         private readonly PhotoRepository $photos,
+        private readonly PhotoAttributeRepository $photoAttributes,
         private readonly PhotosUrlBuilder $photosUrl,
         private readonly QrCodeRenderer $qr,
         #[Autowire(service: 'event_logos_storage')]
@@ -186,6 +188,7 @@ final class EventController extends AbstractController
             'brand'            => $this->brandResolver->resolve($event),
             'searchMode'       => false,
             'filter'           => new PhotoAttributeFilter(),
+            'filterAvailable'  => $this->photoAttributes->eventHasAttributes($event),
             'bibSearchEnabled' => $event->isBibIndexingEnabled(),
             'allowedColours'   => AttributeVocabulary::COLORS,
             'allowedGarments'  => AttributeVocabulary::GARMENTS,
@@ -255,6 +258,7 @@ final class EventController extends AbstractController
             'event'            => $event,
             'searchMode'       => true,
             'filter'           => $filter,
+            'filterAvailable'  => $this->photoAttributes->eventHasAttributes($event),
             'photos'           => $photos,
             'capHit'           => count($photos) === self::HARD_CAP,
             'firstRank'        => 1,

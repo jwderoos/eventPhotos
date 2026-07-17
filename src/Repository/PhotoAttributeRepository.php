@@ -77,6 +77,24 @@ final class PhotoAttributeRepository extends ServiceEntityRepository
         return $result;
     }
 
+    /**
+     * Whether the event has any extracted attribute at all — drives whether the
+     * public gallery offers the attribute filter UI (nothing to filter on = no form).
+     */
+    public function eventHasAttributes(Event $event): bool
+    {
+        $one = $this->createQueryBuilder('a')
+            ->select('1')
+            ->innerJoin('a.photo', 'p')
+            ->andWhere('p.event = :event')
+            ->setParameter('event', $event)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $one !== null;
+    }
+
     public function deleteForPhoto(Photo $photo): void
     {
         $this->getEntityManager()
