@@ -1,16 +1,29 @@
 import io
+import os
 
 from fastapi import FastAPI, HTTPException, Request
 from PIL import Image, UnidentifiedImageError
 
-from app.recognizer import RawResult, Score, StubRecognizer
+from app.recognizer import RawResult, Recognizer, Score, StubRecognizer
 from app.schemas import ExtractResponse, ScoreOut
 from app.vocabulary import VOCABULARY
 
-app = FastAPI(title="EventPhotos Inference", version="0.1.0")
+app = FastAPI(title="EventPhotos Inference", version="0.2.0")
 
-# Swap for a production Recognizer implementation (see recognizer.py plug points).
-RECOGNIZER = StubRecognizer()
+
+def build_recognizer(name: str) -> Recognizer:
+    """Select the recognizer implementation. 'stub' needs no weights (dev/CI);
+    'bib' loads the real YOLOX + RapidOCR pipeline (prod)."""
+    if name == "stub":
+        return StubRecognizer()
+    if name == "bib":
+        from app.bib_recognizer import build_bib_recognizer
+
+        return build_bib_recognizer()
+    raise ValueError(f"unknown RECOGNIZER={name!r} (expected 'stub' or 'bib')")
+
+
+RECOGNIZER: Recognizer = build_recognizer(os.environ.get("RECOGNIZER", "stub"))
 
 _UNPROCESSABLE = 422
 

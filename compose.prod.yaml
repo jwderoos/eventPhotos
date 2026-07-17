@@ -12,6 +12,7 @@ services:
     environment:
       APP_ENV: prod
       APP_DEBUG: "0"
+      INFERENCE_SERVICE_URL: "http://inference:8000"
     volumes:
       - ${DATA_DIR}/uploads:/app/var/uploads
       - ${DATA_DIR}/share:/app/var/share
@@ -38,6 +39,7 @@ services:
     environment:
       APP_ENV: prod
       APP_DEBUG: "0"
+      INFERENCE_SERVICE_URL: "http://inference:8000"
     volumes:
       - ${DATA_DIR}/uploads:/app/var/uploads
       - ${DATA_DIR}/share:/app/var/share
@@ -46,11 +48,33 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      inference:
+        condition: service_started
     restart: unless-stopped
     stop_signal: SIGTERM
     stop_grace_period: 30s
     # Caps are per-replica. With §3.4 scaling worker to 3, total is 3 × 512 MB.
     mem_limit: 512m
+    cpus: 2
+
+  inference:
+    build:
+      context: ./inference
+      dockerfile: Dockerfile
+    image: eventphotos-inference:latest
+    environment:
+      RECOGNIZER: "bib"
+    restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 15s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # CPU-only inference; the box has ~2 GB headroom. Single uvicorn worker,
+    # minutes/photo SLA — PHP worker replicas drive throughput.
+    mem_limit: 2g
     cpus: 2
 
   migrate:
