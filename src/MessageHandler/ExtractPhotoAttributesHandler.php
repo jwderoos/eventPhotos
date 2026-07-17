@@ -9,7 +9,6 @@ use App\Entity\PhotoAttribute;
 use App\Entity\PhotoAttributeType;
 use App\Entity\PhotoStatus;
 use App\Message\ExtractPhotoAttributes;
-use App\Repository\BibSuppressionRepository;
 use App\Repository\PhotoAttributeRepository;
 use App\Repository\PhotoRepository;
 use App\Service\Photo\AttributeExtractionUnavailable;
@@ -30,7 +29,6 @@ final readonly class ExtractPhotoAttributesHandler
     public function __construct(
         private PhotoRepository $photos,
         private PhotoAttributeRepository $attributes,
-        private BibSuppressionRepository $suppressions,
         private AttributeExtractorClientInterface $client,
         private EntityManagerInterface $em,
         #[Autowire(service: 'photo_previews_storage')]
@@ -115,11 +113,7 @@ final readonly class ExtractPhotoAttributesHandler
             return false;
         }
 
-        if ($attribute->confidence < self::BIB_MIN_CONFIDENCE) {
-            return false;
-        }
-
-        return !$this->suppressions->isSuppressed($event, $attribute->value);
+        return $attribute->confidence >= self::BIB_MIN_CONFIDENCE;
     }
 
     private function persist(Photo $photo, PhotoAttributeType $type, AttributeScore $attribute): void

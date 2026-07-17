@@ -185,8 +185,10 @@ final class ExtractPhotoAttributesHandlerTest extends KernelTestCase
         $this->assertSame([], $this->valuesOfType($photo, PhotoAttributeType::Bib));
     }
 
-    public function testBibSkippedWhenSuppressed(): void
+    public function testBibWrittenEvenWhenSuppressed(): void
     {
+        // Suppression is a read-time overlay now; extraction still stores the bib
+        // so undo (removing the suppression) is lossless.
         $this->event->enableBibIndexing();
         $this->em->persist(new BibSuppression($this->event, '1423'));
         $this->em->flush();
@@ -196,7 +198,7 @@ final class ExtractPhotoAttributesHandlerTest extends KernelTestCase
 
         ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
 
-        $this->assertSame([], $this->valuesOfType($photo, PhotoAttributeType::Bib));
+        $this->assertSame(['1423'], $this->valuesOfType($photo, PhotoAttributeType::Bib));
     }
 
     public function testBibWrittenWhenAllConditionsMet(): void
@@ -211,7 +213,7 @@ final class ExtractPhotoAttributesHandlerTest extends KernelTestCase
         $this->assertSame(['1423'], $this->valuesOfType($photo, PhotoAttributeType::Bib));
     }
 
-    public function testSuppressionSurvivesReingest(): void
+    public function testReingestRewritesBibEvenWhenSuppressed(): void
     {
         $this->event->enableBibIndexing();
         $photo = $this->seedReadyPhoto('a1');
@@ -221,14 +223,13 @@ final class ExtractPhotoAttributesHandlerTest extends KernelTestCase
         ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
         $this->assertSame(['1423'], $this->valuesOfType($photo, PhotoAttributeType::Bib));
 
-        // Organizer de-indexes: delete bib tags + suppress (Plan A behaviour, simulated here).
-        $this->attributes->deleteForPhoto($photo);
+        // Organizer de-indexes (reversible overlay): suppression flag only, no row deletion.
         $this->em->persist(new BibSuppression($this->event, '1423'));
         $this->em->flush();
 
-        // Re-ingest re-dispatches extraction; the same bib must NOT reappear.
+        // Re-ingest re-dispatches extraction; the bib row is re-written (search hides it).
         ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
-        $this->assertSame([], $this->valuesOfType($photo, PhotoAttributeType::Bib));
+        $this->assertSame(['1423'], $this->valuesOfType($photo, PhotoAttributeType::Bib));
     }
 
     public function testMarksAttributesExtractedOnSuccessWithTags(): void

@@ -14,6 +14,7 @@ enum AuditAction: string
     case EventExport = 'event.export';
     case EventImport = 'event.import';
     case EventBibSuppress = 'event.bib_suppress';
+    case EventBibReindex = 'event.bib_reindex';
 
     case CollectionCreate = 'collection.create';
     case CollectionEdit = 'collection.edit';

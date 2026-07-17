@@ -23,7 +23,8 @@
     <p class="mb-6 text-sm text-base-content/70">
         Searchable tags extracted from this event's photos, with the number of photos each appears on.
         Bib, colour and clothing-type tags link to the public gallery filtered by that value; scenes are
-        not publicly filterable.
+        not publicly filterable. De-index a bib to hide it from visitors; undo it any time from the
+        De-indexed list below.
     </p>
 
     <div class="grid gap-4 md:grid-cols-2">
@@ -36,24 +37,81 @@
                     {% else %}
                         <div class="flex flex-wrap gap-2">
                             {% for item in group.items %}
-                                {% if group.param %}
-                                    <a data-role="tag-chip"
-                                       href="{{ path('public_event_photos', {
-                                           slug: event.slug,
-                                           (group.param): group.multi ? [item.value] : item.value,
-                                       }) }}"
-                                       target="_blank" rel="noopener"
-                                       class="badge badge-outline gap-1 hover:badge-primary">
-                                        {{ item.value }}
-                                        <span class="opacity-60">({{ item.count }})</span>
-                                    </a>
-                                {% else %}
-                                    <span data-role="tag-chip-plain" class="badge badge-outline gap-1">
-                                        {{ item.value }}
-                                        <span class="opacity-60">({{ item.count }})</span>
-                                    </span>
-                                {% endif %}
+                                <span class="inline-flex items-center gap-1">
+                                    {% if group.param %}
+                                        <a data-role="tag-chip"
+                                           href="{{ path('public_event_photos', {
+                                               slug: event.slug,
+                                               (group.param): group.multi ? [item.value] : item.value,
+                                           }) }}"
+                                           target="_blank" rel="noopener"
+                                           class="badge badge-outline gap-1 hover:badge-primary">
+                                            {{ item.value }}
+                                            <span class="opacity-60">({{ item.count }})</span>
+                                        </a>
+                                    {% else %}
+                                        <span data-role="tag-chip-plain" class="badge badge-outline gap-1">
+                                            {{ item.value }}
+                                            <span class="opacity-60">({{ item.count }})</span>
+                                        </span>
+                                    {% endif %}
+                                    {% if group.type == 'bib' %}
+                                        <form method="post"
+                                              action="{{ path('admin_bib_suppress', {id: event.id}) }}"
+                                              class="inline">
+                                            <input type="hidden" name="bibNumber" value="{{ item.value }}">
+                                            <input type="hidden" name="_token"
+                                                   value="{{ csrf_token('suppress_bib_' ~ event.id) }}">
+                                            <button type="submit"
+                                                    data-role="deindex-bib"
+                                                    title="De-index bib {{ item.value }}"
+                                                    class="btn btn-ghost btn-xs">De-index</button>
+                                        </form>
+                                    {% endif %}
+                                </span>
                             {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    {% if group.type == 'bib' %}
+                        <div class="mt-4 border-t border-base-300 pt-4">
+                            <form method="post"
+                                  action="{{ path('admin_bib_suppress', {id: event.id}) }}"
+                                  class="flex items-end gap-2">
+                                <label class="form-control">
+                                    <span class="label-text">De-index a bib number</span>
+                                    <input type="text" name="bibNumber"
+                                           class="input input-bordered input-sm" maxlength="64" required>
+                                </label>
+                                <input type="hidden" name="_token"
+                                       value="{{ csrf_token('suppress_bib_' ~ event.id) }}">
+                                <button type="submit" class="btn btn-sm">De-index</button>
+                            </form>
+
+                            <h3 class="mt-4 text-sm font-semibold">De-indexed</h3>
+                            {% if deindexedBibs is empty %}
+                                <p class="text-sm text-base-content/60">Nothing de-indexed.</p>
+                            {% else %}
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    {% for bib in deindexedBibs %}
+                                        <span data-role="deindexed-bib"
+                                              class="inline-flex items-center gap-1">
+                                            <span class="badge badge-ghost gap-1">
+                                                {{ bib.value }}
+                                                <span class="opacity-60">({{ bib.count }})</span>
+                                            </span>
+                                            <form method="post"
+                                                  action="{{ path('admin_bib_reindex', {id: event.id}) }}"
+                                                  class="inline">
+                                                <input type="hidden" name="bibNumber" value="{{ bib.value }}">
+                                                <input type="hidden" name="_token"
+                                                       value="{{ csrf_token('reindex_bib_' ~ event.id) }}">
+                                                <button type="submit" class="btn btn-ghost btn-xs">Undo</button>
+                                            </form>
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
                         </div>
                     {% endif %}
                 </div>

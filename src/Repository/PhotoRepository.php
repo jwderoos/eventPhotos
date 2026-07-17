@@ -101,6 +101,12 @@ final class PhotoRepository extends ServiceEntityRepository
                 Join::WITH,
                 'pab.photo = p AND pab.type = :bibType AND pab.value = :bib',
             )
+                ->andWhere(
+                    'NOT EXISTS ('
+                    . 'SELECT 1 FROM App\Entity\BibSuppression bs '
+                    . 'WHERE bs.event = :event AND bs.bibNumber = :bib'
+                    . ')'
+                )
                 ->setParameter('bibType', PhotoAttributeType::Bib)
                 ->setParameter('bib', $filter->bib);
         }

@@ -102,24 +102,4 @@ final class PhotoAttributeRepository extends ServiceEntityRepository
             ->setParameter('photo', $photo)
             ->execute();
     }
-
-    /**
-     * Remove every stored tag for a specific bib value across ALL photos in the event.
-     * Used by organizer de-index (#109): existing bib tags must disappear, while the
-     * inserted BibSuppression (Plan A) blocks any future re-add on re-ingest.
-     */
-    public function deleteBibForEvent(Event $event, string $bibValue): void
-    {
-        $this->getEntityManager()
-            ->createQuery(
-                'DELETE FROM App\Entity\PhotoAttribute a '
-                . 'WHERE a.photo IN ('
-                . 'SELECT p.id FROM App\Entity\Photo p WHERE p.event = :event'
-                . ') AND a.type = :type AND a.value = :bib'
-            )
-            ->setParameter('event', $event)
-            ->setParameter('type', PhotoAttributeType::Bib)
-            ->setParameter('bib', $bibValue)
-            ->execute();
-    }
 }

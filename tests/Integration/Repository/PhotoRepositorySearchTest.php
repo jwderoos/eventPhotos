@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Repository;
 
+use App\Entity\BibSuppression;
 use App\Entity\Photo;
 use App\Entity\PhotoAttributeType;
 use App\Repository\Filter\PhotoAttributeFilter;
@@ -91,5 +92,52 @@ final class PhotoRepositorySearchTest extends KernelTestCase
 
         $this->assertCount(1, $this->repo->searchReady($event, new PhotoAttributeFilter(bib: '1423'), 200));
         $this->assertCount(0, $this->repo->searchReady($event, new PhotoAttributeFilter(bib: '9999'), 200));
+    }
+
+    public function testSuppressedBibIsExcludedFromSearch(): void
+    {
+        $event = PhotoFixtures::event($this->em);
+        $photo = PhotoFixtures::readyPhoto($this->em, $event, '2026-07-15 10:00:00');
+        PhotoFixtures::tagBib($this->em, $photo, '1423');
+        $this->em->persist(new BibSuppression($event, '1423'));
+        $this->em->flush();
+
+        // Bib row still exists, but suppression hides it from search.
+        $this->assertCount(0, $this->repo->searchReady($event, new PhotoAttributeFilter(bib: '1423'), 200));
+    }
+
+    public function testNonSuppressedBibStillMatches(): void
+    {
+        $event = PhotoFixtures::event($this->em);
+        $photo = PhotoFixtures::readyPhoto($this->em, $event, '2026-07-15 10:00:00');
+        PhotoFixtures::tagBib($this->em, $photo, '1423');
+        $this->em->persist(new BibSuppression($event, '9999')); // a different bib suppressed
+        $this->em->flush();
+
+        $this->assertCount(1, $this->repo->searchReady($event, new PhotoAttributeFilter(bib: '1423'), 200));
+    }
+
+    public function testReindexRestoresSearchVisibility(): void
+    {
+        $event = PhotoFixtures::event($this->em);
+        $photo = PhotoFixtures::readyPhoto($this->em, $event, '2026-07-15 10:00:00');
+        PhotoFixtures::tagBib($this->em, $photo, '1423');
+        $this->em->persist(new BibSuppression($event, '1423'));
+        $this->em->flush();
+
+        // Suppressed → hidden from public search.
+        $this->assertCount(0, $this->repo->searchReady($event, new PhotoAttributeFilter(bib: '1423'), 200));
+
+        // Undo: remove the suppression row (the reindexBib controller action does this).
+        $suppression = $this->em->getRepository(BibSuppression::class)->findOneBy([
+            'event'     => $event,
+            'bibNumber' => '1423',
+        ]);
+        $this->assertInstanceOf(BibSuppression::class, $suppression);
+        $this->em->remove($suppression);
+        $this->em->flush();
+
+        // Lossless undo: the bib is searchable again.
+        $this->assertCount(1, $this->repo->searchReady($event, new PhotoAttributeFilter(bib: '1423'), 200));
     }
 }
