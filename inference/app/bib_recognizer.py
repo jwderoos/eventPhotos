@@ -22,28 +22,44 @@ class BibRecognizer:
         return [Score(value, conf) for value, conf in best.items()]
 
 
-class Phase1Recognizer:
-    """Real bibs + stub clothing/colour/scene (Phase 2 replaces the stub half)."""
+class CompositeRecognizer:
+    """Real bibs + a pluggable clothing/scene component. `bib` uses the stub for
+    the clothing half; `full` uses the real ClothingSceneRecognizer."""
 
-    def __init__(self, bib_recognizer: BibRecognizer, stub: StubRecognizer):
-        self._bibs = bib_recognizer
-        self._stub = stub
+    def __init__(self, bib_component, clothing_scene_component):
+        self._bibs = bib_component
+        self._clothing_scene = clothing_scene_component
 
     def recognize(self, image: Image.Image) -> RawResult:
-        stub_result = self._stub.recognize(image)
+        cs = self._clothing_scene.recognize(image)
         return RawResult(
-            clothing_colors=stub_result.clothing_colors,
-            clothing_types=stub_result.clothing_types,
-            scenes=stub_result.scenes,
+            clothing_colors=cs.clothing_colors,
+            clothing_types=cs.clothing_types,
+            scenes=cs.scenes,
             bibs=self._bibs.recognize_bibs(image),
         )
 
 
-def build_bib_recognizer() -> Phase1Recognizer:
+def build_bib_recognizer() -> CompositeRecognizer:
     from app.detect import PersonDetector
     from app.ocr import TextReader
 
-    return Phase1Recognizer(
+    return CompositeRecognizer(
         BibRecognizer(PersonDetector(), TextReader(), BibParser()),
         StubRecognizer(),
+    )
+
+
+def build_full_recognizer() -> CompositeRecognizer:
+    from app.clothing_scene_recognizer import build_clothing_scene_recognizer
+    from app.detect import PersonDetector
+    from app.ocr import TextReader
+
+    # One shared YOLOX session for both the bib and clothing/scene components
+    # (the detection forward pass still runs per component; sharing avoids a
+    # second loaded session — threading the boxes through is a follow-up).
+    detector = PersonDetector()
+    return CompositeRecognizer(
+        BibRecognizer(detector, TextReader(), BibParser()),
+        build_clothing_scene_recognizer(detector=detector),
     )

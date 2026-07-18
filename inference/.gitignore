@@ -1,1 +1,2 @@
 app/weights/*.onnx
+app/weights/*.onnx.data

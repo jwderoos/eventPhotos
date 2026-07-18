@@ -63,7 +63,7 @@ services:
       dockerfile: Dockerfile
     image: eventphotos-inference:latest
     environment:
-      RECOGNIZER: "bib"
+      RECOGNIZER: "full"
     restart: unless-stopped
     stop_signal: SIGTERM
     stop_grace_period: 15s

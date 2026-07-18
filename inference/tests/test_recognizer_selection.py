@@ -14,10 +14,19 @@ def test_unknown_value_raises():
 
 
 @pytest.mark.models
-def test_bib_selection_builds_phase1():
+def test_bib_selection_builds_composite():
     from app.bib_config import YOLOX_WEIGHTS_PATH
     if not YOLOX_WEIGHTS_PATH.exists():
         pytest.skip("yolox weights absent")
-    from app.bib_recognizer import Phase1Recognizer
+    from app.bib_recognizer import CompositeRecognizer
+    assert isinstance(build_recognizer("bib"), CompositeRecognizer)
 
-    assert isinstance(build_recognizer("bib"), Phase1Recognizer)
+
+@pytest.mark.models
+def test_full_selection_builds_composite():
+    from app.bib_config import YOLOX_WEIGHTS_PATH
+    from app.clip_config import CLIP_WEIGHTS_PATH
+    if not (YOLOX_WEIGHTS_PATH.exists() and CLIP_WEIGHTS_PATH.exists()):
+        pytest.skip("weights absent")
+    from app.bib_recognizer import CompositeRecognizer
+    assert isinstance(build_recognizer("full"), CompositeRecognizer)

@@ -13,14 +13,18 @@ app = FastAPI(title="EventPhotos Inference", version="0.2.0")
 
 def build_recognizer(name: str) -> Recognizer:
     """Select the recognizer implementation. 'stub' needs no weights (dev/CI);
-    'bib' loads the real YOLOX + RapidOCR pipeline (prod)."""
+    'bib' loads YOLOX + RapidOCR; 'full' adds the CLIP clothing/scene encoder (prod)."""
     if name == "stub":
         return StubRecognizer()
     if name == "bib":
         from app.bib_recognizer import build_bib_recognizer
 
         return build_bib_recognizer()
-    raise ValueError(f"unknown RECOGNIZER={name!r} (expected 'stub' or 'bib')")
+    if name == "full":
+        from app.bib_recognizer import build_full_recognizer
+
+        return build_full_recognizer()
+    raise ValueError(f"unknown RECOGNIZER={name!r} (expected 'stub', 'bib', or 'full')")
 
 
 RECOGNIZER: Recognizer = build_recognizer(os.environ.get("RECOGNIZER", "stub"))
