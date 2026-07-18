@@ -11,47 +11,53 @@
         <header class="space-y-4">
             <h1 class="text-2xl font-semibold">{{ event.name }}</h1>
 
-            {% if filterAvailable %}
-            <form method="get"
-                  action="{{ path('public_event_photos', {slug: event.slug}) }}"
-                  data-testid="attribute-filter"
-                  class="flex flex-wrap items-end gap-4 text-sm">
-                <fieldset class="flex flex-wrap gap-2">
-                    <legend class="w-full text-xs uppercase text-base-content/60">Colour</legend>
-                    {% for colour in allowedColours %}
-                        <label class="flex items-center gap-1">
-                            <input type="checkbox" name="colour[]" value="{{ colour }}"
-                                   {{ colour in filter.colours ? 'checked' }}
-                                   class="checkbox checkbox-xs">
-                            <span>{{ colour }}</span>
-                        </label>
-                    {% endfor %}
-                </fieldset>
-                <fieldset class="flex flex-wrap gap-2">
-                    <legend class="w-full text-xs uppercase text-base-content/60">Garment</legend>
-                    {% for garment in allowedGarments %}
-                        <label class="flex items-center gap-1">
-                            <input type="checkbox" name="garment[]" value="{{ garment }}"
-                                   {{ garment in filter.garments ? 'checked' }}
-                                   class="checkbox checkbox-xs">
-                            <span>{{ garment|replace({'-': ' '}) }}</span>
-                        </label>
-                    {% endfor %}
-                </fieldset>
-                {% if bibSearchEnabled %}
-                    <label class="flex flex-col gap-1">
-                        <span class="text-xs uppercase text-base-content/60">Bib number</span>
-                        <input type="text" name="bib" inputmode="numeric"
-                               data-testid="bib-filter"
-                               value="{{ filter.bib }}"
-                               class="input input-sm input-bordered w-28">
-                    </label>
+            {% if filterAvailable or bibSearchEnabled %}
+            <div class="space-y-2">
+                <form method="get"
+                      action="{{ path('public_event_photos', {slug: event.slug}) }}"
+                      data-testid="photo-search"
+                      class="flex flex-wrap items-center gap-2 text-sm">
+                    <label for="photo-q" class="sr-only">Search photos</label>
+                    <input type="search"
+                           id="photo-q"
+                           name="q"
+                           value="{{ q }}"
+                           data-testid="search-input"
+                           placeholder="{{ (filterAvailable and bibSearchEnabled) ? 'e.g. 1234, red, t-shirt, finish line' : (bibSearchEnabled ? 'e.g. 1234' : 'e.g. red, t-shirt, finish line') }}"
+                           class="input input-sm input-bordered w-full max-w-md">
+                    <button type="submit" class="btn btn-sm btn-primary">Search</button>
+                    {% if searchMode %}
+                        <a href="{{ path('public_event_photos', {slug: event.slug}) }}"
+                           class="btn btn-sm btn-ghost">Clear</a>
+                    {% endif %}
+                </form>
+
+                <p class="text-xs text-base-content/60">
+                    Search by
+                    {%- if bibSearchEnabled %} bib number{% if filterAvailable %},{% endif %}{% endif -%}
+                    {%- if filterAvailable %} colour, garment, or scene{% endif -%}.
+                </p>
+
+                {% if searchMode and parsedQuery.tokens is not empty %}
+                    <div class="flex flex-wrap gap-2" data-testid="search-chips">
+                        {% for token in parsedQuery.tokens %}
+                            <span class="badge badge-outline gap-1" data-testid="search-chip">
+                                {{ token.label }}
+                                <a href="{{ path('public_event_photos', {slug: event.slug, q: parsedQuery.without(loop.index0).serialize()}) }}"
+                                   data-testid="chip-remove"
+                                   aria-label="Remove {{ token.label }}"
+                                   class="font-semibold">×</a>
+                            </span>
+                        {% endfor %}
+                    </div>
                 {% endif %}
-                <button type="submit" class="btn btn-sm btn-primary">Search</button>
-                {% if searchMode %}
-                    <a href="{{ path('public_event_photos', {slug: event.slug}) }}" class="btn btn-sm btn-ghost">Clear</a>
+
+                {% if searchMode and parsedQuery.ignored is not empty %}
+                    <p class="text-xs text-base-content/50" data-testid="search-ignored">
+                        Ignored: {{ parsedQuery.ignored|join(', ') }}
+                    </p>
                 {% endif %}
-            </form>
+            </div>
             {% endif %}
 
             {% if not searchMode %}

@@ -30,7 +30,7 @@ final class EventFilterVisibilityTest extends WebTestCase
         $crawler = $client->request(Request::METHOD_GET, '/e/notags-2026/photos?t=12:00');
 
         $this->assertResponseIsSuccessful();
-        $this->assertCount(0, $crawler->filter('[data-testid="attribute-filter"]'));
+        $this->assertCount(0, $crawler->filter('[data-testid="photo-search"]'));
     }
 
     public function testFilterShownWhenAttributeDataExists(): void
@@ -47,6 +47,6 @@ final class EventFilterVisibilityTest extends WebTestCase
         $crawler = $client->request(Request::METHOD_GET, '/e/tags-2026/photos?t=12:00');
 
         $this->assertResponseIsSuccessful();
-        $this->assertCount(1, $crawler->filter('[data-testid="attribute-filter"]'));
+        $this->assertCount(1, $crawler->filter('[data-testid="photo-search"]'));
     }
 }

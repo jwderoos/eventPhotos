@@ -6,14 +6,12 @@ namespace App\Repository;
 
 use App\Entity\Event;
 use App\Entity\Photo;
-use App\Entity\PhotoAttribute;
 use App\Entity\PhotoAttributeType;
 use App\Entity\PhotoStatus;
 use App\Repository\Filter\PhotoAttributeFilter;
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
-use Doctrine\ORM\Query\Expr\Join;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -53,17 +51,20 @@ final class PhotoRepository extends ServiceEntityRepository
     }
 
     /**
-     * Filtered gallery search over allowlisted tags. Each active dimension is an
-     * inner join on `photo_attributes`; values within a dimension are OR-ed
-     * (`IN`), dimensions are AND-ed. Spans the whole event timeline (not a
-     * time window) — search is a "find me" query, not a browse.
+     * Filtered gallery search over allowlisted tags. Semantics:
+     *   results = P_bib ∪ (P_colour ∩ P_garment ∩ P_scene)
+     * Each present attribute dimension is an EXISTS-IN subquery (values within a
+     * dimension OR-ed, dimensions AND-ed). The bib term is EXISTS on the bib tag
+     * minus any BibSuppression, OR-ed against the attribute group so a matched
+     * bib surfaces a photo even when its clothing doesn't match, and vice versa.
+     * EXISTS (not joins) keeps rows unique without `distinct`. Spans the whole
+     * event timeline — this is a "find me" query, not a browse.
      *
      * @return list<Photo>
      */
     public function searchReady(Event $event, PhotoAttributeFilter $filter, int $limit): array
     {
         $qb = $this->createQueryBuilder('p')
-            ->distinct()
             ->andWhere('p.event = :event')
             ->andWhere('p.status = :status')
             ->setParameter('event', $event)
@@ -72,49 +73,66 @@ final class PhotoRepository extends ServiceEntityRepository
             ->addOrderBy('p.id', 'ASC')
             ->setMaxResults($limit);
 
+        $orX = $qb->expr()->orX();
+
+        $andParts = [];
         if ($filter->colours !== []) {
-            $qb->innerJoin(
-                PhotoAttribute::class,
-                'pac',
-                Join::WITH,
-                'pac.photo = p AND pac.type = :colourType AND pac.value IN (:colours)',
-            )
-                ->setParameter('colourType', PhotoAttributeType::ClothingColor)
+            $andParts[] = $this->attributeExists('pac', 'colourType', 'colours');
+            $qb->setParameter('colourType', PhotoAttributeType::ClothingColor)
                 ->setParameter('colours', $filter->colours);
         }
 
         if ($filter->garments !== []) {
-            $qb->innerJoin(
-                PhotoAttribute::class,
-                'pag',
-                Join::WITH,
-                'pag.photo = p AND pag.type = :garmentType AND pag.value IN (:garments)',
-            )
-                ->setParameter('garmentType', PhotoAttributeType::ClothingType)
+            $andParts[] = $this->attributeExists('pag', 'garmentType', 'garments');
+            $qb->setParameter('garmentType', PhotoAttributeType::ClothingType)
                 ->setParameter('garments', $filter->garments);
         }
 
+        if ($filter->scenes !== []) {
+            $andParts[] = $this->attributeExists('pas', 'sceneType', 'scenes');
+            $qb->setParameter('sceneType', PhotoAttributeType::Scene)
+                ->setParameter('scenes', $filter->scenes);
+        }
+
+        if ($andParts !== []) {
+            $orX->add(implode(' AND ', $andParts));
+        }
+
         if ($filter->bib !== null) {
-            $qb->innerJoin(
-                PhotoAttribute::class,
-                'pab',
-                Join::WITH,
-                'pab.photo = p AND pab.type = :bibType AND pab.value = :bib',
-            )
-                ->andWhere(
-                    'NOT EXISTS ('
-                    . 'SELECT 1 FROM App\Entity\BibSuppression bs '
-                    . 'WHERE bs.event = :event AND bs.bibNumber = :bib'
-                    . ')'
-                )
-                ->setParameter('bibType', PhotoAttributeType::Bib)
+            $orX->add(
+                'EXISTS ('
+                . 'SELECT 1 FROM App\Entity\PhotoAttribute pab '
+                . 'WHERE pab.photo = p AND pab.type = :bibType AND pab.value = :bib'
+                . ') AND NOT EXISTS ('
+                . 'SELECT 1 FROM App\Entity\BibSuppression bs '
+                . 'WHERE bs.event = :event AND bs.bibNumber = :bib'
+                . ')'
+            );
+            $qb->setParameter('bibType', PhotoAttributeType::Bib)
                 ->setParameter('bib', $filter->bib);
         }
+
+        if ($orX->getParts() === []) {
+            return [];
+        }
+
+        $qb->andWhere($orX);
 
         /** @var list<Photo> $result */
         $result = $qb->getQuery()->getResult();
 
         return $result;
+    }
+
+    private function attributeExists(string $alias, string $typeParam, string $valuesParam): string
+    {
+        return sprintf(
+            'EXISTS (SELECT 1 FROM App\Entity\PhotoAttribute %1$s '
+            . 'WHERE %1$s.photo = p AND %1$s.type = :%2$s AND %1$s.value IN (:%3$s))',
+            $alias,
+            $typeParam,
+            $valuesParam,
+        );
     }
 
     /**

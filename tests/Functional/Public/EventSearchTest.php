@@ -24,13 +24,14 @@ final class EventSearchTest extends WebTestCase
         PhotoFixtures::tagColour($em, $blue, 'blue');
         $em->flush();
 
-        $crawler = $client->request(Request::METHOD_GET, '/e/run-2026/photos?colour%5B%5D=orange');
+        $crawler = $client->request(Request::METHOD_GET, '/e/run-2026/photos?q=orange');
 
         $this->assertResponseIsSuccessful();
         $this->assertCount(1, $crawler->filter('[data-lightbox-target="trigger"]'));
+        $this->assertCount(1, $crawler->filter('[data-testid="search-chip"]'));
     }
 
-    public function testBibFilterIgnoredWhenToggleOff(): void
+    public function testBibQueryIgnoredWhenToggleOff(): void
     {
         $client = self::createClient();
         /** @var EntityManagerInterface $em */
@@ -41,17 +42,27 @@ final class EventSearchTest extends WebTestCase
         PhotoFixtures::tagBib($em, $photo, '1423');
         $em->flush();
 
-        // bib param present but toggle off → treated as no filter → full windowed gallery,
-        // and the bib field must NOT be rendered (no leak that bibs are indexed).
-        // t=12:00 keeps the windowed path in-window (event window is 09:00-18:00),
-        // otherwise the no-filter windowed branch would 302-redirect on a bare request.
-        $crawler = $client->request(Request::METHOD_GET, '/e/nobib-2026/photos?bib=1423&t=12:00');
+        // Bib toggle off → the digits are ignored → no search tokens → falls
+        // through to ordinary browse mode (searchMode=false, no chips rendered).
+        // Proves the bib was NOT matched into a search token.
+        //
+        // Deviation from the brief: the brief's version of this test expects
+        // assertResponseRedirects() for a bare `?q=1423` (no `t`). That is not
+        // reachable: EventController::resolveTimestamp() falls back to "now"
+        // whenever `t` is absent, *without* a window check (see
+        // EventPhotosStubTest::testMissingTimestampFallsBackToNow and the #59
+        // fix in OutsideWindowFallbackTest — the redirect only fires for an
+        // explicit out-of-window `t`, never for a missing one). Asserting a
+        // redirect here would be asserting unreachable code, so this checks the
+        // same intent (bib not matched) via the search-chip absence instead.
+        $crawler = $client->request(Request::METHOD_GET, '/e/nobib-2026/photos?q=1423');
 
         $this->assertResponseIsSuccessful();
-        $this->assertCount(0, $crawler->filter('[data-testid="bib-filter"]'));
+        $this->assertCount(1, $crawler->filter('[data-testid="time-filter"]'));
+        $this->assertCount(0, $crawler->filter('[data-testid="search-chip"]'));
     }
 
-    public function testBibFilterMatchesWhenToggleOn(): void
+    public function testBibQueryMatchesWhenToggleOn(): void
     {
         $client = self::createClient();
         /** @var EntityManagerInterface $em */
@@ -64,10 +75,10 @@ final class EventSearchTest extends WebTestCase
         PhotoFixtures::tagBib($em, $miss, '2000');
         $em->flush();
 
-        $crawler = $client->request(Request::METHOD_GET, '/e/bib-2026/photos?bib=1423');
+        $crawler = $client->request(Request::METHOD_GET, '/e/bib-2026/photos?q=1423');
 
         $this->assertResponseIsSuccessful();
         $this->assertCount(1, $crawler->filter('[data-lightbox-target="trigger"]'));
-        $this->assertCount(1, $crawler->filter('[data-testid="bib-filter"]'));
+        $this->assertSelectorTextContains('[data-testid="search-chip"]', 'bib 1423');
     }
 }

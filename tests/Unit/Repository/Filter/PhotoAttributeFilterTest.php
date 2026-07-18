@@ -23,4 +23,20 @@ final class PhotoAttributeFilterTest extends TestCase
     {
         $this->assertFalse(new PhotoAttributeFilter(bib: '1423')->isEmpty());
     }
+
+    public function testScenesDefaultEmptyAndIsEmptyTrue(): void
+    {
+        $filter = new PhotoAttributeFilter();
+
+        $this->assertSame([], $filter->scenes);
+        $this->assertTrue($filter->isEmpty());
+    }
+
+    public function testScenesOnlyMakesFilterNonEmpty(): void
+    {
+        $filter = new PhotoAttributeFilter(scenes: ['finish-line']);
+
+        $this->assertSame(['finish-line'], $filter->scenes);
+        $this->assertFalse($filter->isEmpty());
+    }
 }
