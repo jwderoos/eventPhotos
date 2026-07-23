@@ -1,17 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="referrer" content="no-referrer">
-    <title>Confirm notifications for {{ eventName }}</title>
-</head>
-<body style="font-family: sans-serif;">
-    <p>Hi,</p>
-    <p>You asked to be notified when photos from <strong>{{ eventName }}</strong> are live.</p>
-    <p>Confirm within 7 days:</p>
-    <p><a href="{{ confirmUrl }}">Confirm my email</a></p>
-    <p style="font-size: 12px; color: #666;">
-        Didn't request this? Ignore this email, or <a href="{{ unsubscribeUrl }}">unsubscribe</a>.
-    </p>
-</body>
-</html>
+{% extends 'email/_layout.html.twig' %}
+
+{% block cta_url %}{{ confirmUrl }}{% endblock %}
+{% block cta_label %}Confirm my email{% endblock %}
+{% block subject %}Confirm notifications for {{ eventName }}{% endblock %}
+{% block heading %}Confirm notifications for {{ eventName }}{% endblock %}
+{% block content %}
+    <p style="margin:0 0 12px 0; font-size:16px; line-height:1.5;">Hi,</p>
+    <p style="margin:0; font-size:16px; line-height:1.5;">You asked to be notified when photos from <strong>{{ eventName }}</strong> are live. Confirm within 7 days:</p>
+{% endblock %}
+{% block footer %}
+    Didn't request this? Ignore this email, or <a href="{{ unsubscribeUrl }}" style="color:#71717a;">unsubscribe</a>.
+{% endblock %}

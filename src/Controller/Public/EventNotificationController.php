@@ -11,12 +11,12 @@ use App\Entity\EventNotificationSubscription;
 use App\Entity\UserMailConfig;
 use App\Repository\EventNotificationSubscriptionRepository;
 use App\Repository\EventRepository;
+use App\Service\Mail\EventStyledEmailFactory;
 use App\Service\Mail\OrganizerMailerResolver;
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
-use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
@@ -42,6 +42,7 @@ final class EventNotificationController extends AbstractController
         private readonly RateLimiterFactoryInterface $signupLimiter,
         #[Autowire(service: 'limiter.confirm_email_resend')]
         private readonly RateLimiterFactoryInterface $confirmResendLimiter,
+        private readonly EventStyledEmailFactory $styledEmailFactory,
     ) {
     }
 
@@ -191,17 +192,19 @@ final class EventNotificationController extends AbstractController
             'token' => $subscription->getUnsubscribeToken(),
         ], UrlGeneratorInterface::ABSOLUTE_URL);
 
-        $email = new TemplatedEmail()
-            ->from($config->getSenderAddress())
-            ->to($subscription->getEmail())
-            ->subject(sprintf('Confirm notifications for %s', $event->getName()))
-            ->htmlTemplate('email/event-notification/confirm.html.twig')
-            ->textTemplate('email/event-notification/confirm.txt.twig')
-            ->context([
+        $email = $this->styledEmailFactory->create(
+            $event,
+            'email/event-notification/confirm.html.twig',
+            'email/event-notification/confirm.txt.twig',
+            [
                 'eventName' => $event->getName(),
                 'confirmUrl' => $confirmUrl,
                 'unsubscribeUrl' => $unsubscribeUrl,
-            ]);
+            ],
+        )
+            ->from($config->getSenderAddress())
+            ->to($subscription->getEmail())
+            ->subject(sprintf('Confirm notifications for %s', $event->getName()));
 
         try {
             $mailer->send($email);
