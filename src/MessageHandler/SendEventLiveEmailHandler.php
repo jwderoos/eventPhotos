@@ -8,11 +8,11 @@ use App\Entity\EventNotificationStatus;
 use App\Entity\UserMailConfig;
 use App\Message\SendEventLiveEmail;
 use App\Repository\EventNotificationSubscriptionRepository;
+use App\Service\Mail\EventStyledEmailFactory;
 use App\Service\Mail\OrganizerMailerResolver;
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
@@ -24,6 +24,7 @@ final readonly class SendEventLiveEmailHandler
         private OrganizerMailerResolver $mailerResolver,
         private UrlGeneratorInterface $urlGenerator,
         private EntityManagerInterface $em,
+        private EventStyledEmailFactory $styledEmailFactory,
     ) {
     }
 
@@ -60,17 +61,19 @@ final readonly class SendEventLiveEmailHandler
             UrlGeneratorInterface::ABSOLUTE_URL,
         );
 
-        $email = new TemplatedEmail()
-            ->from($config->getSenderAddress())
-            ->to($subscription->getEmail())
-            ->subject(sprintf('Photos from %s are live', $event->getName()))
-            ->htmlTemplate('email/event-notification/live.html.twig')
-            ->textTemplate('email/event-notification/live.txt.twig')
-            ->context([
+        $email = $this->styledEmailFactory->create(
+            $event,
+            'email/event-notification/live.html.twig',
+            'email/event-notification/live.txt.twig',
+            [
                 'eventName' => $event->getName(),
                 'eventUrl' => $eventUrl,
                 'unsubscribeUrl' => $unsubscribeUrl,
-            ]);
+            ],
+        )
+            ->from($config->getSenderAddress())
+            ->to($subscription->getEmail())
+            ->subject(sprintf('Photos from %s are live', $event->getName()));
 
         $mailer->send($email);
 

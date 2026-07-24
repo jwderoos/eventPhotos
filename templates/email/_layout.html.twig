@@ -1,0 +1,58 @@
+{#- Email-safe layout: table structure + inline styles only (email clients strip
+    <style> and ignore CSS custom properties). `style` is always a ResolvedStyle. -#}
+{% set bgColor = style.backgroundColor|default('#f4f4f5') %}
+{% set fgColor = style.fontColor|default('#18181b') %}
+{% set btnColor = style.buttonColor|default('#2563eb') %}
+{% set btnFgColor = style.buttonContentColor|default('#ffffff') %}
+{% set ctaUrl %}{% block cta_url %}{% endblock %}{% endset %}
+{% set ctaLabel %}{% block cta_label %}{% endblock %}{% endset %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>{% block subject %}{% endblock %}</title>
+</head>
+<body style="margin:0; padding:0; background-color:{{ bgColor }};">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:{{ bgColor }};">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%; max-width:600px; background-color:#ffffff; border-radius:8px; overflow:hidden;">
+                    {% if heroCid is defined and heroCid %}
+                        <tr>
+                            <td style="padding:0;">
+                                <img src="cid:{{ heroCid }}" alt="{{ eventName }}" width="600" style="display:block; width:100%; max-width:600px; height:auto;">
+                            </td>
+                        </tr>
+                    {% endif %}
+                    <tr>
+                        <td style="padding:32px 32px 8px 32px; font-family:Arial,Helvetica,sans-serif; color:{{ fgColor }};">
+                            <h1 style="margin:0 0 16px 0; font-size:22px; line-height:1.3; color:{{ fgColor }};">{% block heading %}{% endblock %}</h1>
+                            {% block content %}{% endblock %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px 32px 24px 32px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td style="border-radius:6px; background-color:{{ btnColor }};">
+                                        <a href="{{ ctaUrl|trim }}" style="display:inline-block; padding:12px 24px; font-family:Arial,Helvetica,sans-serif; font-size:16px; line-height:1; color:{{ btnFgColor }}; text-decoration:none;">{{ ctaLabel|trim }}</a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:0 32px 28px 32px; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:1.5; color:#71717a;">
+                            {% block footer %}
+                                Don't want these emails? <a href="{{ unsubscribeUrl }}" style="color:#71717a;">Unsubscribe</a>.
+                            {% endblock %}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

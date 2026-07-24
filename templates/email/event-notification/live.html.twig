@@ -1,16 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="referrer" content="no-referrer">
-    <title>Photos from {{ eventName }} are live</title>
-</head>
-<body style="font-family: sans-serif;">
-    <p>Hi,</p>
-    <p>The photos from <strong>{{ eventName }}</strong> are now available.</p>
-    <p><a href="{{ eventUrl }}">View the photos</a></p>
-    <p style="font-size: 12px; color: #666;">
-        Don't want these emails? <a href="{{ unsubscribeUrl }}">Unsubscribe</a>.
-    </p>
-</body>
-</html>
+{% extends 'email/_layout.html.twig' %}
+
+{% block cta_url %}{{ eventUrl }}{% endblock %}
+{% block cta_label %}View the photos{% endblock %}
+{% block subject %}Photos from {{ eventName }} are live{% endblock %}
+{% block heading %}Photos from {{ eventName }} are live{% endblock %}
+{% block content %}
+    <p style="margin:0 0 12px 0; font-size:16px; line-height:1.5;">Hi,</p>
+    <p style="margin:0; font-size:16px; line-height:1.5;">The photos from <strong>{{ eventName }}</strong> are now available.</p>
+{% endblock %}

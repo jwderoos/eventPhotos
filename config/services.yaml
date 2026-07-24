@@ -81,6 +81,9 @@ when@test:
         App\Service\Mail\OrganizerMailerResolver:
             public: true
 
+        App\Service\Mail\EventStyledEmailFactory:
+            public: true
+
         App\Tests\Mail\InMemoryTransportFactory:
             tags:
                 - { name: 'mailer.transport_factory', priority: 100 }
