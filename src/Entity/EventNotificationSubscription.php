@@ -108,7 +108,12 @@ class EventNotificationSubscription
 
         $this->status = EventNotificationStatus::Confirmed;
         $this->confirmedAt = $now;
-        $this->confirmationToken = null;
+        // Token is retained (not nulled) so a repeat tap of the confirm link
+        // still resolves this row and can render the idempotent "confirmed"
+        // page instead of the generic "invalid" page. It is inert after
+        // confirmation — the confirm controller returns before any state
+        // change. See #122. (reconstituteForImport still nulls it for
+        // non-pending imports, whose tokens are freshly minted and never sent.)
         $this->confirmationExpiresAt = null;
     }
 

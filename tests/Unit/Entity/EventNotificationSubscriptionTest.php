@@ -38,14 +38,16 @@ final class EventNotificationSubscriptionTest extends TestCase
         $this->assertGreaterThanOrEqual(43, strlen((string) $sub->getConfirmationToken()));
     }
 
-    public function testConfirmFromPendingClearsToken(): void
+    public function testConfirmFromPendingRetainsToken(): void
     {
         $sub = $this->make('a@example.com', $this->at('2026-06-21 10:00:00'));
+        $tokenBeforeConfirm = $sub->getConfirmationToken();
 
         $sub->confirm($this->at('2026-06-22 10:00:00'));
 
         $this->assertSame(EventNotificationStatus::Confirmed, $sub->getStatus());
-        $this->assertNull($sub->getConfirmationToken());
+        $this->assertNotNull($sub->getConfirmationToken());
+        $this->assertSame($tokenBeforeConfirm, $sub->getConfirmationToken());
         $this->assertFalse($sub->isConfirmationExpired($this->at('2026-07-01 10:00:00')));
     }
 

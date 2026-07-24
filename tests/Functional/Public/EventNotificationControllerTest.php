@@ -147,6 +147,64 @@ final class EventNotificationControllerTest extends WebTestCase
         self::assertSelectorTextContains('body', 'invalid');
     }
 
+    public function testDoubleConfirmShowsConfirmedPageAgain(): void
+    {
+        $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+        $event = $this->makeEventWithMail($em, 'double-confirm-event');
+        $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $sub = new EventNotificationSubscription($event, 'd@example.com', $now);
+        $token = (string) $sub->getConfirmationToken();
+        $em->persist($sub);
+        $em->flush();
+
+        $client->request(Request::METHOD_GET, '/e/double-confirm-event/notify/confirm/' . $token);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'confirmed');
+
+        // Second tap of the SAME link — must not fall into the invalid page.
+        $client->request(Request::METHOD_GET, '/e/double-confirm-event/notify/confirm/' . $token);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'confirmed');
+
+        $em->clear();
+        /** @var EventNotificationSubscriptionRepository $repo */
+        $repo = self::getContainer()->get(EventNotificationSubscriptionRepository::class);
+        /** @var Event $reloadedEvent */
+        $reloadedEvent = $em->getRepository(Event::class)->findOneBy(['slug' => 'double-confirm-event']);
+        $reloaded = $repo->findOneByEventAndEmail($reloadedEvent, 'd@example.com');
+        $this->assertInstanceOf(EventNotificationSubscription::class, $reloaded);
+        $this->assertSame(EventNotificationStatus::Confirmed, $reloaded->getStatus());
+    }
+
+    public function testExpiredConfirmTokenShowsTimedOutPage(): void
+    {
+        $client = self::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+        $event = $this->makeEventWithMail($em, 'timed-out-event');
+        // createdAt 8 days ago -> confirmationExpiresAt (createdAt + 7 days) is in the past.
+        $createdAt = new DateTimeImmutable('now', new DateTimeZone('UTC'))->modify('-8 days');
+        $sub = new EventNotificationSubscription($event, 't@example.com', $createdAt);
+        $token = (string) $sub->getConfirmationToken();
+        $em->persist($sub);
+        $em->flush();
+
+        $client->request(Request::METHOD_GET, '/e/timed-out-event/notify/confirm/' . $token);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'timed out');
+
+        $em->clear();
+        /** @var EventNotificationSubscriptionRepository $repo */
+        $repo = self::getContainer()->get(EventNotificationSubscriptionRepository::class);
+        /** @var Event $reloadedEvent */
+        $reloadedEvent = $em->getRepository(Event::class)->findOneBy(['slug' => 'timed-out-event']);
+        $reloaded = $repo->findOneByEventAndEmail($reloadedEvent, 't@example.com');
+        $this->assertInstanceOf(EventNotificationSubscription::class, $reloaded);
+        $this->assertSame(EventNotificationStatus::Pending, $reloaded->getStatus());
+    }
+
     private function makeEventWithMail(EntityManagerInterface $em, string $slug): Event
     {
         $owner = new User($slug . '-owner@example.com', 'Owner');

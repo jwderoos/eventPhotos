@@ -113,22 +113,33 @@ final class EventNotificationController extends AbstractController
     )]
     public function confirm(string $slug, string $token): Response
     {
-        $this->resolve($slug);
+        $event = $this->resolve($slug);
         $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
         $subscription = $this->subscriptions->findByConfirmationToken($token);
 
-        if (
-            !$subscription instanceof EventNotificationSubscription
-            || $subscription->getStatus() !== EventNotificationStatus::Pending
-            || $subscription->isConfirmationExpired($now)
-        ) {
+        if (!$subscription instanceof EventNotificationSubscription) {
             return $this->minimalPage('public/event_notification/invalid.html.twig');
+        }
+
+        // Idempotent: a repeat tap of an already-used (but valid) confirm link.
+        if ($subscription->getStatus() === EventNotificationStatus::Confirmed) {
+            return $this->minimalPage('public/event_notification/confirmed.html.twig', ['event' => $event]);
+        }
+
+        // Unsubscribed (or any other non-pending state) → generic invalid.
+        if ($subscription->getStatus() !== EventNotificationStatus::Pending) {
+            return $this->minimalPage('public/event_notification/invalid.html.twig');
+        }
+
+        // Pending but past the confirmation window → timed-out page.
+        if ($subscription->isConfirmationExpired($now)) {
+            return $this->minimalPage('public/event_notification/timed_out.html.twig', ['event' => $event]);
         }
 
         $subscription->confirm($now);
         $this->em->flush();
 
-        return $this->minimalPage('public/event_notification/confirmed.html.twig');
+        return $this->minimalPage('public/event_notification/confirmed.html.twig', ['event' => $event]);
     }
 
     #[Route(
