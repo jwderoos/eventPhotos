@@ -6,34 +6,26 @@ namespace App\MessageHandler;
 
 use App\Entity\EventNotificationStatus;
 use App\Entity\UserMailConfig;
-use App\Message\SendEventLiveEmail;
+use App\Message\SendSubscriptionConfirmationEmail;
 use App\Repository\EventNotificationSubscriptionRepository;
 use App\Service\Mail\EventStyledEmailFactory;
 use App\Service\Mail\OrganizerMailerResolver;
-use DateTimeImmutable;
-use DateTimeZone;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 #[AsMessageHandler]
-final readonly class SendEventLiveEmailHandler
+final readonly class SendSubscriptionConfirmationEmailHandler
 {
     public function __construct(
         private EventNotificationSubscriptionRepository $subscriptions,
         private OrganizerMailerResolver $mailerResolver,
         private EventStyledEmailFactory $emailFactory,
-        private EntityManagerInterface $em,
     ) {
     }
 
-    public function __invoke(SendEventLiveEmail $message): void
+    public function __invoke(SendSubscriptionConfirmationEmail $message): void
     {
         $subscription = $this->subscriptions->find($message->subscriptionId);
-        if (
-            $subscription === null
-            || $subscription->getStatus() !== EventNotificationStatus::Confirmed
-            || $subscription->getNotifiedAt() !== null
-        ) {
+        if ($subscription === null || $subscription->getStatus() !== EventNotificationStatus::Pending) {
             return;
         }
 
@@ -43,14 +35,9 @@ final readonly class SendEventLiveEmailHandler
             return;
         }
 
-        // Strict resolver: throws if the organizer transport vanished. The thrown
-        // exception hard-fails the message into Messenger's retry/dead-letter path —
+        // Strict resolver: a throw hard-fails into Messenger retry/dead-letter —
         // never a platform-mail fallback.
         $mailer = $this->mailerResolver->forEvent($event);
-
-        $mailer->send($this->emailFactory->liveAnnouncement($event, $subscription, $config));
-
-        $subscription->markNotified(new DateTimeImmutable('now', new DateTimeZone('UTC')));
-        $this->em->flush();
+        $mailer->send($this->emailFactory->confirmation($event, $subscription, $config));
     }
 }

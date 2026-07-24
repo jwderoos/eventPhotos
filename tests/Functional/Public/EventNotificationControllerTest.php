@@ -9,20 +9,20 @@ use App\Entity\EventNotificationStatus;
 use App\Entity\EventNotificationSubscription;
 use App\Entity\User;
 use App\Entity\UserMailConfig;
+use App\Message\SendSubscriptionConfirmationEmail;
 use App\Repository\EventNotificationSubscriptionRepository;
 use App\Service\Mail\DsnVault;
 use App\Tests\Mail\CapturedMail;
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class EventNotificationControllerTest extends WebTestCase
 {
-    /** Host the organizer DSN resolves to via the test DNS stub (PrebakedDnsResolver). */
-    private const string ORGANIZER_MAIL_HOST = '93.184.216.34';
-
     protected function setUp(): void
     {
         CapturedMail::reset();
@@ -45,7 +45,10 @@ final class EventNotificationControllerTest extends WebTestCase
         );
 
         self::assertResponseIsSuccessful();
-        $this->assertCount(1, CapturedMail::messagesForHost(self::ORGANIZER_MAIL_HOST));
+
+        $sent = $this->asyncTransport()->getSent();
+        $this->assertCount(1, $sent);
+        $this->assertInstanceOf(SendSubscriptionConfirmationEmail::class, $sent[0]->getMessage());
 
         /** @var EventNotificationSubscriptionRepository $repo */
         $repo = self::getContainer()->get(EventNotificationSubscriptionRepository::class);
@@ -71,7 +74,7 @@ final class EventNotificationControllerTest extends WebTestCase
         );
 
         self::assertResponseIsSuccessful();
-        $this->assertCount(0, CapturedMail::messagesForHost(self::ORGANIZER_MAIL_HOST));
+        $this->assertCount(0, $this->asyncTransport()->getSent());
 
         /** @var EventNotificationSubscriptionRepository $repo */
         $repo = self::getContainer()->get(EventNotificationSubscriptionRepository::class);
@@ -106,7 +109,7 @@ final class EventNotificationControllerTest extends WebTestCase
         );
 
         self::assertResponseIsSuccessful();
-        $this->assertCount(0, CapturedMail::messagesForHost(self::ORGANIZER_MAIL_HOST));
+        $this->assertCount(0, $this->asyncTransport()->getSent());
     }
 
     public function testConfirmTokenConfirms(): void
@@ -205,8 +208,25 @@ final class EventNotificationControllerTest extends WebTestCase
         $this->assertSame(EventNotificationStatus::Pending, $reloaded->getStatus());
     }
 
+    private function asyncTransport(): InMemoryTransport
+    {
+        /** @var InMemoryTransport $transport */
+        $transport = self::getContainer()->get('messenger.transport.async');
+
+        return $transport;
+    }
+
     private function makeEventWithMail(EntityManagerInterface $em, string $slug): Event
     {
+        // The confirm_email_resend limiter lives in a filesystem-backed pool that
+        // persists across runs; clear it so repeated local runs within the 10-min
+        // window don't suppress the dispatch these tests assert on. Called after
+        // createClient() has booted the kernel, so getContainer() is safe here.
+        $pool = self::getContainer()->get('rate_limiter.cache_pool');
+        if ($pool instanceof CacheItemPoolInterface) {
+            $pool->clear();
+        }
+
         $owner = new User($slug . '-owner@example.com', 'Owner');
         $owner->addRole('ROLE_ORGANIZER');
 

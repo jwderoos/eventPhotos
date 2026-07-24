@@ -4,28 +4,25 @@ declare(strict_types=1);
 
 namespace App\Controller\Public;
 
-use Throwable;
 use App\Entity\Event;
 use App\Entity\EventNotificationStatus;
 use App\Entity\EventNotificationSubscription;
-use App\Entity\UserMailConfig;
+use App\Message\SendSubscriptionConfirmationEmail;
 use App\Repository\EventNotificationSubscriptionRepository;
 use App\Repository\EventRepository;
 use App\Service\Mail\OrganizerMailerResolver;
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
-use Psr\Log\LoggerInterface;
-use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Validator\Constraints\Email;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -37,7 +34,7 @@ final class EventNotificationController extends AbstractController
         private readonly OrganizerMailerResolver $mailerResolver,
         private readonly EntityManagerInterface $em,
         private readonly ValidatorInterface $validator,
-        private readonly LoggerInterface $logger,
+        private readonly MessageBusInterface $bus,
         #[Autowire(service: 'limiter.visitor_email_signup')]
         private readonly RateLimiterFactoryInterface $signupLimiter,
         #[Autowire(service: 'limiter.confirm_email_resend')]
@@ -99,7 +96,7 @@ final class EventNotificationController extends AbstractController
         $this->em->flush();
 
         if ($shouldSend && $this->confirmResendLimiter->create($email)->consume()->isAccepted()) {
-            $this->sendConfirmation($event, $subscription);
+            $this->bus->dispatch(new SendSubscriptionConfirmationEmail((int) $subscription->getId()));
         }
 
         return $this->checkInbox($event);
@@ -162,55 +159,6 @@ final class EventNotificationController extends AbstractController
         }
 
         return $this->minimalPage('public/event_notification/unsubscribed.html.twig');
-    }
-
-    private function sendConfirmation(Event $event, EventNotificationSubscription $subscription): void
-    {
-        $config = $event->getOwner()->getMailConfig();
-        if (!$config instanceof UserMailConfig) {
-            return;
-        }
-
-        try {
-            $mailer = $this->mailerResolver->forEvent($event);
-        } catch (Throwable $throwable) {
-            $this->logger->error('Could not resolve organizer mailer for confirmation.', [
-                'event_id' => $event->getId(),
-                'exception' => $throwable->getMessage(),
-            ]);
-
-            return;
-        }
-
-        $confirmUrl = $this->generateUrl('public_event_notify_confirm', [
-            'slug' => $event->getSlug(),
-            'token' => $subscription->getConfirmationToken(),
-        ], UrlGeneratorInterface::ABSOLUTE_URL);
-        $unsubscribeUrl = $this->generateUrl('public_event_notify_unsubscribe', [
-            'slug' => $event->getSlug(),
-            'token' => $subscription->getUnsubscribeToken(),
-        ], UrlGeneratorInterface::ABSOLUTE_URL);
-
-        $email = new TemplatedEmail()
-            ->from($config->getSenderAddress())
-            ->to($subscription->getEmail())
-            ->subject(sprintf('Confirm notifications for %s', $event->getName()))
-            ->htmlTemplate('email/event-notification/confirm.html.twig')
-            ->textTemplate('email/event-notification/confirm.txt.twig')
-            ->context([
-                'eventName' => $event->getName(),
-                'confirmUrl' => $confirmUrl,
-                'unsubscribeUrl' => $unsubscribeUrl,
-            ]);
-
-        try {
-            $mailer->send($email);
-        } catch (Throwable $throwable) {
-            $this->logger->error('Failed sending confirmation email.', [
-                'event_id' => $event->getId(),
-                'exception' => $throwable->getMessage(),
-            ]);
-        }
     }
 
     private function checkInbox(Event $event): Response

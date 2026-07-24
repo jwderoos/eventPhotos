@@ -76,7 +76,7 @@
                         control this with the “Allow participants to request email updates” checkbox above.
                     </p>
 
-                    <p class="text-sm text-base-content/70">{{ subscriberCount }} subscriber(s) so far.</p>
+                    <p class="text-sm text-base-content/70">{{ confirmedCount }} confirmed of {{ subscriberCount }} total signup(s).</p>
 
                     {% if event.isPublished %}
                         <p class="text-sm">Published {{ event.publishedAt|date('Y-m-d H:i') }} — notifications sent.</p>
@@ -97,6 +97,18 @@
                                 <span class="text-xs text-base-content/60">Add at least one ready photo before publishing.</span>
                             {% endif %}
                         </form>
+
+                        {% if pendingCount > 0 %}
+                            <form method="post" action="{{ path('admin_event_notify_resend_pending', {id: event.id}) }}" class="mt-2 flex flex-col gap-1">
+                                <input type="hidden" name="_token" value="{{ csrf_token('resend_pending_' ~ event.id) }}">
+                                <button type="submit" class="btn btn-outline btn-sm w-fit">
+                                    Re-send confirmation to {{ pendingCount }} unverified subscriber(s)
+                                </button>
+                                <span class="text-xs text-base-content/60">
+                                    Nudges unconfirmed sign-ups with a fresh link — run before publishing.
+                                </span>
+                            </form>
+                        {% endif %}
                     {% endif %}
                 {% endif %}
             </div>
