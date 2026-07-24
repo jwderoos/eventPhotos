@@ -11,9 +11,11 @@ services:
     image: caddy:2-alpine
     env_file:
       - .env.prod            # supplies {$DOMAIN} used by the Caddyfile
-    ports:
-      - "80:80"
-      - "443:443"
+    # Host network namespace: Caddy binds ens3 (v4 + v6) directly and sees the
+    # real client IP. The Docker bridge is IPv4-only, so on-bridge Caddy would
+    # SNAT IPv6 clients to the gateway (172.18.0.1), collapsing them into one
+    # rate-limit bucket. Reaches nginx via its loopback-published port below.
+    network_mode: host
     volumes:
       - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data      # ACME account + issued certs — MUST persist
@@ -25,9 +27,12 @@ services:
     mem_limit: 64m
     cpus: 0.5
 
-  # nginx no longer publishes a host port; Caddy reaches it as nginx:80 in-network.
+  # Published on the loopback interface only so host-network Caddy can reach it
+  # (it can't resolve the Docker service name `nginx`). Not exposed publicly —
+  # Caddy remains the sole public edge, terminating TLS on ens3.
   nginx:
-    ports: !override []
+    ports: !override
+      - "127.0.0.1:8080:80"
     mem_limit: 128m
     cpus: 0.5
 

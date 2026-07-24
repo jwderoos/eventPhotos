@@ -5,5 +5,11 @@
 # caddy_data named volume so restarts don't re-hit ACME rate limits.
 {$DOMAIN} {
 	encode zstd gzip
-	reverse_proxy nginx:80
+	# Caddy runs in the host network namespace (see compose.vps.yaml) so it sees
+	# the real client IP for BOTH IPv4 and IPv6 clients. The Docker bridge is
+	# IPv4-only, so if Caddy sat on it, IPv6 clients would be SNAT'd to the
+	# bridge gateway (172.18.0.1) and collapse into one rate-limit bucket.
+	# In host mode the Docker service name `nginx` is not resolvable, so we
+	# reach nginx via its loopback-published port.
+	reverse_proxy 127.0.0.1:8080
 }
