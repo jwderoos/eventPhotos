@@ -9,14 +9,14 @@ use App\Entity\EventDisplayState;
 use App\Entity\Photo;
 use App\Entity\PhotoStatus;
 use App\Repository\EventRepository;
-use App\Repository\Filter\PhotoAttributeFilter;
 use App\Repository\OrganizerProfileRepository;
 use App\Repository\PhotoAttributeRepository;
 use App\Repository\PhotoRepository;
 use App\Service\Brand\BrandResolver;
 use App\Service\Event\PhotosUrlBuilder;
 use App\Service\Mail\OrganizerMailerResolver;
-use App\Service\Photo\AttributeVocabulary;
+use App\Service\Photo\Search\ParsedPhotoQuery;
+use App\Service\Photo\Search\PhotoSearchQueryParser;
 use App\Service\QrCodeRenderer;
 use App\Service\Style\StyleResolver;
 use DateTimeImmutable;
@@ -64,6 +64,7 @@ final class EventController extends AbstractController
         private readonly BrandResolver $brandResolver,
         #[Autowire(service: 'event_banners_storage')]
         private readonly FilesystemOperator $eventBannersStorage,
+        private readonly PhotoSearchQueryParser $searchParser,
     ) {
     }
 
@@ -99,9 +100,12 @@ final class EventController extends AbstractController
             throw new BadRequestHttpException('Window is no longer configurable per request.');
         }
 
-        $filter = $this->buildFilter($request, $event);
-        if (!$filter->isEmpty()) {
-            return $this->renderSearch($event, $filter, $request);
+        $hasAttributes = $this->photoAttributes->eventHasAttributes($event);
+        $q             = trim((string) $request->query->get('q', ''));
+        $parsed        = $this->searchParser->parse($q, $event->isBibIndexingEnabled(), $hasAttributes);
+
+        if (!$parsed->isEmpty()) {
+            return $this->renderSearch($event, $parsed, $q, $hasAttributes, $request);
         }
 
         $timestamp = $this->resolveTimestamp($request->query->get('t'), $event);
@@ -187,56 +191,29 @@ final class EventController extends AbstractController
             'resolvedStyle'    => $this->styleResolver->resolve($event),
             'brand'            => $this->brandResolver->resolve($event),
             'searchMode'       => false,
-            'filter'           => new PhotoAttributeFilter(),
-            'filterAvailable'  => $this->photoAttributes->eventHasAttributes($event),
+            'parsedQuery'      => new ParsedPhotoQuery([], []),
+            'q'                => '',
+            'filterAvailable'  => $hasAttributes,
             'bibSearchEnabled' => $event->isBibIndexingEnabled(),
-            'allowedColours'   => AttributeVocabulary::COLORS,
-            'allowedGarments'  => AttributeVocabulary::GARMENTS,
         ], $response);
     }
 
-    private function buildFilter(Request $request, Event $event): PhotoAttributeFilter
-    {
-        $colours  = $this->allowedValues($request->query->all('colour'), AttributeVocabulary::COLORS);
-        $garments = $this->allowedValues($request->query->all('garment'), AttributeVocabulary::GARMENTS);
-
-        $bib = null;
-        if ($event->isBibIndexingEnabled()) {
-            $raw = trim((string) $request->query->get('bib', ''));
-            if ($raw !== '') {
-                $bib = $raw;
-            }
-        }
-
-        return new PhotoAttributeFilter($colours, $garments, $bib);
-    }
-
-    /**
-     * @param  array<int|string, mixed> $requested
-     * @param  list<string>             $allowed
-     * @return list<string>
-     */
-    private function allowedValues(array $requested, array $allowed): array
-    {
-        $clean = [];
-        foreach ($requested as $value) {
-            if (is_string($value) && in_array($value, $allowed, true) && !in_array($value, $clean, true)) {
-                $clean[] = $value;
-            }
-        }
-
-        return $clean;
-    }
-
-    private function renderSearch(Event $event, PhotoAttributeFilter $filter, Request $request): Response
-    {
+    private function renderSearch(
+        Event $event,
+        ParsedPhotoQuery $parsed,
+        string $q,
+        bool $hasAttributes,
+        Request $request,
+    ): Response {
+        $filter        = $parsed->toFilter();
         $lastUpdatedAt = $this->photos->lastReadyUpdatedAtForEvent($event);
         $readyCount    = $this->photos->countReady($event);
         $etag          = sha1(sprintf(
-            '%d|search|%s|%s|%s|%s|%d',
+            '%d|search|%s|%s|%s|%s|%s|%d',
             (int) $event->getId(),
             implode(',', $filter->colours),
             implode(',', $filter->garments),
+            implode(',', $filter->scenes),
             $filter->bib ?? '-',
             $lastUpdatedAt instanceof DateTimeImmutable ? $lastUpdatedAt->format('U.u') : '-',
             $readyCount,
@@ -257,15 +234,14 @@ final class EventController extends AbstractController
         return $this->render('public/event/photos.html.twig', [
             'event'            => $event,
             'searchMode'       => true,
-            'filter'           => $filter,
-            'filterAvailable'  => $this->photoAttributes->eventHasAttributes($event),
+            'parsedQuery'      => $parsed,
+            'q'                => $q,
+            'filterAvailable'  => $hasAttributes,
             'photos'           => $photos,
             'capHit'           => count($photos) === self::HARD_CAP,
             'firstRank'        => 1,
             'totalReady'       => count($photos),
             'bibSearchEnabled' => $event->isBibIndexingEnabled(),
-            'allowedColours'   => AttributeVocabulary::COLORS,
-            'allowedGarments'  => AttributeVocabulary::GARMENTS,
             'resolvedStyle'    => $this->styleResolver->resolve($event),
             'brand'            => $this->brandResolver->resolve($event),
         ], $response);

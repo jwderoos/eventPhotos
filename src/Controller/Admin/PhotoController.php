@@ -8,13 +8,10 @@ use App\Audit\AuditAction;
 use App\Audit\AuditContext;
 use App\Audit\Attribute\AuditIgnore;
 use App\Audit\Attribute\Audited;
-use App\Entity\BibSuppression;
 use App\Entity\Event;
 use App\Entity\Photo;
 use App\Entity\PhotoStatus;
 use App\Message\ProcessPhoto;
-use App\Repository\BibSuppressionRepository;
-use App\Repository\PhotoAttributeRepository;
 use App\Repository\PhotoRepository;
 use App\Security\Voter\EventVoter;
 use App\Security\Voter\PhotoVoter;
@@ -43,11 +40,11 @@ final class PhotoController extends AbstractController
 
     private const string STALE_PENDING_THRESHOLD = '-5 minutes';
 
+    private const string STALE_TAGGING_THRESHOLD = '-5 minutes';
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly PhotoRepository $photos,
-        private readonly BibSuppressionRepository $bibSuppressions,
-        private readonly PhotoAttributeRepository $photoAttributes,
         private readonly MessageBusInterface $bus,
         #[Autowire(service: 'photo_originals_storage')]
         private readonly FilesystemOperator $originals,
@@ -183,22 +180,36 @@ final class PhotoController extends AbstractController
         $total = $result['total'];
 
         $hasStalePending = false;
-        $cutoff          = new DateTimeImmutable(self::STALE_PENDING_THRESHOLD);
+        $hasStaleTagging = false;
+        $pendingCutoff   = new DateTimeImmutable(self::STALE_PENDING_THRESHOLD);
+        $taggingCutoff   = new DateTimeImmutable(self::STALE_TAGGING_THRESHOLD);
         foreach ($photos as $p) {
-            if ($p->getStatus() === PhotoStatus::Pending && $p->getCreatedAt() < $cutoff) {
+            if ($p->getStatus() === PhotoStatus::Pending && $p->getCreatedAt() < $pendingCutoff) {
                 $hasStalePending = true;
-                break;
+            }
+
+            if ($p->isTaggingPending() && $p->getUpdatedAt() < $taggingCutoff) {
+                $hasStaleTagging = true;
             }
         }
 
+        $readyCount           = $this->photos->countReady($event);
+        $taggedCount          = $this->photos->countTagged($event);
+        $pendingCount         = $this->photos->countByStatus($event, PhotoStatus::Pending);
+        $processingIncomplete = $pendingCount > 0 || $taggedCount < $readyCount;
+
         return $this->render('admin/event/photos_grid.html.twig', [
-            'event'           => $event,
-            'photos'          => $photos,
-            'total'           => $total,
-            'page'            => $page,
-            'perPage'         => self::PER_PAGE,
-            'hasStalePending' => $hasStalePending,
-            'failedCount'     => $this->photos->countByStatus($event, PhotoStatus::Failed),
+            'event'                => $event,
+            'photos'               => $photos,
+            'total'                => $total,
+            'page'                 => $page,
+            'perPage'              => self::PER_PAGE,
+            'hasStalePending'      => $hasStalePending,
+            'failedCount'          => $this->photos->countByStatus($event, PhotoStatus::Failed),
+            'readyCount'           => $readyCount,
+            'taggedCount'          => $taggedCount,
+            'hasStaleTagging'      => $hasStaleTagging,
+            'processingIncomplete' => $processingIncomplete,
         ]);
     }
 
@@ -338,47 +349,6 @@ final class PhotoController extends AbstractController
         $this->bus->dispatch(new ProcessPhoto($photoId, reingest: true));
 
         return $this->redirectToRoute('admin_photo_grid', $target);
-    }
-
-    #[Route(
-        '/admin/events/{id}/bib-suppressions',
-        name: 'admin_bib_suppress',
-        requirements: ['id' => '\d+'],
-        methods: ['POST'],
-    )]
-    #[Audited(AuditAction::EventBibSuppress, targetParam: 'id', targetType: 'Event')]
-    public function suppressBib(Event $event, Request $request): RedirectResponse
-    {
-        $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
-        $this->assertCsrf($request, 'suppress_bib_' . $event->getId());
-
-        $bibNumber = trim((string) $request->request->get('bibNumber'));
-        if ($bibNumber === '') {
-            $this->addFlash('error', 'Enter a bib number to suppress.');
-
-            return $this->redirectToRoute('admin_photo_grid', ['id' => $event->getId()]);
-        }
-
-        if (mb_strlen($bibNumber) > BibSuppression::MAX_BIB_NUMBER_LENGTH) {
-            $this->addFlash('error', 'Bib number is too long.');
-
-            return $this->redirectToRoute('admin_photo_grid', ['id' => $event->getId()]);
-        }
-
-        // Plan C: delete every already-stored bib PhotoAttribute row event-wide so the
-        // bib disappears from search immediately (not just on the next re-ingest). The
-        // BibSuppression insert below (Plan A) blocks any future re-add on re-ingest.
-        $this->photoAttributes->deleteBibForEvent($event, $bibNumber);
-
-        if (!$this->bibSuppressions->isSuppressed($event, $bibNumber)) {
-            $this->em->persist(new BibSuppression($event, $bibNumber));
-            $this->em->flush();
-        }
-
-        $this->audit->set('suppressed_bib', $bibNumber);
-        $this->addFlash('success', sprintf('Bib %s will not be indexed.', $bibNumber));
-
-        return $this->redirectToRoute('admin_photo_grid', ['id' => $event->getId()]);
     }
 
     #[Route(

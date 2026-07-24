@@ -13,6 +13,7 @@ use App\Entity\User;
 use App\Message\ExtractPhotoAttributes;
 use App\MessageHandler\ExtractPhotoAttributesHandler;
 use App\Repository\PhotoAttributeRepository;
+use App\Service\Photo\AttributeExtractionUnavailable;
 use App\Service\Photo\AttributeScore;
 use App\Service\Photo\ExtractedAttributes;
 use App\Tests\Fake\FakeAttributeExtractorClient;
@@ -85,6 +86,22 @@ final class ExtractPhotoAttributesHandlerTest extends KernelTestCase
         // The handler reads the preview derivative; content is irrelevant to the fake client.
         $path = sprintf('event-%d/%d.jpg', $this->event->getId(), $photo->getId());
         $this->previews->write($path, 'fake-preview-bytes');
+
+        return $photo;
+    }
+
+    /**
+     * A Ready photo whose preview bytes were never written to the previews disk,
+     * so the handler's read() fails and it returns early.
+     */
+    private function seedReadyPhotoWithoutPreview(string $hash): Photo
+    {
+        $photo = new Photo($this->event, str_pad($hash, 64, '0'), 'p.jpg', 1000);
+        $this->em->persist($photo);
+        $this->em->flush();
+
+        $photo->markReady(new DateTimeImmutable('2026-06-10 10:30'), 1600, 1067, 500);
+        $this->em->flush();
 
         return $photo;
     }
@@ -168,8 +185,10 @@ final class ExtractPhotoAttributesHandlerTest extends KernelTestCase
         $this->assertSame([], $this->valuesOfType($photo, PhotoAttributeType::Bib));
     }
 
-    public function testBibSkippedWhenSuppressed(): void
+    public function testBibWrittenEvenWhenSuppressed(): void
     {
+        // Suppression is a read-time overlay now; extraction still stores the bib
+        // so undo (removing the suppression) is lossless.
         $this->event->enableBibIndexing();
         $this->em->persist(new BibSuppression($this->event, '1423'));
         $this->em->flush();
@@ -179,7 +198,7 @@ final class ExtractPhotoAttributesHandlerTest extends KernelTestCase
 
         ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
 
-        $this->assertSame([], $this->valuesOfType($photo, PhotoAttributeType::Bib));
+        $this->assertSame(['1423'], $this->valuesOfType($photo, PhotoAttributeType::Bib));
     }
 
     public function testBibWrittenWhenAllConditionsMet(): void
@@ -194,7 +213,7 @@ final class ExtractPhotoAttributesHandlerTest extends KernelTestCase
         $this->assertSame(['1423'], $this->valuesOfType($photo, PhotoAttributeType::Bib));
     }
 
-    public function testSuppressionSurvivesReingest(): void
+    public function testReingestRewritesBibEvenWhenSuppressed(): void
     {
         $this->event->enableBibIndexing();
         $photo = $this->seedReadyPhoto('a1');
@@ -204,13 +223,75 @@ final class ExtractPhotoAttributesHandlerTest extends KernelTestCase
         ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
         $this->assertSame(['1423'], $this->valuesOfType($photo, PhotoAttributeType::Bib));
 
-        // Organizer de-indexes: delete bib tags + suppress (Plan A behaviour, simulated here).
-        $this->attributes->deleteForPhoto($photo);
+        // Organizer de-indexes (reversible overlay): suppression flag only, no row deletion.
         $this->em->persist(new BibSuppression($this->event, '1423'));
         $this->em->flush();
 
-        // Re-ingest re-dispatches extraction; the same bib must NOT reappear.
+        // Re-ingest re-dispatches extraction; the bib row is re-written (search hides it).
         ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
-        $this->assertSame([], $this->valuesOfType($photo, PhotoAttributeType::Bib));
+        $this->assertSame(['1423'], $this->valuesOfType($photo, PhotoAttributeType::Bib));
+    }
+
+    public function testMarksAttributesExtractedOnSuccessWithTags(): void
+    {
+        $photo = $this->seedReadyPhoto('gg');
+        $this->client->setNext($this->response(colors: [['orange', 0.92]]));
+
+        ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
+
+        $this->em->refresh($photo);
+        $this->assertInstanceOf(DateTimeImmutable::class, $photo->getAttributesExtractedAt());
+    }
+
+    public function testMarksAttributesExtractedOnSuccessWithNoTags(): void
+    {
+        $photo = $this->seedReadyPhoto('hh');
+        $this->client->setNext(ExtractedAttributes::empty());
+
+        ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
+
+        $this->em->refresh($photo);
+        $this->assertInstanceOf(DateTimeImmutable::class, $photo->getAttributesExtractedAt());
+    }
+
+    public function testDoesNotMarkAttributesExtractedWhenPreviewMissing(): void
+    {
+        $photo = $this->seedReadyPhotoWithoutPreview('ii');
+
+        ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
+
+        $this->em->refresh($photo);
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $photo->getAttributesExtractedAt());
+    }
+
+    public function testExtractionFailurePreservesExistingTagsAndDoesNotMark(): void
+    {
+        $photo = $this->seedReadyPhoto('jj');
+
+        // Seed pre-existing tags directly (bypassing the handler) so the photo
+        // starts with a null attributesExtractedAt marker, matching the real
+        // "tagged once already, re-ingest kicks off a new extraction" scenario.
+        $this->em->persist(new PhotoAttribute($photo, PhotoAttributeType::ClothingColor, 'orange', 0.92));
+        $this->em->flush();
+        $this->assertSame(['orange'], $this->valuesOfType($photo, PhotoAttributeType::ClothingColor));
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $photo->getAttributesExtractedAt());
+
+        $this->client->throwOnNextExtract(new AttributeExtractionUnavailable('down'));
+
+        $threw = false;
+        try {
+            ($this->handler)(new ExtractPhotoAttributes($photo->getId() ?? 0));
+        } catch (AttributeExtractionUnavailable) {
+            $threw = true;
+        }
+
+        $this->assertTrue($threw, 'Handler must re-throw AttributeExtractionUnavailable.');
+
+        $this->em->clear();
+        /** @var Photo $refetched */
+        $refetched = $this->em->find(Photo::class, $photo->getId());
+
+        $this->assertSame(['orange'], $this->valuesOfType($refetched, PhotoAttributeType::ClothingColor));
+        $this->assertNotInstanceOf(DateTimeImmutable::class, $refetched->getAttributesExtractedAt());
     }
 }

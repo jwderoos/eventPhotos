@@ -132,7 +132,7 @@ final class BibSuppressionActionTest extends WebTestCase
         $this->assertSame(1, $count);
     }
 
-    public function testSuppressBibDeletesStoredBibTags(): void
+    public function testSuppressBibKeepsStoredBibTags(): void
     {
         [$user, $event] = $this->makeOrganizerWithEvent();
 
@@ -156,7 +156,112 @@ final class BibSuppressionActionTest extends WebTestCase
 
         /** @var PhotoAttributeRepository $repo */
         $repo = self::getContainer()->get(PhotoAttributeRepository::class);
-        $this->assertSame([], $repo->findBy(['type' => PhotoAttributeType::Bib, 'value' => '1423']));
+        // Reversible overlay: the bib row is NOT deleted, only flagged suppressed.
+        $this->assertCount(1, $repo->findBy(['type' => PhotoAttributeType::Bib, 'value' => '1423']));
         $this->assertCount(1, $repo->findBy(['type' => PhotoAttributeType::ClothingColor, 'value' => 'orange']));
+
+        /** @var BibSuppressionRepository $suppressions */
+        $suppressions = self::getContainer()->get(BibSuppressionRepository::class);
+        $this->assertTrue($suppressions->isSuppressed($event, '1423'));
+    }
+
+    public function testReindexBibRemovesSuppression(): void
+    {
+        [$user, $event] = $this->makeOrganizerWithEvent();
+        $this->em->persist(new BibSuppression($event, '1423'));
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $token = $this->primeCsrfToken('reindex_bib_' . $event->getId());
+
+        $this->client->request(Request::METHOD_POST, '/admin/events/' . $event->getId() . '/bib-reindex', [
+            'bibNumber' => '1423',
+            '_token'    => $token,
+        ]);
+
+        self::assertResponseRedirects();
+
+        /** @var BibSuppressionRepository $repo */
+        $repo = self::getContainer()->get(BibSuppressionRepository::class);
+        $this->assertFalse($repo->isSuppressed($event, '1423'));
+    }
+
+    public function testReindexBibRequiresCsrf(): void
+    {
+        [$user, $event] = $this->makeOrganizerWithEvent();
+        $this->client->loginUser($user);
+
+        $this->client->request(Request::METHOD_POST, '/admin/events/' . $event->getId() . '/bib-reindex', [
+            'bibNumber' => '1423',
+            '_token'    => 'wrong',
+        ]);
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testTagsPageShowsDeindexedBibWithUndoAndHidesItFromIndexed(): void
+    {
+        [$user, $event] = $this->makeOrganizerWithEvent();
+
+        $photo = new Photo($event, str_pad('t1', 64, '0'), 'p.jpg', 1000);
+        $this->em->persist($photo);
+        $this->em->flush();
+        $this->em->persist(new PhotoAttribute($photo, PhotoAttributeType::Bib, '1423', 0.99));
+        $this->em->persist(new BibSuppression($event, '1423'));
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request(Request::METHOD_GET, '/admin/events/' . $event->getId() . '/tags');
+
+        self::assertResponseIsSuccessful();
+        // A de-indexed bib appears in its own list with a re-index form, not as an indexed chip.
+        $this->assertGreaterThan(
+            0,
+            $crawler->filter('form[action$="/bib-reindex"]')->count(),
+            'expected an undo (re-index) form for the de-indexed bib',
+        );
+        self::assertSelectorTextContains('[data-role="deindexed-bib"]', '1423');
+        // The suppressed bib must NOT appear as an indexed (clickable) chip.
+        self::assertSelectorNotExists('a[data-role="tag-chip"][href*="bib=1423"]');
+    }
+
+    public function testPhotoGridPageHasNoDeindexForm(): void
+    {
+        [$user, $event] = $this->makeOrganizerWithEvent();
+        $this->client->loginUser($user);
+
+        $this->client->request(
+            Request::METHOD_GET,
+            '/admin/events/' . $event->getId() . '/photos-grid',
+        );
+
+        self::assertResponseIsSuccessful();
+        // The de-index form lives on the tags page (#117 review); the photo grid
+        // must not post to the suppress route.
+        self::assertSelectorNotExists('form[action$="/bib-suppressions"]');
+    }
+
+    public function testReindexBibWithoutMatchingSuppressionIsNoOp(): void
+    {
+        [$user, $event] = $this->makeOrganizerWithEvent();
+        $this->client->loginUser($user);
+
+        $token = $this->primeCsrfToken('reindex_bib_' . $event->getId());
+
+        $this->client->request(Request::METHOD_POST, '/admin/events/' . $event->getId() . '/bib-reindex', [
+            'bibNumber' => '9999',
+            '_token'    => $token,
+        ]);
+
+        self::assertResponseRedirects();
+
+        $count = $this->em->createQueryBuilder()
+            ->select('COUNT(bs)')
+            ->from(BibSuppression::class, 'bs')
+            ->where('bs.event = :event')
+            ->setParameter('event', $event)
+            ->getQuery()
+            ->getSingleScalarResult();
+        $this->assertSame(0, $count);
     }
 }

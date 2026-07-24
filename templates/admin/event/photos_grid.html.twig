@@ -1,9 +1,20 @@
 <turbo-frame id="photos-grid">
+    {% if processingIncomplete %}<span data-processing-incomplete hidden></span>{% endif %}
     {% if hasStalePending %}
         <div class="alert alert-warning my-4">
             Some photos look stuck. Is the worker running?
             <code>bin/console messenger:consume async failed -vv</code>
         </div>
+    {% endif %}
+    {% if hasStaleTagging %}
+        <div class="alert alert-warning my-4">
+            Some photos are taking a long time to tag. Is the worker and inference service running?
+        </div>
+    {% endif %}
+    {% if readyCount > 0 %}
+        <p class="text-sm text-base-content/70 my-2" data-testid="tagging-progress">
+            Tagging {{ taggedCount }} / {{ readyCount }}
+        </p>
     {% endif %}
 
     {% if total == 0 %}
@@ -54,20 +65,6 @@
                 {% endif %}
             </div>
         </nav>
-    {% endif %}
-
-    {% if event.bibIndexingEnabled %}
-        <form method="post"
-              action="{{ path('admin_bib_suppress', {id: event.id}) }}"
-              class="mt-6 flex items-end gap-2">
-            <label class="form-control">
-                <span class="label-text">De-index a bib number</span>
-                <input type="text" name="bibNumber" class="input input-bordered input-sm" maxlength="64" required>
-            </label>
-            <input type="hidden" name="_token"
-                   value="{{ csrf_token('suppress_bib_' ~ event.id) }}">
-            <button type="submit" class="btn btn-sm">Suppress</button>
-        </form>
     {% endif %}
 
     {% if total > 0 %}

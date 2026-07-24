@@ -40,6 +40,9 @@ class Photo
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?DateTimeImmutable $takenAt = null;
 
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?DateTimeImmutable $attributesExtractedAt = null;
+
     #[ORM\Column(type: Types::STRING, length: 16, enumType: PhotoStatus::class)]
     private PhotoStatus $status = PhotoStatus::Pending;
 
@@ -139,6 +142,23 @@ class Photo
         return $this->updatedAt;
     }
 
+    public function getAttributesExtractedAt(): ?DateTimeImmutable
+    {
+        return $this->attributesExtractedAt;
+    }
+
+    public function markAttributesExtracted(): void
+    {
+        $now = new DateTimeImmutable();
+        $this->attributesExtractedAt = $now;
+        $this->updatedAt = $now;
+    }
+
+    public function isTaggingPending(): bool
+    {
+        return $this->status === PhotoStatus::Ready && !$this->attributesExtractedAt instanceof DateTimeImmutable;
+    }
+
     public function markReady(DateTimeImmutable $takenAt, int $width, int $height, int $derivativeBytes): void
     {
         if ($this->status !== PhotoStatus::Pending) {
@@ -182,6 +202,7 @@ class Photo
         }
 
         $this->processingError = null;
+        $this->attributesExtractedAt = null;
         $this->status = PhotoStatus::Pending;
     }
 
@@ -196,6 +217,7 @@ class Photo
         }
 
         $this->processingError = null;
+        $this->attributesExtractedAt = null;
         $this->status = PhotoStatus::Pending;
     }
 }

@@ -3,5 +3,5 @@ framework:
         scoped_clients:
             inference.client:
                 base_uri: '%env(INFERENCE_SERVICE_URL)%'
-                timeout: 10
-                max_duration: 60
+                timeout: 300
+                max_duration: 600

@@ -30,8 +30,10 @@ export default class extends Controller {
             clearTimeout(this.timer);
             this.timer = null;
         }
-        const pending = this.element.querySelector('[data-status="pending"]');
-        if (!pending) {
+        const stillWorking = this.element.querySelector(
+            '[data-status="pending"], [data-tagging="pending"], [data-processing-incomplete]'
+        ) !== null;
+        if (!stillWorking) {
             return;
         }
         this.timer = setTimeout(() => this.poll(), 5000);
