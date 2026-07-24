@@ -7,6 +7,7 @@ namespace App\Controller\Admin;
 use App\Audit\AuditAction;
 use App\Audit\AuditContext;
 use App\Audit\Attribute\Audited;
+use App\Audit\Attribute\AuditIgnore;
 use App\Entity\Event;
 use App\Entity\User;
 use App\Form\EventImportType;
@@ -23,6 +24,7 @@ use App\Service\Event\Archive\SlugAlreadyExistsException;
 use App\Service\Event\EventArchiveExporter;
 use App\Service\Event\EventArchiveImporter;
 use App\Service\Mail\OrganizerMailerResolver;
+use App\Service\Notification\PendingConfirmationResender;
 use App\Service\QrCodeRenderer;
 use App\Service\Style\StyleResolver;
 use DateTimeImmutable;
@@ -72,6 +74,7 @@ final class EventController extends AbstractController
         private readonly BannerUploader $bannerUploader,
         private readonly EventArchiveExporter $exporter,
         private readonly EventArchiveImporter $importer,
+        private readonly PendingConfirmationResender $pendingResender,
     ) {
     }
 
@@ -232,13 +235,15 @@ final class EventController extends AbstractController
         }
 
         $rate           = max(1, $this->notificationRatePerMinute);
-        $confirmedCount = count($this->subscriptions->findConfirmedByEvent($event));
+        $confirmedCount = $this->subscriptions->countConfirmedByEvent($event);
 
         return $this->render('admin/event/form.html.twig', [
             'form'             => $form,
             'event'            => $event,
             'mode'             => 'edit',
             'subscriberCount'  => $this->subscriptions->countByEvent($event),
+            'confirmedCount'   => $confirmedCount,
+            'pendingCount'     => $this->subscriptions->countPendingByEvent($event),
             'mailActive'       => $mailActive,
             'readyPhotoCount'  => $this->photos->countReady($event),
             'projectedMinutes' => (int) ceil($confirmedCount / $rate),
@@ -312,6 +317,35 @@ final class EventController extends AbstractController
         $this->bus->dispatch(new SendEventLiveNotifications((int) $event->getId()));
 
         $this->addFlash('success', 'Event published. Notifying confirmed subscribers.');
+
+        return $this->redirectToRoute('admin_event_edit', ['id' => $event->getId()]);
+    }
+
+    #[Route(
+        '/admin/events/{id}/notify/resend-pending',
+        name: 'admin_event_notify_resend_pending',
+        requirements: ['id' => '\d+'],
+        methods: ['POST'],
+    )]
+    #[AuditIgnore]
+    public function resendPendingConfirmations(Event $event, Request $request): RedirectResponse
+    {
+        $this->denyAccessUnlessGranted(EventVoter::EDIT, $event);
+
+        $token = $request->request->get('_token');
+        if (!is_string($token) || !$this->isCsrfTokenValid('resend_pending_' . $event->getId(), $token)) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
+        if ($event->isPublished() || !$this->mailerResolver->isCustomActive($event->getOwner())) {
+            $this->addFlash('error', 'Cannot re-send confirmations for this event.');
+
+            return $this->redirectToRoute('admin_event_edit', ['id' => $event->getId()]);
+        }
+
+        $count = $this->pendingResender->resendAll($event);
+
+        $this->addFlash('success', sprintf('Re-sent confirmation to %d unverified subscriber(s).', $count));
 
         return $this->redirectToRoute('admin_event_edit', ['id' => $event->getId()]);
     }

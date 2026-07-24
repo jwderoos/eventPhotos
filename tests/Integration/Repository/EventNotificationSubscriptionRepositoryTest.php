@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Repository;
 
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use App\Entity\Event;
+use App\Entity\EventNotificationStatus;
 use App\Entity\EventNotificationSubscription;
 use App\Entity\User;
 use App\Repository\EventNotificationSubscriptionRepository;
@@ -63,6 +64,37 @@ final class EventNotificationSubscriptionRepositoryTest extends KernelTestCase
         $confirmedList = $this->repo->findConfirmedByEvent($event);
         $this->assertCount(1, $confirmedList);
         $this->assertSame('a@example.com', $confirmedList[0]->getEmail());
+    }
+
+    public function testStatusScopedCountsAndFindPending(): void
+    {
+        $event = $this->persistEvent('status-scoped-event');
+        $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+
+        $confirmed = new EventNotificationSubscription($event, 'confirmed@example.com', $now);
+        $confirmed->confirm($now);
+
+        $this->em->persist($confirmed);
+
+        $this->em->persist(new EventNotificationSubscription($event, 'pending-a@example.com', $now));
+        $this->em->persist(new EventNotificationSubscription($event, 'pending-b@example.com', $now));
+
+        $unsub = new EventNotificationSubscription($event, 'unsub@example.com', $now);
+        $unsub->unsubscribe($now);
+
+        $this->em->persist($unsub);
+
+        $this->em->flush();
+
+        $this->assertSame(1, $this->repo->countConfirmedByEvent($event));
+        $this->assertSame(2, $this->repo->countPendingByEvent($event));
+        $this->assertSame(4, $this->repo->countByEvent($event));
+
+        $pending = $this->repo->findPendingByEvent($event);
+        $this->assertCount(2, $pending);
+        foreach ($pending as $sub) {
+            $this->assertSame(EventNotificationStatus::Pending, $sub->getStatus());
+        }
     }
 
     public function testUniqueConstraintPerEventEmail(): void

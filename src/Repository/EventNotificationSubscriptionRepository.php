@@ -62,4 +62,46 @@ final class EventNotificationSubscriptionRepository extends ServiceEntityReposit
             ->getQuery()
             ->getSingleScalarResult();
     }
+
+    public function countConfirmedByEvent(Event $event): int
+    {
+        return (int) $this->createQueryBuilder('s')
+            ->select('COUNT(s.id)')
+            ->andWhere('s.event = :event')
+            ->andWhere('s.status = :status')
+            ->setParameter('event', $event)
+            ->setParameter('status', EventNotificationStatus::Confirmed)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    public function countPendingByEvent(Event $event): int
+    {
+        return (int) $this->createQueryBuilder('s')
+            ->select('COUNT(s.id)')
+            ->andWhere('s.event = :event')
+            ->andWhere('s.status = :status')
+            ->setParameter('event', $event)
+            ->setParameter('status', EventNotificationStatus::Pending)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * @return array<int, EventNotificationSubscription>
+     */
+    public function findPendingByEvent(Event $event): array
+    {
+        /** @var array<int, EventNotificationSubscription> $result */
+        $result = $this->createQueryBuilder('s')
+            ->andWhere('s.event = :event')
+            ->andWhere('s.status = :status')
+            ->setParameter('event', $event)
+            ->setParameter('status', EventNotificationStatus::Pending)
+            ->orderBy('s.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $result;
+    }
 }

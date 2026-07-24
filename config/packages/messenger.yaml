@@ -15,6 +15,7 @@ framework:
             'App\Message\ExtractPhotoAttributes': async
             'App\Message\SendEventLiveNotifications': async
             'App\Message\SendEventLiveEmail': async
+            'App\Message\SendSubscriptionConfirmationEmail': async
 
 when@test:
     framework:
